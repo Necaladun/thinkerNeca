@@ -55,3 +55,13 @@ The diagnostics are written to `minor_terrain_render.log` in the same folder
 as the game executable (not necessarily the current working directory).
 The custom PCX is also loaded from that executable folder. The normal map
 render entrypoint, terrain scan, asset loading, and first draw are logged.
+
+If the log reports `PCX file not found/open failed`, copy
+`assets/minor_terrain.pcx` from the repository into the **game installation**
+folder containing the actual running executable, not merely the project's
+`patch/` build output directory. Rebuilding the DLL is not required for this.
+
+For a found PCX, the Develop log separately records file size/header,
+`Buffer_load_pcx` return, image clipping dimensions, and `Sprite_extract_2`
+return. A decoded image may use a DirectDraw surface with a null raw `data`
+pointer; image dimensions now control whether extraction is attempted.
