@@ -996,6 +996,18 @@ static std::string minor_graphics_file(const char* name)
     return name;
 }
 
+// Write a fresh diagnostic header at DLL startup so a missing map callback
+// cannot be mistaken for an absent or incorrectly deployed DLL.
+void minor_graphics_startup_trace()
+{
+    const std::string path = minor_graphics_file("minor_terrain_render.log");
+    FILE* fp = fopen(path.c_str(), "w");
+    if (fp) {
+        fprintf(fp, "Thinker minor-terrain graphics: Develop build startup reached\n");
+        fclose(fp);
+    }
+}
+
 // Temporary graphics diagnostic; record only transition events.
 static void minor_graphics_trace(const char* message, int x, int y, int extra)
 {
