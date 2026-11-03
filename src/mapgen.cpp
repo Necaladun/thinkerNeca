@@ -21,8 +21,10 @@ int __cdecl near_landmark(int x, int y) {
         const int minor = LM_JUNGLE
             | (conf.modified_landmarks ? LM_URANIUM : 0);
         const int landmarks = sq->lm_items();
+        // Minor terrain has an independent ID; zero-code tiles still count.
+        const bool minor_tile = minor_landmark_at(x2, y2) != MINOR_NONE;
         if ((sq->code_at() && (landmarks & ~minor))
-            || (i < TableRange[2] && (landmarks & minor))) {
+            || (i < TableRange[2] && ((landmarks & minor) || minor_tile))) {
             return true;
         }
     }
@@ -498,8 +500,10 @@ void __cdecl world_rainfall() {
             } else if (*MapCloudCover - alt + temperature + 5 >= 2 && moisture_mod > 0) {
                 ++moisture;
             }
-            if ((landmarks & (LM_DISABLE | LM_JUNGLE)) == LM_JUNGLE && !is_ocean(sq) && alt < 6) {
-                int code = landmarks >> 24;
+            const bool minor_jungle = minor_landmark_at(x, y) == MINOR_JUNGLE;
+            if (((landmarks & (LM_DISABLE | LM_JUNGLE)) == LM_JUNGLE || minor_jungle)
+                && !is_ocean(sq) && alt < 6) {
+                int code = minor_jungle ? minor_landmark_code_at(x, y) : landmarks >> 24;
                 if (code < 0) { code = -code; }
                 if (code >= 49) {
                     if (code >= 81 || alt >= 5) { ++moisture; }
@@ -641,7 +645,8 @@ void __cdecl world_rocky() {
                     if (!(sq->landmarks & LM_FRESH) || !is_ocean(sq)) {
                         if (is_ocean(sq)) {
                             bit_set(x, y, BIT_ENERGY_RES, 1);
-                        } else if (flag || !(sq->landmarks & LM_JUNGLE)) {
+                        } else if (flag || (!(sq->landmarks & LM_JUNGLE)
+                            && minor_landmark_at(x, y) != MINOR_JUNGLE)) {
                             if (sq->is_rainy() || sq->alt_level() > ALT_ONE_ABOVE_SEA) {
                                 bit_set(x, y, BIT_MINERAL_RES, 1);
                             }
@@ -841,6 +846,7 @@ void __cdecl mod_world_monsoon(int x, int y) {
     auto eligible = [&](int tx, int ty) -> bool {
         MAP* tile = mapsq(tx, ty);
         return tile && ty >= y_a && ty <= y_b && !tile->lm_items()
+            && minor_landmark_at(tx, ty) == MINOR_NONE
             && (tile->alt_level() == ALT_SHORE_LINE
                 || tile->alt_level() == ALT_ONE_ABOVE_SEA);
     };
@@ -849,7 +855,8 @@ void __cdecl mod_world_monsoon(int x, int y) {
     // Jungle patch, leaving at least two ordinary tiles between patches.
     auto separated = [&](int tx, int ty) -> bool {
         for (auto& tile : iterate_tiles(tx, ty, 0, TableRange[2])) {
-            if (tile.sq->landmarks & LM_JUNGLE) {
+            if ((tile.sq->landmarks & LM_JUNGLE)
+                || minor_landmark_at(tile.x, tile.y) == MINOR_JUNGLE) {
                 return false;
             }
         }
@@ -949,8 +956,11 @@ void __cdecl mod_world_monsoon(int x, int y) {
             continue;
         }
         for (const Point& p : patch) {
-            bit2_set(p.x, p.y, LM_JUNGLE, true);
-            code_set(p.x, p.y, num % 121);
+            if (!minor_landmark_set(p.x, p.y, MINOR_JUNGLE,
+                static_cast<uint8_t>(num % 121))) {
+                debug("minor Jungle placement failed at %d,%d\n", p.x, p.y);
+                return;
+            }
             num++;
         }
     }
@@ -1228,10 +1238,9 @@ void __cdecl mod_world_dune(int x, int y) {
 
 
 /*
-Minor terrain is a separate per-tile layer, not one of the original 16
-LM_* landmarks. Batch 2 only generates Ironstone; Jungle and Uranium
-continue to use their existing landmark generators until later migration.
-No resource yield or sprite rendering is performed in this pass.
+Independent late minor terrain generation. All minor types occupy their
+own type/code per tile and never set native LM_* bits or landmark names.
+Jungle uses the climate-aware mod_world_monsoon generator in an earlier pass.
 */
 static void generate_minor_ironstone() {
     if (!*MapTiles || *MapAreaTiles <= 0 || *MapAreaX < 2 || *MapAreaY < 2) {
@@ -1262,9 +1271,8 @@ static void generate_minor_ironstone() {
             && minor_landmark_at(tx, ty) == MINOR_NONE;
     };
     auto separated = [&](int tx, int ty) -> bool {
-        // Two-tile buffer between completed minor patches. Treat the
-        // original Jungle/Uranium as minor terrain for spacing, while
-        // allowing Ironstone alongside other major landmark footprints.
+        // Two-tile buffer between completed minor patches and legacy
+        // native Jungle/Uranium footprints.
         for (auto& tile : iterate_tiles(tx, ty, 0, TableRange[2])) {
             if (minor_landmark_at(tile.x, tile.y) != MINOR_NONE
                 || (tile.sq->landmarks & (LM_JUNGLE | LM_URANIUM))) {
@@ -1367,8 +1375,10 @@ static void generate_minor_ironstone() {
         if ((int)patch.size() != target) {
             continue;
         }
-        for (const Point& p : patch) {
-            if (!minor_landmark_set(p.x, p.y, MINOR_IRONSTONE)) {
+        for (int i = 0; i < (int)patch.size(); ++i) {
+            const Point& p = patch[i];
+            if (!minor_landmark_set(p.x, p.y, MINOR_IRONSTONE,
+                static_cast<uint8_t>(i))) {
                 debug("minor Ironstone placement failed at %d,%d\n", p.x, p.y);
                 return;
             }
@@ -1382,10 +1392,15 @@ static void generate_minor_ironstone() {
         completed, patch_count);
 }
 
+// Late minor terrain is placed after final climate/rockiness. Jungle is
+// generated before the native major landmarks so it can influence rainfall.
 static void generate_minor_landmarks() {
-    // MINOR_JUNGLE and MINOR_URANIUM are reserved for the later migration.
-    // Never duplicate their original LM_* generation in this batch.
-    generate_minor_ironstone();
+    if (conf.modified_landmarks && conf.minor_uranium) {
+        mod_world_diamond(-1, -1);
+    }
+    if (conf.minor_ironstone) {
+        generate_minor_ironstone();
+    }
 }
 
 void __cdecl mod_world_diamond(int x, int y) {
@@ -1427,7 +1442,8 @@ void __cdecl mod_world_diamond(int x, int y) {
     auto eligible = [&](int tx, int ty) -> bool {
         MAP* tile = mapsq(tx, ty);
         // This excludes Jungle entirely, including its zero-code tiles.
-        return tile && !is_ocean(tile) && !tile->lm_items();
+        return tile && !is_ocean(tile) && !tile->lm_items()
+            && minor_landmark_at(tx, ty) == MINOR_NONE;
     };
 
     // Keep two ordinary tiles between distinct Uranium patches, Jungle,
@@ -1435,7 +1451,8 @@ void __cdecl mod_world_diamond(int x, int y) {
     // so each patch can grow contiguously without blocking itself.
     auto separated = [&](int tx, int ty) -> bool {
         for (auto& tile : iterate_tiles(tx, ty, 0, TableRange[2])) {
-            if (tile.sq->lm_items()) {
+            if (tile.sq->lm_items()
+                || minor_landmark_at(tile.x, tile.y) != MINOR_NONE) {
                 return false;
             }
         }
@@ -1541,9 +1558,12 @@ void __cdecl mod_world_diamond(int x, int y) {
         }
         for (int i = 0; i < (int)patch.size(); i++) {
             const Point& p = patch[i];
-            bit2_set(p.x, p.y, LM_URANIUM, true);
+            if (!minor_landmark_set(p.x, p.y, MINOR_URANIUM,
+                static_cast<uint8_t>(i))) {
+                debug("minor Uranium placement failed at %d,%d\n", p.x, p.y);
+                return;
+            }
             bit_set(p.x, p.y, BIT_FUNGUS, false);
-            code_set(p.x, p.y, i);
         }
         centers.push_back({seed_x, seed_y});
         completed++;
@@ -2074,6 +2094,13 @@ void world_generate(uint32_t seed) {
     mod_world_fungus(noise);
     Path_continents(Paths);
 
+    // Climate-aware Jungle exists before the major landmarks and final
+    // world_climate pass. The old "jungle" knob controls native landmarks
+    // only; minor_jungle is independently enabled by default.
+    if (conf.modified_landmarks && conf.minor_jungle) {
+        mod_world_monsoon(-1, -1);
+    }
+
     LMConfig lm;
     memcpy(&lm, &conf.landmarks, sizeof(lm));
 
@@ -2081,7 +2108,7 @@ void world_generate(uint32_t seed) {
         if (conf.world_mirror_x || conf.world_mirror_y) {
             break;
         }
-        if (lm.jungle > 0) {
+        if (!conf.modified_landmarks && lm.jungle > 0) {
             mod_world_monsoon(-1, -1);
             lm.jungle--;
         }
@@ -2101,7 +2128,7 @@ void world_generate(uint32_t seed) {
             mod_world_ridge(-1, -1);
             lm.ridge--;
         }
-        if (lm.uranium > 0) {
+        if (!conf.modified_landmarks && lm.uranium > 0) {
             mod_world_diamond(-1, -1);
             lm.uranium--;
         }
@@ -2151,6 +2178,19 @@ void world_generate(uint32_t seed) {
         if (lm.geothermal > 0) {
             mod_world_geothermal(-1, -1);
             lm.geothermal--;
+        }
+    }
+    // Remove minor terrain where a major landmark has taken precedence.
+    // The native Jungle/Uranium flags below remain reserved for vanilla-mode
+    // worlds and the map editor; they are not assigned by new minor generators.
+    for (int tile_id = 0; tile_id < *MapAreaTiles; ++tile_id) {
+        MAP& tile = (*MapTiles)[tile_id];
+        if (tile.lm_items() && *MapHalfX > 0) {
+            const int ty = tile_id / *MapHalfX;
+            const int tx = 2 * (tile_id % *MapHalfX) + (ty & 1);
+            if (minor_landmark_at(tx, ty) != MINOR_NONE) {
+                minor_landmark_clear(tx, ty);
+            }
         }
     }
     // Jungle and Uranium are mutually exclusive. Later major landmarks
