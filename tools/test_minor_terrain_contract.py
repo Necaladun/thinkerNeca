@@ -129,6 +129,15 @@ def main() -> None:
     require('minor_sprites[id].width > 0' in renderer
             and 'minor_sprites[id].height <= 56' in renderer,
             'Transparent trimming must not disable solid Ironstone art')
+    require('minor_inspector_scan_native(fp);' in renderer
+            and 'INSPECTOR SCAN' in renderer
+            and '0x4B6570' in renderer
+            and '0x4B8890' in renderer,
+            'Status feature-line diagnostics must read native executable bytes')
+    require('write_jump(0x4B6570' not in patches
+            and 'Natural[13]' not in renderer
+            and 'sq->landmarks |= LM_NEXUS' not in renderer,
+            'Tile inspector diagnostics may not spoof native landmarks')
     print('Minor-terrain structural/source invariants passed')
 
 

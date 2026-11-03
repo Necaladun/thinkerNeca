@@ -1015,6 +1015,104 @@ static std::string minor_graphics_file(const char* name)
     return name;
 }
 
+
+/*
+Read-only reconnaissance of StatusWin_draw_status. OpenSMAC reconstructs
+the terrain-feature line (river / forest / fungus) but NOT the original
+terranx.exe instruction offsets. Do not modify LM flags or replace the
+StatusWin entry point. Instead, log E8 text-call candidates and the
+native forest/fungus bit tests for instruction-level verification.
+
+The original binary is required to distinguish:
+  * feature text appended when a forest/fungus/river already exists;
+  * the empty-feature case, where the native line draw is skipped.
+A hook must handle BOTH without moving the inspector's resource and
+improvement text, or silently duplicating native lines.
+*/
+static void minor_inspector_scan_native(FILE* fp)
+{
+    if (!fp) {
+        return;
+    }
+    const uintptr_t start = 0x4B6570;
+    const uintptr_t end = 0x4B8890; // StatusWin_on_redraw begins here.
+    struct TextTarget {
+        uintptr_t address;
+        const char* name;
+        int count;
+    };
+    TextTarget targets[] = {
+        {0x5DCEA0, "Buffer_write_l_3", 0},
+        {0x5DCF40, "Buffer_write_l_4", 0},
+        {0x5DD530, "Buffer_wrap_2", 0},
+        {0x5DB580, "Buffer_write_l", 0},
+        {0x6169A0, "Strings_get", 0}
+    };
+    fprintf(fp, "INSPECTOR SCAN StatusWin_draw_status 0x%08X..0x%08X (read-only)\\n",
+        (unsigned)start, (unsigned)end);
+    const uint8_t* begin = reinterpret_cast<const uint8_t*>(start);
+    const uint8_t* finish = reinterpret_cast<const uint8_t*>(end);
+    for (const uint8_t* at = begin; at + 5 <= finish; ++at) {
+        if (*at != 0xE8) {
+            continue;
+        }
+        int32_t relative = 0;
+        memcpy(&relative, at + 1, sizeof(relative));
+        const uintptr_t dest = reinterpret_cast<uintptr_t>(at + 5) + relative;
+        for (TextTarget& target : targets) {
+            if (dest != target.address) {
+                continue;
+            }
+            ++target.count;
+            if (target.count > 36) {
+                break;
+            }
+            fprintf(fp, "INSPECTOR CALL %s at 0x%08X target=0x%08X bytes:",
+                target.name, (unsigned)(uintptr_t)at, (unsigned)dest);
+            const uint8_t* left = at >= begin + 14 ? at - 14 : begin;
+            const uint8_t* right = at + 25 < finish ? at + 25 : finish;
+            for (const uint8_t* p = left; p < right; ++p) {
+                fprintf(fp, " %02X", *p);
+            }
+            fputc('\n', fp);
+            break;
+        }
+    }
+    for (const TextTarget& target : targets) {
+        fprintf(fp, "INSPECTOR CALL COUNT %s = %d\\n", target.name, target.count);
+    }
+    const struct {
+        uint8_t literal[4];
+        const char* name;
+    } masks[] = {
+        {{0x00, 0x00, 0x20, 0x00}, "Forest BIT_FOREST (0x00200000)"},
+        {{0x20, 0x00, 0x00, 0x00}, "Fungus BIT_FUNGUS (0x00000020)"},
+        {{0x80, 0x00, 0x00, 0x00}, "River BIT_RIVER (0x00000080)"}
+    };
+    for (const auto& mask : masks) {
+        int matches = 0;
+        for (const uint8_t* at = begin; at + 4 <= finish; ++at) {
+            if (memcmp(at, mask.literal, 4)) {
+                continue;
+            }
+            ++matches;
+            if (matches > 12) {
+                continue;
+            }
+            fprintf(fp, "INSPECTOR MASK %s at 0x%08X bytes:",
+                mask.name, (unsigned)(uintptr_t)at);
+            const uint8_t* left = at >= begin + 24 ? at - 24 : begin;
+            const uint8_t* right = at + 40 < finish ? at + 40 : finish;
+            for (const uint8_t* p = left; p < right; ++p) {
+                fprintf(fp, " %02X", *p);
+            }
+            fputc('\n', fp);
+        }
+        fprintf(fp, "INSPECTOR MASK COUNT %s = %d\\n", mask.name, matches);
+    }
+    fprintf(fp, "INSPECTOR SCAN END. Bytes are candidates, not verified hooks.\\n");
+}
+
 // Write a fresh diagnostic header at DLL startup so a missing map callback
 // cannot be mistaken for an absent or incorrectly deployed DLL.
 void minor_graphics_startup_trace()
@@ -1055,6 +1153,7 @@ void minor_graphics_startup_trace()
         }
         fprintf(fp, "Native mask literals: Jungle=%d Uranium=%d\n",
             jungle_hits, uranium_hits);
+        minor_inspector_scan_native(fp);
         fclose(fp);
     }
 }

@@ -272,3 +272,44 @@ near (60,112) occupies (59,111), (61,111), (59,113), (61,113),
 (60,114), (62,114), (63,115). The save and original game's art are
 not committed to the repository. Runtime min-zoom visuals still need
 confirmation by the user.
+
+## Tile inspector: independent terrain in the Forest/Fungus feature line
+
+The requested result is **not** an additional named landmark, nor a map
+overlay. Independent Jungle, Uranium and Ironstone belong in the existing
+terrain-feature text line where the original status panel shows
+River/Forest/Fungus, preserving rockiness, rainfall, resource bonuses
+and separately listed improvements.
+
+OpenSMAC's reconstruction at `src/ui/maininfc.cpp` describes the native
+`tile_words` logic; the original executable inlines it into
+`StatusWin_draw_status` starting at `0x4B6570`. Importantly, the
+native code can skip the entire feature-text draw when none of those
+native features is present. Merely rewriting an existing nonempty line
+would silently fail for *standalone* Ironstone/Uranium/Jungle tiles.
+
+### Read-only instruction reconnaissance (first integration stage)
+
+On Develop startup, `minor_terrain_render.log` now includes an
+`INSPECTOR SCAN` section. The scan reads the original native
+`0x4B6570..0x4B8890` code, records direct E8 calls to the game text
+functions (`Buffer_write_l_3`, `Buffer_write_l_4`, `Buffer_wrap_2`,
+`Buffer_write_l` and `Strings_get`), and records byte windows near
+the native Forest, Fungus, River bit-mask constants. It writes **no
+binary patches** and changes **no status panel drawing yet**.
+
+We need this information from a supported local `terranx.exe` before
+a safe minimal instruction detour can append the minor name to the
+native feature buffer and force its display when that buffer would
+otherwise be empty. The subsequent hook must preserve calling
+conventions, source buffer capacities, fog-of-war/active-unit tile
+selection, native line positioning, and the existing Thinker patch
+sites at `0x4B6C44`, `0x4B6E4F` etc.
+
+The earlier experimental implementation from commit `a3830d1fa2`
+temporarily changed `LM_NEXUS` and `Natural[13]`; that crashed in
+the running game and MUST NOT be resurrected.
+
+This commit is intentionally a diagnostic prerequisite rather than
+a claim of completed inspector integration. No new INI setting,
+save format, gameplay yield or rendering graphics changes are needed.
