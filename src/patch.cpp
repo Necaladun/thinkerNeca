@@ -546,6 +546,32 @@ bool patch_setup(Config* cf) {
     write_jump(0x592030, (int)mod_bonus_at);
     write_jump(0x592250, (int)say_loc);
     write_jump(0x592550, (int)find_landmark);
+
+    /*
+    StatusWin::draw_status is a native engine function, so keep its entry
+    point intact and redirect direct E8 call sites to our wrapper instead.
+    Search only the known StatusWin method block and match the original call
+    target exactly; do not patch unrelated calls or globally alter LM_*.
+    */
+    {
+        const int32_t status_draw_target = 0x4B6570;
+        const int32_t status_code_begin = 0x4B4A00;
+        const int32_t status_code_end = 0x4BA200;
+        int patched = 0;
+        for (int32_t addr = status_code_begin; addr + 5 <= status_code_end; ++addr) {
+            if (*(const uint8_t*)addr != 0xE8) {
+                continue;
+            }
+            int32_t relative = 0;
+            memcpy(&relative, (const void*)(addr + 1), sizeof(relative));
+            if (addr + 5 + relative == status_draw_target) {
+                write_call(addr, (int)mod_StatusWin_draw_status);
+                ++patched;
+                addr += 4;
+            }
+        }
+        debug("minor terrain status: redirected %d draw_status calls\\n", patched);
+    }
     write_jump(0x592600, (int)new_landmark);
     write_jump(0x592650, (int)valid_landmark);
     write_jump(0x5926F0, (int)kill_landmark);
