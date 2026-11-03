@@ -56,15 +56,15 @@ void minor_native_jungle_current_hook()
 {
     __asm__ __volatile__(
         "pushal\n\t"
-        "pushl 0x24(%%ebp)\n\t"
-        "pushl 0x20(%%ebp)\n\t"
+        "pushl 0x24(%ebp)\n\t"
+        "pushl 0x20(%ebp)\n\t"
         "call _minor_render_jungle_xy\n\t"
-        "addl $8, %%esp\n\t"
-        "testl %%eax, %%eax\n\t"
+        "addl $8, %esp\n\t"
+        "testl %eax, %eax\n\t"
         "jz 1f\n\t"
-        "movl $4, 20(%%esp)\n\t"
+        "movl $4, 20(%esp)\n\t"
         "1: popal\n\t"
-        "andl $0x80000004, %%edx\n\t"
+        "andl $0x80000004, %edx\n\t"
         "pushl $0x463CCB\n\t"
         "ret\n\t"
     );
@@ -75,14 +75,14 @@ void minor_native_jungle_neighbour_hook_1()
 {
     __asm__ __volatile__(
         "pushal\n\t"
-        "pushl %%eax\n\t"
+        "pushl %eax\n\t"
         "call _minor_render_jungle_map\n\t"
-        "addl $4, %%esp\n\t"
-        "testl %%eax, %%eax\n\t"
+        "addl $4, %esp\n\t"
+        "testl %eax, %eax\n\t"
         "jz 1f\n\t"
-        "movl $4, 20(%%esp)\n\t"
+        "movl $4, 20(%esp)\n\t"
         "1: popal\n\t"
-        "andl $0x80000004, %%edx\n\t"
+        "andl $0x80000004, %edx\n\t"
         "pushl $0x463D99\n\t"
         "ret\n\t"
     );
@@ -93,14 +93,14 @@ void minor_native_jungle_neighbour_hook_2()
 {
     __asm__ __volatile__(
         "pushal\n\t"
-        "pushl %%eax\n\t"
+        "pushl %eax\n\t"
         "call _minor_render_jungle_map\n\t"
-        "addl $4, %%esp\n\t"
-        "testl %%eax, %%eax\n\t"
+        "addl $4, %esp\n\t"
+        "testl %eax, %eax\n\t"
         "jz 1f\n\t"
-        "movl $4, 20(%%esp)\n\t"
+        "movl $4, 20(%esp)\n\t"
         "1: popal\n\t"
-        "andl $0x80000004, %%edx\n\t"
+        "andl $0x80000004, %edx\n\t"
         "pushl $0x464E7E\n\t"
         "ret\n\t"
     );
