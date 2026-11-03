@@ -18,7 +18,8 @@ int __cdecl near_landmark(int x, int y) {
         // Jungle and Uranium are small terrain features, not full landmarks.
         // Keep an eight-tile radius for other landmarks and a two-tile radius
         // for these features. Check flags to include tiles with code zero.
-        const int minor = LM_JUNGLE | LM_URANIUM;
+        const int minor = LM_JUNGLE
+            | (conf.modified_landmarks ? LM_URANIUM : 0);
         const int landmarks = sq->lm_items();
         if ((sq->code_at() && (landmarks & ~minor))
             || (i < TableRange[2] && (landmarks & minor))) {
@@ -1282,7 +1283,7 @@ void __cdecl mod_world_diamond(int x, int y) {
     std::vector<Point> centers;
     int completed = 0;
     for (int attempt_patch = 0;
-        attempt_patch < patch_count * 5 && completed < patch_count;
+        attempt_patch < patch_count * 8 && completed < patch_count;
         attempt_patch++) {
         int seed_x = -1;
         int seed_y = -1;
@@ -1371,8 +1372,9 @@ void __cdecl mod_world_diamond(int x, int y) {
             selected.insert(chosen);
         }
 
-        // Never commit undersized islands. Retry elsewhere instead.
-        if (patch.size() < 3) {
+        // Only commit complete patches: retry instead of leaving a
+        // truncated deposit that drags down the six-tile average.
+        if ((int)patch.size() != target) {
             continue;
         }
         for (int i = 0; i < (int)patch.size(); i++) {
@@ -1992,10 +1994,11 @@ void world_generate(uint32_t seed) {
     // Jungle and Uranium are mutually exclusive. Later major landmarks
     // replace either terrain feature in their footprints, but preserve it
     // on surrounding tiles rather than stacking special resource bonuses.
-    const int minor_landmarks = LM_JUNGLE | LM_URANIUM;
+    const int minor_landmarks = LM_JUNGLE
+        | (conf.modified_landmarks ? LM_URANIUM : 0);
     for (int tile_id = 0; tile_id < *MapAreaTiles; tile_id++) {
         MAP& tile = (*MapTiles)[tile_id];
-        if (tile.landmarks & LM_JUNGLE) {
+        if (conf.modified_landmarks && (tile.landmarks & LM_JUNGLE)) {
             tile.landmarks &= ~LM_URANIUM;
         }
         if ((tile.landmarks & minor_landmarks)
