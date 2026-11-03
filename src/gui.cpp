@@ -416,7 +416,7 @@ void check_scroll() {
 
 #ifndef BUILD_REL
 static void minor_graphics_trace(const char* message, int x, int y, int extra);
-static void draw_minor_ironstone_map(Console* win);
+static void draw_minor_terrain_map(Console* win);
 #endif
 
 int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
@@ -448,7 +448,7 @@ int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
         if (This == MapWin) {
             // Redraw the minor layer after both full and partial passes.
             // Temporary until minor terrain has a dedicated engine layer.
-            draw_minor_ironstone_map(This);
+            draw_minor_terrain_map(This);
         }
 #endif
         return 0;
@@ -494,7 +494,7 @@ int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
         MapWin_gen_map(This, faction_id, units_only);
 #ifndef BUILD_REL
         // Reapply the custom layer after a partial redraw as well.
-        draw_minor_ironstone_map(This);
+        draw_minor_terrain_map(This);
 #endif
         // Restore This's original values
         This->MapPixelLeft = MapPixelLeft;
@@ -1601,172 +1601,121 @@ int __cdecl mod_design_new_veh(int faction_id, int unit_id) {
 
 
 /*
-Ironstone visual proof of concept. Reuse Thinker's existing per-tile
-MapWin_gen_overlays override rather than patching another binary address.
-Sprite: minor_terrain.pcx, rectangle (12,4,104,56), transparent index 253.
+Independent minor-terrain renderer. The atlas has 128x64 slots for
+Ironstone (legacy-compatible first slot), Jungle, and Uranium. The native
+LM_* sprite system and names remain untouched.
+
+This is still a Develop-only post-map overlay, NOT a verified terrain-layer
+hook: drawing over units/base graphics and PRACX support remain unresolved.
 */
-static void draw_minor_ironstone(Console* win, int x, int y)
-{
 #ifndef BUILD_REL
-    // PRACX has its own rendering hooks; defer integration with that mode.
-    static bool skip_logged = false;
+static Sprite minor_sprites[4] = {};
+static bool minor_sprite_ready[4] = {};
+static bool minor_sprites_attempted = false;
+
+static void load_minor_terrain_sprites(Buffer* canvas)
+{
+    if (minor_sprites_attempted || !canvas || !canvas->palette) {
+        return;
+    }
+    minor_sprites_attempted = true;
+    const std::string path = minor_graphics_file("minor_terrain.pcx");
+    FILE* fp = fopen(path.c_str(), "rb");
+    if (!fp) {
+        minor_graphics_trace("minor terrain PCX unavailable", 0, 0, GetLastError());
+        return;
+    }
+    fclose(fp);
+
+    Buffer image;
+    Buffer_ctor(&image);
+    const int loaded = Buffer_load_pcx(&image, path.c_str(), canvas->palette, 0, 0);
+    minor_graphics_trace("minor terrain atlas loaded / width / height",
+        loaded, image.clipRect.right, image.clipRect.bottom);
+
+    // Retain legacy Ironstone at x=12 so existing 128x64 assets continue
+    // to render it. The new 384x64 atlas adds Jungle and Uranium to the right.
+    const int sprite_x[4] = {0, 140, 268, 12};
+    for (int id = MINOR_JUNGLE; id <= MINOR_IRONSTONE; ++id) {
+        if (image.clipRect.right >= sprite_x[id] + 104
+            && image.clipRect.bottom >= 60) {
+            Sprite_ctor(&minor_sprites[id]);
+            const int result = Sprite_extract_2(
+                &minor_sprites[id], &image, 0x1FD,
+                sprite_x[id], 4, 104, 56, nullptr);
+            minor_sprite_ready[id] = result >= 0
+                && minor_sprites[id].data != nullptr
+                && minor_sprites[id].width == 104;
+            minor_graphics_trace("minor sprite id / extract result / ready",
+                id, result, minor_sprite_ready[id]);
+        } else {
+            minor_graphics_trace("minor sprite missing from atlas", id,
+                image.clipRect.right, image.clipRect.bottom);
+        }
+    }
+    Buffer_dtor(&image);
+}
+
+static void draw_minor_terrain_tile(Console* win, int x, int y)
+{
     if (conf.reduced_mode || win != MapWin || !*MapTiles
         || win->cOwner < 0 || win->cOwner >= MaxPlayerNum) {
-        if (!skip_logged) {
-            skip_logged = true;
-            minor_graphics_trace("skipped window or mode", x, y,
-                conf.reduced_mode ? 1 : (win != MapWin ? 2 : 3));
-        }
         return;
     }
-    if (minor_landmark_at(x, y) != MINOR_IRONSTONE) {
+    const MinorLandmark type = minor_landmark_at(x, y);
+    if (type <= MINOR_NONE || type > MINOR_IRONSTONE) {
         return;
-    }
-    static bool found_logged = false;
-    if (!found_logged) {
-        found_logged = true;
-        minor_graphics_trace("Ironstone tile reached renderer", x, y, *GameState);
     }
     MAP* tile = mapsq(x, y);
-    // Match the engine's revealed-map and scenario-editor display rules.
-    // Ordinary faction fog of war still hides unexplored minor terrain.
     if (!tile || !(tile->is_known(win->cOwner)
         || (*GameState & STATE_OMNISCIENT_VIEW))) {
-        static bool fog_logged = false;
-        if (!fog_logged) {
-            fog_logged = true;
-            minor_graphics_trace("Ironstone skipped by fog", x, y,
-                tile ? tile->visibility : -1);
-        }
         return;
     }
     Buffer* canvas = &win->oMainWin.oCanvas;
-    if (!canvas->palette) {
-        static bool palette_logged = false;
-        if (!palette_logged) {
-            palette_logged = true;
-            minor_graphics_trace("Ironstone canvas has no palette", x, y, 0);
-        }
+    load_minor_terrain_sprites(canvas);
+    if (!minor_sprite_ready[type]) {
         return;
     }
-    static bool attempted = false;
-    static bool ready = false;
-    static Sprite iron_sprite = {};
-    if (!attempted) {
-        attempted = true;
-        const std::string path = minor_graphics_file("minor_terrain.pcx");
-        // The previous single "missing or invalid" message concealed which
-        // stage failed. Record the actual path and the loader/extractor state.
-        {
-            const std::string log_path = minor_graphics_file("minor_terrain_render.log");
-            FILE* log = fopen(log_path.c_str(), "a");
-            if (log) {
-                fprintf(log, "PCX requested path: %s\n", path.c_str());
-                fclose(log);
-            }
-        }
-        FILE* fp = fopen(path.c_str(), "rb");
-        if (!fp) {
-            minor_graphics_trace("PCX file not found/open failed", x, y, GetLastError());
-        } else {
-            fseek(fp, 0, SEEK_END);
-            long pcx_size = ftell(fp);
-            fseek(fp, 0, SEEK_SET);
-            uint8_t header[128] = {};
-            size_t header_read = fread(header, 1, sizeof(header), fp);
-            fclose(fp);
-            minor_graphics_trace("PCX exists; size in bytes", x, y, (int)pcx_size);
-            if (header_read == sizeof(header)) {
-                minor_graphics_trace("PCX header identifier/version/planes",
-                    (int)header[0], (int)header[1], (int)header[65]);
-                minor_graphics_trace("PCX header coordinates",
-                    (int)header[8] + ((int)header[9] << 8),
-                    (int)header[10] + ((int)header[11] << 8),
-                    (int)header[3]);
-            }
-            Buffer image;
-            Buffer_ctor(&image);
-            const int load_result = Buffer_load_pcx(
-                &image, path.c_str(), canvas->palette, 0, 0);
-            minor_graphics_trace("PCX Buffer_load_pcx return", x, y, load_result);
-            minor_graphics_trace("PCX Buffer clip right/bottom",
-                image.clipRect.right, image.clipRect.bottom, image.data != nullptr);
-            minor_graphics_trace("PCX Buffer size right/bottom",
-                image.sizeRect.right, image.sizeRect.bottom,
-                image.ddSurface != nullptr);
 
-            // Buffer::data can be null for some backends; the PCX loader may
-            // have populated a DirectDraw surface. Only validate dimensions
-            // before asking the engine to extract a sprite.
-            if (image.clipRect.right >= 116 && image.clipRect.bottom >= 60) {
-                Sprite_ctor(&iron_sprite);
-                const int extract_result = Sprite_extract_2(
-                    &iron_sprite, &image, 0x1FD, 12, 4, 104, 56, nullptr);
-                minor_graphics_trace("Sprite_extract_2 return",
-                    extract_result, iron_sprite.width, iron_sprite.data != nullptr);
-                ready = iron_sprite.data != nullptr && iron_sprite.width == 104;
-            } else {
-                minor_graphics_trace("PCX loaded without expected dimensions",
-                    image.clipRect.right, image.clipRect.bottom, load_result);
-            }
-            Buffer_dtor(&image);
-        }
-        minor_graphics_trace(ready ? "PCX sprite loaded" : "PCX unavailable for drawing",
-            x, y, iron_sprite.width);
-        debug("minor terrain sprite load: %s\n", ready ? "ready" : "failed");
-    }
-    if (!ready) {
-        return;
-    }
     long px = 0;
     long py = 0;
     MapWin_tile_to_pixel(win, x, y, &px, &py);
-    int tile_width = win->PixelsPerTileX;
+    const int tile_width = win->PixelsPerTileX;
     if (tile_width > 0 && win->PixelsPerTileY > 0) {
-        int draw_width = max(1, tile_width * 3 / 4);
-        const int result = Sprite_draw_2(&iron_sprite, canvas, 253,
+        const int draw_width = max(1, tile_width * 3 / 4);
+        Sprite_draw_2(&minor_sprites[type], canvas, 253,
             (int)px + (tile_width - draw_width) / 2,
             (int)py + win->PixelsPerTileY / 8, draw_width, 104);
-        static bool draw_logged = false;
-        if (!draw_logged) {
-            draw_logged = true;
-            minor_graphics_trace("Ironstone Sprite_draw_2 invoked", x, y, result);
-            minor_graphics_trace("draw position x/y", (int)px, (int)py, draw_width);
-        }
     }
-#else
-    (void)win;
-    (void)x;
-    (void)y;
-#endif
 }
 
 /*
-Draw minor terrain after the standard MapWin_gen_map pass. This uses the same
-known-good callsites as Thinker's smooth-scrolling wrapper; it does not need
-the optional debug-goals overlay callback to run. The per-map scan is limited
-to the saved minor-terrain byte array and a handful of small Ironstone sprites.
+Draw minor terrain after the existing map pass in Develop builds. The
+tile-inspector path is separate and must not be patched by spoofing LM_*.
 */
-#ifndef BUILD_REL
-static void draw_minor_ironstone_map(Console* win)
+static void draw_minor_terrain_map(Console* win)
 {
     if (conf.reduced_mode || win != MapWin || !*MapTiles
         || *MapAreaTiles <= 0 || *MapHalfX <= 0) {
         return;
     }
     static bool first_scan = true;
-    int deposits = 0;
-    for (int id = 0; id < *MapAreaTiles; id++) {
+    int counts[4] = {};
+    for (int id = 0; id < *MapAreaTiles; ++id) {
         const int y = id / *MapHalfX;
         const int x = 2 * (id % *MapHalfX) + (y & 1);
-        if (minor_landmark_at(x, y) == MINOR_IRONSTONE) {
-            deposits++;
-            draw_minor_ironstone(win, x, y);
+        const MinorLandmark type = minor_landmark_at(x, y);
+        if (type > MINOR_NONE && type <= MINOR_IRONSTONE) {
+            counts[type]++;
+            draw_minor_terrain_tile(win, x, y);
         }
     }
     if (first_scan) {
         first_scan = false;
-        minor_graphics_trace("map scan finished; Ironstone tiles", 0, 0, deposits);
+        for (int id = MINOR_JUNGLE; id <= MINOR_IRONSTONE; ++id) {
+            minor_graphics_trace("minor terrain scan id / total tiles",
+                id, counts[id], *MapAreaTiles);
+        }
     }
 }
 #endif

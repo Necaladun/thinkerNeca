@@ -1,75 +1,62 @@
-# Independent minor terrain graphics: Ironstone proof of concept
+# Independent minor-terrain graphics — Develop-only prototype
 
-This is an experimental **Develop/Debug build only** feature. It uses the
-minor-terrain byte array and versioned SAV/MP extension from earlier batches.
-It does **not** modify original LM_* landmarks, tile resource yields, map
-generator random sequences, or vanilla PCX sheets.
+## Source artwork and atlas
 
-## Asset
+`tools/make_minor_terrain.py` builds a three-sprite, 384x64 indexed PCX
+atlas from **your locally installed `ter1.pcx`**. Pillow is required:
 
-* `assets/minor_terrain.pcx`: 128x64, 8-bit indexed PCX.
-* Derived from an original `ter1.pcx` Uranium sprite region
-  (source rectangle x=815, y=256, width=104, height=56).
-* The recoloured sprite sits at x=12, y=4, width=104, height=56.
-* Palette index 253 is the transparency key (extraction flag `0x1FD`).
-* Source `ter1.pcx` is not distributed in this repository.
-* Regenerate: `python tools/make_minor_terrain.py /path/to/ter1.pcx assets/minor_terrain.pcx` (Pillow required).
+```bash
+python tools/make_minor_terrain.py "/path/to/SMAC/ter1.pcx" "/path/to/SMAC/minor_terrain.pcx"
+```
 
-## Local deployment
+The script preserves the game's palette (index 253 is transparency),
+uses 128x64 slots and extracts 104x56 sprites. Slots:
 
-Build the Code::Blocks **Develop** target. The post-build steps copy the DLL
-and `assets/minor_terrain.pcx` into the project's `patch/` folder.
+| Slot | X offset | Feature | Source |
+| --- | ---: | --- | --- |
+| 0 | 12 | Ironstone | Rust recolour of Uranium, preserving previous Ironstone art |
+| 1 | 140 | Jungle | **Temporary stylised canopy marker**, generated in Pillow |
+| 2 | 268 | Uranium | Native Uranium sprite, copied from `ter1.pcx` at (815,256,104,56) |
 
-If running the game from another installation directory, copy **both**
-`thinker.dll` and `minor_terrain.pcx` into the game directory (next to
-`terranx.exe`). The runtime loader resolves `minor_terrain.pcx` relative to the game
-executable's directory, independently of the working directory.
+The repo **does not redistribute native game artwork**. The existing
+128x64 `assets/minor_terrain.pcx` remains a legacy Ironstone-only
+fallback (slot 0). It must be replaced with the generated three-type
+atlas to draw Jungle and Uranium. The current Jungle marker is NOT
+pixel-for-pixel native Jungle graphics; matching that texture still
+requires further engine/artwork investigation.
 
-The Develop renderer routes the normal MapWin_gen_map calls through Thinker's
-existing smooth-scrolling wrapper, including when `smooth_scrolling=0`.
-Ironstone draws after the normal map pass. The optional debug-goals overlay
-(`MapWin_gen_overlays`) is not used for custom terrain painting. No patch at
-0x466C70 is needed. Drawing remains disabled in Release and PRACX/reduced mode.
+### Deployment
 
-## Verification
+The game loads `minor_terrain.pcx` from the **same directory as
+`terranx.exe`**, not the working directory. Put the newly generated
+384x64 file there. Avoid accidentally overwriting it with the
+repository's 128x64 legacy asset during a post-build copy step.
 
-1. Generate a new game with distributed minor Ironstone or load a SAV produced
-   after minor terrain Batch 2.
-2. Reveal / inspect Ironstone tiles and confirm rust-red deposits display.
-3. Pan, zoom, inspect fog of war and ensure units, improvements and bases
-   remain visible.
-4. Save/reload and confirm the same Ironstone tiles still display.
-5. Move `minor_terrain.pcx` out of the game directory temporarily and
-   ensure a new game still renders without the custom sprite.
+## Current rendering integration
 
-Rendering is experimental and **has not yet been compiled or run in SMACX**.
-This version reuses Thinker's known map redraw callsites. For a graphics
-crash, revert the Develop-only MapWin_gen_map calls in `src/patch.cpp`
-and report the details.
+Develop builds use Thinker's existing `mod_gen_map` wrapper and
+`MapWin_tile_to_pixel` to draw registered minor sprites on explored
+tiles. `src/gui.cpp` now uses a type-indexed atlas loader and shared
+draw routine, instead of hard-coding Ironstone. Missing sprite slots
+are diagnosed in `minor_terrain_render.log`; the old 128x64 asset
+still displays Ironstone.
 
-Known limitations: only Ironstone is drawn; independent Jungle and Uranium
-now have type/code support on a migration branch but require atlas sprites
-and native-style layered drawing before they can be considered game-ready.
-No PRACX integration; presentation/scale require in-game testing.
+**This is not a final rendering implementation.** The sprites still
+draw after the normal map pass, including partial redraws. That may
+overpaint bases, improvements or units. The correct native terrain
+stage has not been established. Release builds and PRACX/reduced mode
+do not draw these independent sprites yet.
 
-The diagnostics are written to `minor_terrain_render.log` in the same folder
-as the game executable (not necessarily the current working directory).
-The custom PCX is also loaded from that executable folder. The normal map
-render entrypoint, terrain scan, asset loading, and first draw are logged.
+The tile inspector is also **not integrated**. Do not restore the
+previous crashing `StatusWin::draw_status` shim or reassign native
+landmark names.
 
-Zoom/redraw diagnostic: minor terrain is reapplied after **both** full and
-`units_only` map passes in Develop builds. The log records up to 40 distinct
-`map redraw zoom / tile-pixels / units_only` transitions. This is an interim
-measure for the original map renderer; drawing over unit sprites or other
-layering glitches are possible until the feature has a dedicated terrain
-render stage.
+## Verification needed on Windows
 
-If the log reports `PCX file not found/open failed`, copy
-`assets/minor_terrain.pcx` from the repository into the **game installation**
-folder containing the actual running executable, not merely the project's
-`patch/` build output directory. Rebuilding the DLL is not required for this.
-
-For a found PCX, the Develop log separately records file size/header,
-`Buffer_load_pcx` return, image clipping dimensions, and `Sprite_extract_2`
-return. A decoded image may use a DirectDraw surface with a null raw `data`
-pointer; image dimensions now control whether extraction is attempted.
+1. Regenerate a 384x64 atlas from the installed game's `ter1.pcx`.
+2. Start a fresh modified-landmarks map with all three `minor_*` flags enabled.
+3. Check visibility at normal/fogged zoom levels, base founding,
+   terraforming, unit occupancy, and map panning.
+4. Confirm the debug log finds three extractable sprite slots.
+5. Complete terrain-stage rendering and inspector text before treating
+   this as game-ready or merging the draft migration into `master`.
