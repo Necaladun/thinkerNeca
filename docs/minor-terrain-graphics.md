@@ -25,9 +25,10 @@ If running the game from another installation directory, copy **both**
 `terranx.exe`). The runtime loader uses the relative filename
 `minor_terrain.pcx`.
 
-This hook is disabled in Release builds and when Thinker's `reduced_mode`
-indicates PRACX, to avoid overwriting PRACX's hook at SMACX 0x466C70.
-PRACX compatibility is not implemented in this proof of concept.
+The Ironstone rendering uses the already-installed Thinker
+`MapWin_gen_overlays` hook (0x4688E0). No separate binary patch at
+0x466C70 is needed. Drawing remains disabled in Release builds and
+PRACX/reduced mode.
 
 ## Verification
 
@@ -41,9 +42,9 @@ PRACX compatibility is not implemented in this proof of concept.
    ensure a new game still renders without the custom sprite.
 
 Rendering is experimental and **has not yet been compiled or run in SMACX**.
-The entrypoint uses SMACX's per-tile hook documented by PRACX. If the build
-fails, or a crash occurs during rendering, remove the experimental
-`write_call(0x466C70, ...)` hook in `src/patch.cpp` and report the details.
+This version uses Thinker's existing map overlay function, not a new
+binary patch site. If the build fails or a rendering crash occurs, revert
+`draw_minor_ironstone(This, x, y)` in `src/gui.cpp` and report the details.
 
 Known limitations: only Ironstone is drawn; no yield modifiers or other minor
 sprites; no PRACX integration; the presentation/scale may require adjustment
