@@ -1108,8 +1108,11 @@ static void minor_inspector_scan_native(FILE* fp)
             }
             fprintf(fp, "INSPECTOR MASK %s at 0x%08X bytes:",
                 mask.name, (unsigned)(uintptr_t)at);
-            const uint8_t* left = at >= begin + 24 ? at - 24 : begin;
-            const uint8_t* right = at + 40 < finish ? at + 40 : finish;
+            // Include enough code context to reconstruct the conditional
+            // fallthrough and skip branch around the feature line; the
+            // short Jungle-mask diagnostic was insufficient for this.
+            const uint8_t* left = at >= begin + 112 ? at - 112 : begin;
+            const uint8_t* right = at + 160 < finish ? at + 160 : finish;
             for (const uint8_t* p = left; p < right; ++p) {
                 fprintf(fp, " %02X", *p);
             }
