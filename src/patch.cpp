@@ -624,6 +624,15 @@ bool patch_setup(Config* cf) {
     remove_call(0x419FB2); // base_doctors
     remove_call(0x4F7B42); // base_doctors
 
+    // Experimental Ironstone sprite proof-of-concept. This callsite is
+    // used by PRACX for its resource overlay, so do not override it when
+    // PRACX is installed. It is deliberately independent of yield code.
+#ifndef BUILD_REL
+    if (!cf->reduced_mode) {
+        write_call(0x466C70, (int)minor_terrain_overlay_thunk);
+    }
+#endif
+
     write_call(0x58D84C, (int)mod_load_map_daemon); // map_menu
     write_call(0x5AB891, (int)mod_load_map_daemon); // load_map
     write_call(0x5ABCE3, (int)mod_save_map_daemon); // save_map
