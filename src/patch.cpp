@@ -1168,6 +1168,17 @@ bool patch_setup(Config* cf) {
     if (!cf->reduced_mode) {
         write_call(0x62D3EC, (int)mod_Win_init_class);
     }
+    // Minor-terrain visuals require the standard map-pass wrapper even when
+    // smooth scrolling is disabled. The four callsites are already supported
+    // by Thinker in its smooth-scrolling mode.
+#ifndef BUILD_REL
+    if (!cf->smooth_scrolling) {
+        write_call(0x46AB81, (int)mod_gen_map);
+        write_call(0x46ABD1, (int)mod_gen_map);
+        write_call(0x46AC56, (int)mod_gen_map);
+        write_call(0x46ACC5, (int)mod_gen_map);
+    }
+#endif
     if (cf->smooth_scrolling) {
         write_offset(0x50F3DC, (void*)mod_blink_timer);
         write_call(0x46AB81, (int)mod_gen_map);
