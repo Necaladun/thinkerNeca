@@ -119,3 +119,24 @@ the supported GOG `terranx.exe` that the return address falls within
 that reconstructed function; the Windows compile check alone cannot
 establish the runtime callsite. It is an incremental integration, not a
 general mechanism for Jungle or arbitrary native landmarks.
+
+## Native Jungle graphics preview (Develop only)
+
+`minor_native_jungle_preview=1` now uses the original game's loaded
+Jungle texture array at `0x789C28` (15 textures), the 256-entry
+`RainTransition` table at `0x685484`, and the native textured polygon
+blitter at `0x61A760`. Neighbour joins recognise both independent and
+legacy Jungle, without altering the game map's native LM bits.
+
+The coordinates are reconstructed using the native terrain polygon arrays
+and `MapWin_get_corner_y_offset`, following the OpenSMAC C++ reconstruction.
+The artwork is loaded from the game's `texture.pcx` by SMAC/X itself;
+nothing needs to be extracted or redistributed.
+
+**Not a production-ready terrain-stage hook.** This Develop-only
+implementation runs through the existing late overlay callback and may
+overpaint roads or improvements. Base and vehicle-occupied tiles are skipped.
+The definitive integration must extend native Jungle recognition inside
+`MapWin_gen_terrain_poly` at instruction-verified patch points.
+No unverified binary patch has been added. Set the option to 0 to compare
+with the previous PCX fallback.

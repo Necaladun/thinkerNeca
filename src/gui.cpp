@@ -1690,6 +1690,81 @@ static void load_minor_terrain_sprites(Buffer* canvas)
     Buffer_dtor(&image);
 }
 
+// This Draw-only preview uses the game's *already loaded* Monsoon Jungle
+// textures, native RainTransition neighbour mask and native polygon blitter.
+// It doesn't modify map LM flags or ship texture.pcx-derived artwork.
+// Correct drawing order still needs an instruction-verified terrain-stage hook.
+static void draw_native_minor_jungle(Console* win, int x, int y)
+{
+    constexpr uintptr_t kTransitions = 0x685484;
+    constexpr uintptr_t kJungleTextures = 0x789C28;
+    constexpr uintptr_t kPolyX = 0x685F20;
+    constexpr uintptr_t kPolyY = 0x685F50;
+    constexpr uintptr_t kPolyCorner = 0x685F80;
+    constexpr uintptr_t kPolyUV = 0x686090;
+    constexpr uintptr_t kTextureKey = 0x9BB548;
+
+    unsigned mask = 0;
+    for (int k = 0; k < 8; ++k) {
+        const int dir = (k - 1) & 7;
+        const int nx = wrap(x + NearbyTiles[dir][0]);
+        const int ny = y + NearbyTiles[dir][1];
+        MAP* n = mapsq(nx, ny);
+        if (!n || n->alt_level() < ALT_SHORE_LINE) {
+            continue;
+        }
+        const bool native = (n->landmarks & (LM_DISABLE | LM_JUNGLE)) == LM_JUNGLE;
+        if (native || minor_landmark_at(nx, ny) == MINOR_JUNGLE) {
+            mask |= 1u << k;
+        }
+    }
+    const uint8_t* transitions = reinterpret_cast<const uint8_t*>(kTransitions);
+    const unsigned variant = transitions[2 * mask];
+    const unsigned rotation = transitions[2 * mask + 1];
+    if (variant >= 15 || rotation >= 4) {
+        minor_graphics_trace("invalid Jungle variant/rotation",
+            x, y, (int)(variant * 10 + rotation));
+        return;
+    }
+    const int* poly_x = reinterpret_cast<const int*>(kPolyX);
+    const int* poly_y = reinterpret_cast<const int*>(kPolyY);
+    const int* poly_corner = reinterpret_cast<const int*>(kPolyCorner);
+    const int (*poly_uv)[2] = reinterpret_cast<const int (*)[2]>(kPolyUV);
+    const int zoom_unit = *piZoomNum > 0 && *piZoomDenom > 0
+        ? (*piZoomNum * 50 / *piZoomDenom)
+        : ((win->ZoomFactor + 16) * 50 / 16);
+    const int q = (zoom_unit + 1) / 4;
+    const int q2 = 2 * q;
+    if (q <= 0) {
+        return;
+    }
+    long px = 0, py = 0;
+    MapWin_tile_to_pixel(win, x, y, &px, &py);
+    long lift = 0;
+    for (int corner = 1; corner <= 4; ++corner) {
+        lift += pfncMapGetCornerYOffset(win, x, y, corner);
+    }
+    lift >>= 2;
+    Vert points[8] = {};
+    Vert uv[8] = {};
+    for (int corner = 0; corner < 4; ++corner) {
+        const int i = corner * 3 + 1;
+        points[2 * corner] = (int)px + q2 * 2 + poly_x[i] * q2;
+        points[2 * corner + 1] = (int)py + (int)lift + q2
+            + poly_y[i] * q
+            - pfncMapGetCornerYOffset(win, x, y, poly_corner[i]);
+        const int j = ((rotation + corner) & 3) * 3 + 1;
+        uv[2 * corner] = poly_uv[j][0];
+        uv[2 * corner + 1] = poly_uv[j][1];
+    }
+    Texture* tex = reinterpret_cast<Texture*>(kJungleTextures + variant * 0x70);
+    int* texture_key = reinterpret_cast<int*>(kTextureKey);
+    const int old_key = *texture_key;
+    *texture_key = 9;
+    Texture_draw_upper_threshold_trans(tex, &win->oMainWin.oCanvas, points, 4, uv);
+    *texture_key = old_key;
+}
+
 static void draw_minor_terrain_tile(Console* win, int x, int y)
 {
     if (conf.reduced_mode || win != MapWin || !*MapTiles
@@ -1714,6 +1789,11 @@ static void draw_minor_terrain_tile(Console* win, int x, int y)
         // The feature remains in the underlying minor tile data.
         return;
     }
+    if (type == MINOR_JUNGLE && conf.minor_native_jungle_preview) {
+        draw_native_minor_jungle(win, x, y);
+        return;
+    }
+
     Buffer* canvas = &win->oMainWin.oCanvas;
     load_minor_terrain_sprites(canvas);
     if (!minor_sprite_ready[type]) {
