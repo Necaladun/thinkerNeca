@@ -954,81 +954,212 @@ void __cdecl mod_world_ruin(int x, int y) {
 
 void __cdecl mod_world_dune(int x, int y) {
     world_rainfall();
-    MAP* sq = mapsq(x, y);
-    if (!sq) {
-        int attempts = 0;
-        int half_height = *MapAreaY / 2;
-        do {
+
+    // Keep a solid 3x3 core, but let the perimeter vary between maps. Shape
+    // randomness uses its own generator so it does not perturb landmark RNG.
+    const bool fixed_location = mapsq(x, y) != NULL;
+    const int attempts = fixed_location ? 1 : 1000;
+    int oasis_i = -1;
+    GameRandom shape_rand;
+
+    for (int attempt = 0; attempt < attempts; attempt++) {
+        if (!fixed_location) {
+            int half_height = *MapAreaY / 2;
             y = map_rand.get(half_height) + half_height - *MapAreaY / 4;
             x = map_rand.get(*MapAreaX);
             x = ((x ^ y) & 1) ^ x;
-            sq = mapsq(x, y);
-            if (++attempts >= 1000) {
-                return;
-            }
-        } while (is_ocean(sq) || sq->is_rainy_or_moist() || near_landmark(x, y));
-    }
-    for (int i = 0; i < TableRange[2]; i++) {
-        int x2 = wrap(x + TableOffsetX[i]);
-        int y2 = y + TableOffsetY[i];
-        sq = mapsq(x2, y2);
-        if (sq && (!is_ocean(sq) || i < 9 || map_rand.get(3))) {
-            if (i == 2 || i == 7) {
-                world_alt_set(x2, y2, ALT_ONE_ABOVE_SEA, true);
-            } else {
-                world_alt_set(x2, y2, ALT_SHORE_LINE, true);
-            }
-            bit_set(x2, y2, BIT_FUNGUS, false);
-            bit2_set(x2, y2, LM_DUNES, true);
-            rocky_set(x2, y2, LEVEL_FLAT);
-            code_set(x2, y2, i);
+        }
+        MAP* center = mapsq(x, y);
+        if (!center || is_ocean(center) || center->is_rainy_or_moist()
+            || near_landmark(x, y)) {
+            continue;
+        }
 
-            // Dunes have only three designated energy deposits and one oasis.
-            sq->items &= ~(BIT_BONUS_RES | BIT_NUTRIENT_RES | BIT_MINERAL_RES | BIT_ENERGY_RES);
-            if (i == 2 || i == 7 || i == 4) {
-                sq->items |= BIT_BONUS_RES | BIT_ENERGY_RES;
+        // The 3x3 core must exist entirely on land. Raising the two dune
+        // crests would otherwise reclaim neighbouring ocean squares.
+        bool valid = true;
+        for (int i = 0; i < 9; i++) {
+            MAP* tile = mapsq(wrap(x + TableOffsetX[i]), y + TableOffsetY[i]);
+            if (!tile || is_ocean(tile) || tile->lm_items()) {
+                valid = false;
+                break;
             }
         }
-    }
+        if (!valid) {
+            continue;
+        }
+        const int crest1_x = wrap(x + TableOffsetX[2]);
+        const int crest1_y = y + TableOffsetY[2];
+        const int crest2_x = wrap(x + TableOffsetX[7]);
+        const int crest2_y = y + TableOffsetY[7];
+        if (is_coast(crest1_x, crest1_y, false)
+            || is_coast(crest2_x, crest2_y, false)) {
+            continue;
+        }
 
-    // Put the oasis away from the two raised dune crests. Otherwise a later
-    // shoreline pass can raise a shallow lake back into dry land.
-    const int crest1_x = wrap(x + TableOffsetX[2]);
-    const int crest1_y = y + TableOffsetY[2];
-    const int crest2_x = wrap(x + TableOffsetX[7]);
-    const int crest2_y = y + TableOffsetY[7];
-    int oasis_x = -1;
-    int oasis_y = -1;
+        shape_rand.reseed(pair_hash(*MapRandomSeed ^ 0xD0E5u,
+            (uint32_t(x) << 16) ^ uint32_t(y)));
 
-    // Prefer an enclosed lake within the inner ring, then other inland
-    // locations; accept a coastal location only as a last resort.
-    for (int pass = 0; pass < 3 && oasis_x < 0; pass++) {
-        for (int i = 1; i < TableRange[2]; i++) {
+        // Reserve a truly inland oasis before removing any perimeter tiles.
+        // Prefer the core if a site is far enough from both raised crests.
+        std::vector<int> inner_oases;
+        std::vector<int> outer_oases;
+        for (int i = 0; i < TableRange[2]; i++) {
             if (i == 2 || i == 7 || i == 4) {
-                continue; // Reserved energy deposits
+                continue; // Three energy deposits
             }
             int x2 = wrap(x + TableOffsetX[i]);
             int y2 = y + TableOffsetY[i];
             MAP* tile = mapsq(x2, y2);
-            if (!tile || !(tile->landmarks & LM_DUNES)
-                || is_ocean(tile) || tile->alt_level() != ALT_SHORE_LINE
+            if (!tile || is_ocean(tile) || tile->lm_items()
+                || is_coast(x2, y2, false)
                 || map_range(x2, y2, crest1_x, crest1_y) <= 1
                 || map_range(x2, y2, crest2_x, crest2_y) <= 1) {
                 continue;
             }
-            if ((pass == 0 && i >= 9) || (pass < 2 && is_coast(x2, y2, false))) {
-                continue;
+            if (i < 9) {
+                inner_oases.push_back(i);
+            } else {
+                outer_oases.push_back(i);
             }
-            oasis_x = x2;
-            oasis_y = y2;
-            break;
+        }
+        const std::vector<int>& candidates =
+            !inner_oases.empty() ? inner_oases : outer_oases;
+        if (candidates.empty()) {
+            continue;
+        }
+        oasis_i = candidates[shape_rand.get((int)candidates.size())];
+        break;
+    }
+    if (oasis_i < 0) {
+        return;
+    }
+
+    std::vector<uint8_t> footprint(TableRange[3], 0);
+    for (int i = 0; i < 9; i++) {
+        footprint[i] = 1;
+    }
+
+    // Start with the available land in the 5x5 middle ring. Ocean and
+    // existing landmarks are natural boundaries, not tiles to terraform.
+    int middle_count = 0;
+    for (int i = 9; i < TableRange[2]; i++) {
+        MAP* tile = mapsq(wrap(x + TableOffsetX[i]), y + TableOffsetY[i]);
+        if (tile && !is_ocean(tile) && !tile->lm_items()) {
+            footprint[i] = 1;
+            middle_count++;
         }
     }
-    if (oasis_x >= 0) {
-        world_alt_set(oasis_x, oasis_y, ALT_OCEAN_SHELF, true);
-        bit2_set(oasis_x, oasis_y, LM_FRESH, true);
-        bit_set(oasis_x, oasis_y, BIT_BONUS_RES | BIT_NUTRIENT_RES, true);
+    footprint[oasis_i] = 1;
+
+    // Cut a few short, connected notches into the middle-ring boundary.
+    // Coastal gaps count toward irregularity, so keep smaller coastal
+    // rings more intact instead of making the Dunes disappear.
+    int remove_budget = min(3 + shape_rand.get(3),
+        max(0, middle_count - max(6, (middle_count * 2 + 2) / 3)));
+    for (int notch = 0; notch < 3 && remove_budget > 0; notch++) {
+        std::vector<int> anchors;
+        for (int i = 9; i < TableRange[2]; i++) {
+            if (footprint[i] && i != oasis_i) {
+                anchors.push_back(i);
+            }
+        }
+        if (anchors.empty()) {
+            break;
+        }
+        int anchor = anchors[shape_rand.get((int)anchors.size())];
+        footprint[anchor] = 0;
+        remove_budget--;
+
+        // Sometimes extend the notch by removing an adjacent outer tile.
+        if (remove_budget > 0 && shape_rand.get(4) != 0) {
+            std::vector<int> neighbours;
+            int ax = wrap(x + TableOffsetX[anchor]);
+            int ay = y + TableOffsetY[anchor];
+            for (int j = 9; j < TableRange[2]; j++) {
+                if (footprint[j] && j != oasis_i
+                    && map_range(ax, ay, wrap(x + TableOffsetX[j]),
+                        y + TableOffsetY[j]) <= 1) {
+                    neighbours.push_back(j);
+                }
+            }
+            if (!neighbours.empty()) {
+                footprint[neighbours[shape_rand.get((int)neighbours.size())]] = 0;
+                remove_budget--;
+            }
+        }
     }
+
+    // Add one to four small, connected protrusions from the 7x7 ring.
+    // Prefer tiles touching at least two existing Dunes tiles, avoiding
+    // isolated fingers. Never fill coastal ocean or another landmark.
+    int fringe_count = 1 + shape_rand.get(4);
+    for (int added = 0; added < fringe_count; added++) {
+        std::vector<int> good;
+        std::vector<int> possible;
+        for (int i = TableRange[2]; i < TableRange[3]; i++) {
+            int x2 = wrap(x + TableOffsetX[i]);
+            int y2 = y + TableOffsetY[i];
+            MAP* tile = mapsq(x2, y2);
+            if (!tile || is_ocean(tile) || tile->lm_items() || footprint[i]) {
+                continue;
+            }
+            int adjacent = 0;
+            for (int j = 0; j < TableRange[3]; j++) {
+                if (footprint[j] && map_range(x2, y2,
+                    wrap(x + TableOffsetX[j]), y + TableOffsetY[j]) <= 1) {
+                    adjacent++;
+                }
+            }
+            if (adjacent > 0) {
+                possible.push_back(i);
+                if (adjacent >= 2) {
+                    good.push_back(i);
+                }
+            }
+        }
+        const std::vector<int>& choices = !good.empty() ? good : possible;
+        if (choices.empty()) {
+            break;
+        }
+        footprint[choices[shape_rand.get((int)choices.size())]] = 1;
+    }
+
+    // All chosen tiles are land before this point. Lower the footprint
+    // first, then raise the two crests to retain their energy advantage.
+    for (int i = 0; i < TableRange[3]; i++) {
+        if (!footprint[i]) {
+            continue;
+        }
+        int x2 = wrap(x + TableOffsetX[i]);
+        int y2 = y + TableOffsetY[i];
+        world_alt_set(x2, y2, ALT_SHORE_LINE, true);
+        bit_set(x2, y2, BIT_FUNGUS, false);
+        bit2_set(x2, y2, LM_DUNES, true);
+        rocky_set(x2, y2, LEVEL_FLAT);
+        code_set(x2, y2, i);
+
+        // Only the three energy deposits and the freshwater oasis
+        // may have resource bonuses anywhere inside Great Dunes.
+        MAP* tile = mapsq(x2, y2);
+        tile->items &= ~(BIT_BONUS_RES | BIT_NUTRIENT_RES
+            | BIT_MINERAL_RES | BIT_ENERGY_RES);
+        if (i == 2 || i == 7 || i == 4) {
+            tile->items |= BIT_BONUS_RES | BIT_ENERGY_RES;
+        }
+    }
+    for (int i = 0; i < 2; i++) {
+        const int crest_i = i == 0 ? 2 : 7;
+        world_alt_set(wrap(x + TableOffsetX[crest_i]),
+            y + TableOffsetY[crest_i], ALT_ONE_ABOVE_SEA, true);
+    }
+
+    // The shallow inland lake is the sole nutrient resource.
+    int oasis_x = wrap(x + TableOffsetX[oasis_i]);
+    int oasis_y = y + TableOffsetY[oasis_i];
+    world_alt_set(oasis_x, oasis_y, ALT_OCEAN_SHELF, true);
+    bit2_set(oasis_x, oasis_y, LM_FRESH, true);
+    bit_set(oasis_x, oasis_y, BIT_BONUS_RES | BIT_NUTRIENT_RES, true);
     name_landmark(x, y + 2, LM_DUNES);
 }
 
