@@ -417,6 +417,7 @@ void check_scroll() {
 #ifndef BUILD_REL
 static void minor_graphics_trace(const char* message, int x, int y, int extra);
 static void draw_minor_terrain_map(Console* win);
+static void draw_minor_terrain_tile(Console* win, int x, int y);
 #endif
 
 int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
@@ -448,7 +449,9 @@ int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
         if (This == MapWin) {
             // Redraw the minor layer after both full and partial passes.
             // Temporary until minor terrain has a dedicated engine layer.
-            draw_minor_terrain_map(This);
+            if (conf.minor_render_mode == 0) {
+                draw_minor_terrain_map(This);
+            }
         }
 #endif
         return 0;
@@ -494,7 +497,9 @@ int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
         MapWin_gen_map(This, faction_id, units_only);
 #ifndef BUILD_REL
         // Reapply the custom layer after a partial redraw as well.
-        draw_minor_terrain_map(This);
+        if (conf.minor_render_mode == 0) {
+            draw_minor_terrain_map(This);
+        }
 #endif
         // Restore This's original values
         This->MapPixelLeft = MapPixelLeft;
@@ -1044,6 +1049,29 @@ void __thiscall MapWin_gen_overlays(Console* This, int x, int y)
     if (first_overlay_call) {
         first_overlay_call = false;
         minor_graphics_trace("original overlay callback entered", x, y, This == MapWin);
+    }
+    // Use an existing Thinker per-tile draw callback as a development
+    // alternative to the current post-map paint. Its order relative to
+    // native base/unit passes still needs in-game validation.
+    if (This == MapWin && conf.minor_render_mode == 1) {
+        draw_minor_terrain_tile(This, x, y);
+    }
+    // Diagnostic name is shown on the map only, never written to the
+    // native status panel or its landmark table.
+    if (This == MapWin && conf.minor_debug_tile_names
+        && StatusWin->tile_x == x && StatusWin->tile_y == y) {
+        const char* name = minor_terrain_name_at(x, y);
+        MAP* sq = mapsq(x, y);
+        if (name[0] && sq && sq->is_known(This->cOwner)
+            && This->cOwner >= 0 && This->cOwner < MaxPlayerNum) {
+            RECT label_rect;
+            MapWin_tile_to_pixel(This, x, y, &label_rect.left, &label_rect.top);
+            label_rect.right = label_rect.left + This->PixelsPerTileX;
+            label_rect.bottom = label_rect.top + This->PixelsPerTileY;
+            Buffer_set_text_color(&This->oMainWin.oCanvas, ColorWhite, 0, 1, 1);
+            Buffer_set_font(&This->oMainWin.oCanvas, &This->oFont2, 0, 0, 0);
+            Buffer_write_cent_l_7(&This->oMainWin.oCanvas, name, &label_rect, 20);
+        }
     }
 #endif
     Buffer* Canvas = &This->oMainWin.oCanvas;
@@ -1670,7 +1698,10 @@ static void draw_minor_terrain_tile(Console* win, int x, int y)
     }
     MAP* tile = mapsq(x, y);
     if (!tile || !(tile->is_known(win->cOwner)
-        || (*GameState & STATE_OMNISCIENT_VIEW))) {
+        || (*GameState & STATE_OMNISCIENT_VIEW))
+        || tile->is_base() || (tile->items & BIT_VEH_IN_TILE)) {
+        // A post-map proof-of-concept must not paint over base/unit art.
+        // The feature remains in the underlying minor tile data.
         return;
     }
     Buffer* canvas = &win->oMainWin.oCanvas;

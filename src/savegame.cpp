@@ -26,6 +26,10 @@ const MinorTerrainDefinition& minor_terrain_definition(MinorLandmark type) {
     return MinorTerrainDefinitions[id < MINOR_TYPE_COUNT ? id : 0];
 }
 
+const char* minor_terrain_name_at(int x, int y) {
+    return minor_terrain_definition(minor_landmark_at(x, y)).name;
+}
+
 void minor_landmark_reset() {
     if (*MapTiles && *MapAreaTiles > 0) {
         minor_landmarks.assign(*MapAreaTiles, MinorTerrainTile{MINOR_NONE, 0});

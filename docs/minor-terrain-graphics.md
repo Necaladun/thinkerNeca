@@ -61,3 +61,25 @@ landmark names.
 4. Confirm the debug log finds three extractable sprite slots.
 5. Complete terrain-stage rendering and inspector text before treating
    this as game-ready or merging the draft migration into `master`.
+
+## Existing per-tile rendering callback — experimental A/B mode
+
+The Thinker executable already replaces `MapWin_gen_overlays` at
+`0x4688E0`. The new `minor_render_mode` option chooses between:
+
+- `minor_render_mode=0` (default): existing post-`MapWin_gen_map`
+  whole-map drawing. Known risk: incorrect layering / units-only redraws.
+- `minor_render_mode=1`: draws each minor sprite inside the existing
+  per-tile `MapWin_gen_overlays` callback. This avoids the repeated
+  whole-map sprite scan and may integrate more naturally with native
+  tile painting, but its order relative to units and improvements is
+  **not yet established** without an in-game comparison.
+
+No new binary hook, status-window wrapper or `LM_*` flag spoofing is used.
+Both modes suppress overlay sprites on tiles containing bases/vehicles to
+avoid covering unit artwork while rendering order remains uncertain.
+
+For visual debugging, `minor_debug_tile_names=1` paints the definition's
+name on a hovered map tile through the same supported per-tile drawing
+callback (Develop only). This is **not** the native tile-inspector label,
+and deliberately makes no claim to solve that outstanding integration.

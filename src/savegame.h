@@ -37,6 +37,7 @@ struct MinorTerrainDefinition {
     MinorGenerationPhase generation_phase;
 };
 const MinorTerrainDefinition& minor_terrain_definition(MinorLandmark type);
+const char* minor_terrain_name_at(int x, int y);
 
 MinorLandmark minor_landmark_at(int x, int y);
 uint8_t minor_landmark_code_at(int x, int y);

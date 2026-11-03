@@ -184,6 +184,10 @@ struct Config {
     int minor_jungle = 1;
     int minor_uranium = 1;
     int minor_ironstone = 1;
+    // Develop-only diagnostic: 0=post-map proof of concept,
+    // 1=existing per-tile MapWin_gen_overlays callback.
+    int minor_render_mode = 0;
+    int minor_debug_tile_names = 0;
     int time_warp_mod = 1;
     int time_warp_techs = 5;
     int time_warp_projects = 1;
