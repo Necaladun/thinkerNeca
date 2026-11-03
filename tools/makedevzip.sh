@@ -6,6 +6,7 @@ if [ -e "patch/thinker.dll" ]; then
     mkdir -p build/tmp
     cd build/tmp
     cp -f ../../patch/{thinker.exe,thinker.dll} .
+    cp -f ../../assets/minor_terrain.pcx .
     cp -fr ../../docs/* .
     7z a -mx9 -sdel ../../$ZIP .
   fi
