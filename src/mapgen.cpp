@@ -11,7 +11,16 @@ int __cdecl near_landmark(int x, int y) {
     for (int i = 0; i < TableRange[8]; i++) {
         int x2 = wrap(x + TableOffsetX[i]);
         int y2 = y + TableOffsetY[i];
-        if (code_at(x2, y2)) {
+        MAP* sq = mapsq(x2, y2);
+        if (!sq) {
+            continue;
+        }
+        // Treat Jungle as terrain: other landmarks retain their original
+        // eight-tile spacing, while Jungle only blocks centres within two.
+        // Flag checks also catch Jungle tiles with a zero landmark code.
+        const int landmarks = sq->lm_items();
+        if ((sq->code_at() && landmarks != LM_JUNGLE)
+            || (i < TableRange[2] && (landmarks & LM_JUNGLE))) {
             return true;
         }
     }
@@ -1029,7 +1038,7 @@ void __cdecl mod_world_dune(int x, int y) {
         bool valid = true;
         for (int i = 0; i < 9; i++) {
             MAP* tile = mapsq(wrap(x + TableOffsetX[i]), y + TableOffsetY[i]);
-            if (!tile || is_ocean(tile) || tile->lm_items()) {
+            if (!tile || is_ocean(tile) || (tile->lm_items() & ~LM_JUNGLE)) {
                 valid = false;
                 break;
             }
@@ -1060,7 +1069,7 @@ void __cdecl mod_world_dune(int x, int y) {
             int x2 = wrap(x + TableOffsetX[i]);
             int y2 = y + TableOffsetY[i];
             MAP* tile = mapsq(x2, y2);
-            if (!tile || is_ocean(tile) || tile->lm_items()
+            if (!tile || is_ocean(tile) || (tile->lm_items() & ~LM_JUNGLE)
                 || is_coast(x2, y2, false)
                 || map_range(x2, y2, crest1_x, crest1_y) <= 1
                 || map_range(x2, y2, crest2_x, crest2_y) <= 1) {
@@ -1090,11 +1099,11 @@ void __cdecl mod_world_dune(int x, int y) {
     }
 
     // Start with the available land in the 5x5 middle ring. Ocean and
-    // existing landmarks are natural boundaries, not tiles to terraform.
+    // other landmarks remain boundaries, while Jungle can be replaced.
     int middle_count = 0;
     for (int i = 9; i < TableRange[2]; i++) {
         MAP* tile = mapsq(wrap(x + TableOffsetX[i]), y + TableOffsetY[i]);
-        if (tile && !is_ocean(tile) && !tile->lm_items()) {
+        if (tile && !is_ocean(tile) && !(tile->lm_items() & ~LM_JUNGLE)) {
             footprint[i] = 1;
             middle_count++;
         }
@@ -1150,7 +1159,7 @@ void __cdecl mod_world_dune(int x, int y) {
             int x2 = wrap(x + TableOffsetX[i]);
             int y2 = y + TableOffsetY[i];
             MAP* tile = mapsq(x2, y2);
-            if (!tile || is_ocean(tile) || tile->lm_items() || footprint[i]) {
+            if (!tile || is_ocean(tile) || (tile->lm_items() & ~LM_JUNGLE) || footprint[i]) {
                 continue;
             }
             int adjacent = 0;
@@ -1834,6 +1843,16 @@ void world_generate(uint32_t seed) {
         if (lm.geothermal > 0) {
             mod_world_geothermal(-1, -1);
             lm.geothermal--;
+        }
+    }
+    // Later landmarks replace Jungle on intersecting tiles instead of
+    // stacking their nutrient and rainfall effects. Outside them, Jungle
+    // remains unchanged as a special terrain feature.
+    for (int tile_id = 0; tile_id < *MapAreaTiles; tile_id++) {
+        MAP& tile = (*MapTiles)[tile_id];
+        if ((tile.landmarks & LM_JUNGLE)
+            && (tile.lm_items() & ~LM_JUNGLE)) {
+            tile.landmarks &= ~LM_JUNGLE;
         }
     }
     fixup_landmarks();
