@@ -140,3 +140,18 @@ The definitive integration must extend native Jungle recognition inside
 `MapWin_gen_terrain_poly` at instruction-verified patch points.
 No unverified binary patch has been added. Set the option to 0 to compare
 with the previous PCX fallback.
+
+## Native instruction reconnaissance (no game binary redistributed)
+
+Develop startup now logs the location and a small surrounding byte window
+for occurrences of the mask constants `0x80000004` (native Jungle) and
+`0x80000008` (native Uranium) inside
+`MapWin_gen_terrain_poly` (`0x4632D0..0x466600`).
+Results go to `minor_terrain_render.log`.
+
+This is **read-only instrumentation**. Matching a mask constant does
+*not* prove that an instruction is safe to replace. Before adding an
+insertion hook we still must inspect instruction boundaries, branches,
+register/stack liveness and existing Thinker/PRACX patch overlaps. The
+binary bytes are not copied into the repository; a developer can inspect
+the short diagnostic log from the supported local executable.

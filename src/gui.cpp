@@ -1023,6 +1023,38 @@ void minor_graphics_startup_trace()
     FILE* fp = fopen(path.c_str(), "w");
     if (fp) {
         fprintf(fp, "Thinker minor-terrain graphics: Develop build startup reached\n");
+
+        // Instruction reconnaissance only: the original SMAX executable
+        // uses masks 0x80000004 (Jungle) and 0x80000008 (Uranium).
+        // Scan the native terrain function for the *literal constants*
+        // and log adjacent instruction bytes. A match is NOT a validated
+        // hook site. Never modify executable instructions here.
+        const uint8_t* begin = reinterpret_cast<const uint8_t*>(0x4632D0);
+        const uint8_t* end = reinterpret_cast<const uint8_t*>(0x466600);
+        int jungle_hits = 0, uranium_hits = 0;
+        for (const uint8_t* p = begin; p + 4 <= end; ++p) {
+            const bool jungle_mask = p[0] == 0x04 && p[1] == 0
+                && p[2] == 0 && p[3] == 0x80;
+            const bool uranium_mask = p[0] == 0x08 && p[1] == 0
+                && p[2] == 0 && p[3] == 0x80;
+            if (!jungle_mask && !uranium_mask) {
+                continue;
+            }
+            int& hits = jungle_mask ? jungle_hits : uranium_hits;
+            if (++hits > 20) {
+                continue;
+            }
+            fprintf(fp, "Native %s mask candidate 0x%08X:",
+                jungle_mask ? "Jungle" : "Uranium", (unsigned)(uintptr_t)p);
+            const uint8_t* left = p - 16 < begin ? begin : p - 16;
+            const uint8_t* right = p + 24 > end ? end : p + 24;
+            for (const uint8_t* b = left; b != right; ++b) {
+                fprintf(fp, " %02X", *b);
+            }
+            fprintf(fp, "\n");
+        }
+        fprintf(fp, "Native mask literals: Jungle=%d Uranium=%d\n",
+            jungle_hits, uranium_hits);
         fclose(fp);
     }
 }
