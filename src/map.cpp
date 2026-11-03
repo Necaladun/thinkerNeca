@@ -941,8 +941,12 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
     if (!sq) {
         return 0;
     }
+    // Minor Ironstone is stored independently of the 16 native LM_* flags.
+    // Grant its mineral via the same landmark-bonus path as Garland Crater:
+    // base-square bonuses, mine interactions and mineral-cap rules match.
+    const bool minor_ironstone = minor_landmark_at(x, y) == MINOR_IRONSTONE;
     bool has_limit = true;
-    bool bonus_landmark = false;
+    bool bonus_landmark = minor_ironstone;
     bool bonus_mineral = bonus_at(x, y) == RES_MINERAL;
     bool is_base = sq->is_base();
     int alt = sq->alt_level();
@@ -952,7 +956,7 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
     || (sq->landmarks & LM_VOLCANO && sq->code_at() < 9)
     || (sq->landmarks & LM_FOSSIL && sq->code_at() < 6)
     || (sq->landmarks & LM_CANYON)) {
-        bonus_landmark = !(sq->landmarks & LM_DISABLE);
+        bonus_landmark |= !(sq->landmarks & LM_DISABLE);
     }
     int value = bonus_landmark + (bonus_mineral ? ResInfo->bonus_sq.mineral : 0);
 
@@ -1043,7 +1047,10 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
         }
     }
     // Original function can return inconsistent sea mineral output when base_id is not set
-    assert((base_id < 0 && alt == ALT_OCEAN_SHELF)
+    // The unmodified executable does not know about our independent
+    // minor-terrain array, so its baseline output is not expected to match.
+    assert(minor_ironstone
+        || (base_id < 0 && alt == ALT_OCEAN_SHELF)
         || (has_limit && !bonus_mineral && conf.tile_output_limit[1] != 2)
         || (value == mine_yield(faction_id, base_id, x, y, flag)));
     return value;
@@ -1554,6 +1561,7 @@ int item_yield(int x, int y, int faction_id, int bonus, MapItem item) {
         if (sq->items & BIT_RIVER && !is_ocean(sq)) {
             E++;
         }
+        if (minor_landmark_at(x, y) == MINOR_IRONSTONE) { M++; }
         if (sq->landmarks & LM_CRATER && sq->code_at() < 9) { M++; }
         if (sq->landmarks & LM_VOLCANO && sq->code_at() < 9) { M++; E++; }
         if (sq->landmarks & LM_JUNGLE) { N++; }
