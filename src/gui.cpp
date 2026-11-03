@@ -1479,10 +1479,6 @@ void __thiscall ReportWin_close_handler(SubInterface* This)
 }
 
 /*
-Fix foreign base names being visible in unexplored tiles when issuing move to or patrol
-orders to the tiles. This version adds visibility checks for all base tiles.
-*/
-/*
 The native tile-status renderer only prints #NATURAL short names for tiles
 bearing one of the original LM_* flags. Minor terrain deliberately lives in
 a separate savegame extension, so named-landmark entries alone cannot make
@@ -1542,6 +1538,10 @@ void __thiscall mod_StatusWin_draw_status(
     sq->landmarks = original_flags;
 }
 
+/*
+Fix foreign base names being visible in unexplored tiles when issuing move to or patrol
+orders to the tiles. This version adds visibility checks for all base tiles.
+*/
 void __cdecl say_loc(char* dest, int x, int y, int a4, int a5, int a6)
 {
     int base_id = -1;

@@ -564,13 +564,13 @@ bool patch_setup(Config* cf) {
             }
             int32_t relative = 0;
             memcpy(&relative, (const void*)(addr + 1), sizeof(relative));
-            if (addr + 5 + relative == status_draw_target) {
+            if (relative == status_draw_target - (addr + 5)) {
                 write_call(addr, (int)mod_StatusWin_draw_status);
                 ++patched;
                 addr += 4;
             }
         }
-        debug("minor terrain status: redirected %d draw_status calls\\n", patched);
+        debug("minor terrain status: redirected %d draw_status calls\n", patched);
     }
     write_jump(0x592600, (int)new_landmark);
     write_jump(0x592650, (int)valid_landmark);
