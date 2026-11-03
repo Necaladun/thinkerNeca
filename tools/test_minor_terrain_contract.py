@@ -155,9 +155,10 @@ def main() -> None:
             and 'minor_inspector_length_inner(char* text, int tile_half_x, int tile_y)' in renderer
             and "const size_t capacity = 256;" in renderer
             and "memcpy(end, name, name_len + 1);" in renderer
-            and "'INSPECTOR HOOK native feature strlen'" in renderer,
+            and '"INSPECTOR HOOK native feature strlen' in renderer,
             'Feature-line append needs native ABI, bounded output and logging')
     require('sq->is_known(MapWin->cOwner)' in renderer
+            and 'length + separator_len >= capacity' in renderer
             and 'name_len >= capacity - length - separator_len' in renderer,
             'Native Inspector hook must respect fog and buffer capacity')
     print('Minor-terrain structural/source invariants passed')
