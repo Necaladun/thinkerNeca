@@ -143,6 +143,23 @@ def main() -> None:
             and 'Natural[13]' not in renderer
             and 'sq->landmarks |= LM_NEXUS' not in renderer,
             'Tile inspector diagnostics may not spoof native landmarks')
+    require('minor_native_inspector=1' in ini
+            and 'MATCH("minor_native_inspector")' in cfg,
+            'Native Inspector hook needs a reversible configuration switch')
+    require('const int site = 0x4B7A0C;' in patches
+            and '0xE8, 0xCF, 0xD9, 0x18, 0x00' in patches
+            and 'memcmp((const void*)site, expected, sizeof(expected))' in patches
+            and 'write_call(site, (int)minor_native_inspector_strlen_hook);' in patches,
+            'Only the verified native Inspector strlen call may be redirected')
+    require('int __cdecl minor_native_inspector_strlen_hook()' in renderer
+            and 'minor_inspector_length_inner(char* text, int tile_half_x, int tile_y)' in renderer
+            and "const size_t capacity = 256;" in renderer
+            and "memcpy(end, name, name_len + 1);" in renderer
+            and "'INSPECTOR HOOK native feature strlen'" in renderer,
+            'Feature-line append needs native ABI, bounded output and logging')
+    require('sq->is_known(MapWin->cOwner)' in renderer
+            and 'name_len >= capacity - length - separator_len' in renderer,
+            'Native Inspector hook must respect fog and buffer capacity')
     print('Minor-terrain structural/source invariants passed')
 
 

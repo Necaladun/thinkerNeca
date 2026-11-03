@@ -288,6 +288,32 @@ native code can skip the entire feature-text draw when none of those
 native features is present. Merely rewriting an existing nonempty line
 would silently fail for *standalone* Ironstone/Uranium/Jungle tiles.
 
+### Native tile Inspector feature-line hook (candidate for in-game test)
+
+The user's Develop diagnostic captured the native feature-line flow:
+`StatusWin_draw_status` composes River/Forest/Fungus in the original
+256-byte `StrBuffer` (address `0x9B86A0`) and executes a five-byte
+`call strlen` at `0x4B7A0C` (expected bytes `E8 CF D9 18 00`).
+The subsequent branch at `0x4B7A16` skips drawing if the returned
+length is zero, so intercepting this *one callsite* also handles standalone
+minor tiles without an existing native feature.
+
+`minor_native_inspector=1` (default) installs a Develop-only and
+non-PRACX `strlen` call redirect **only when all five bytes match**.
+The cdecl thunk supplies the native tile coordinates (ESI = x/2,
+EDI = y) to a bounded formatter. It appends `, Ironstone`,
+`, Uranium` or `, Jungle` to the existing feature buffer, or the
+bare name when empty, with no more than 255 bytes including a final NUL.
+Existing rendering and line positioning remain native; no LM flags,
+map codes, landmark names or save bytes change.
+
+The startup log now records `INSPECTOR HOOK native feature strlen ...
+active=1` for installed hooks and `active=0` for unsupported
+preimages. Set `minor_native_inspector=0` to disable the experiment.
+**Not yet tested in a running game.** Test standalone and combined
+feature text, clicking and hovering tiles, fog, base/vehicle tiles,
+tab/redraw changes and save/reload before merging.
+
 ### Read-only instruction reconnaissance (first integration stage)
 
 On Develop startup, `minor_terrain_render.log` now includes an

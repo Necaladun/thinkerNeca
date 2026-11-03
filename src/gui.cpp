@@ -1187,8 +1187,85 @@ static std::string minor_inspector_feature_line(const char* native, int x, int y
     return line;
 }
 
+// Report whether the verified native inspector callsite was installed.
+void minor_graphics_inspector_hook_result(int addr, bool active)
+{
+    const std::string path = minor_graphics_file("minor_terrain_render.log");
+    FILE* fp = fopen(path.c_str(), "a");
+    if (fp) {
+        fprintf(fp, "INSPECTOR HOOK native feature strlen site=0x%08X active=%d\n",
+            (unsigned)addr, active ? 1 : 0);
+        fclose(fp);
+    }
+}
+
+#if defined(__GNUC__) && defined(__i386__)
+// At 0x4B7A0C, native ESI is tile x/2 and EDI is tile y, as verified by
+// the immediately preceding native MAP index calculation. The original
+// function has completed the River/Forest/Fungus line in StrBuffer and
+// calls strlen to decide whether to draw that line. We add only the
+// independent feature name, without modifying MAP flags, #NATURAL names,
+// the whole StatusWin function or its layout/line position.
+extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x, int tile_y)
+{
+    if (!text) {
+        return 0;
+    }
+    const size_t length = strlen(text);
+    // OpenSMAC's reconstructed original globals.h: StrBuffer is char[256]
+    // at 0x9B86A0. Accept only this exact native buffer/callsite.
+    const size_t capacity = 256;
+    if (text != reinterpret_cast<char*>(0x9B86A0)
+        || length >= capacity || !*MapTiles || !*MapHalfX
+        || tile_half_x < 0 || tile_half_x >= *MapHalfX
+        || tile_y < 0 || tile_y >= *MapAreaY
+        || MapWin->cOwner < 0 || MapWin->cOwner >= MaxPlayerNum) {
+        return static_cast<int>(length);
+    }
+    const int x = 2 * tile_half_x + (tile_y & 1);
+    MAP* sq = mapsq(x, tile_y);
+    if (!sq || !(sq->is_known(MapWin->cOwner)
+        || (*GameState & STATE_OMNISCIENT_VIEW))) {
+        return static_cast<int>(length);
+    }
+    const char* name = minor_terrain_name_at(x, tile_y);
+    if (!name || !name[0]) {
+        return static_cast<int>(length);
+    }
+    const size_t name_len = strlen(name);
+    const size_t separator_len = length ? 2 : 0;
+    if (name_len >= capacity - length - separator_len) {
+        return static_cast<int>(length);
+    }
+    char* end = text + length;
+    if (separator_len) {
+        *end++ = ',';
+        *end++ = ' ';
+    }
+    memcpy(end, name, name_len + 1);
+    return static_cast<int>(length + separator_len + name_len);
+}
+
+// Native caller already pushed one cdecl char* parameter; at shim entry
+// ESI/EDI belong to StatusWin_draw_status. Pass those saved coordinates
+// to the safe C++ append helper and retain the normal strlen return/ABI.
+extern "C" __attribute__((naked, used))
+int __cdecl minor_native_inspector_strlen_hook()
+{
+    __asm__ __volatile__(
+        "movl 4(%esp), %eax\n\t"
+        "pushl %edi\n\t"
+        "pushl %esi\n\t"
+        "pushl %eax\n\t"
+        "call _minor_inspector_length_inner\n\t"
+        "addl $12, %esp\n\t"
+        "ret\n\t"
+    );
+}
+#endif
+
 // Confirm the independent registry returns the intended text for the
-// exact hovered/inspected tile. This does NOT alter StatusWin contents.
+// exact hovered/inspected tile. The optional native hook is separate.
 static void minor_inspector_trace_hover(int x, int y)
 {
     static int reports = 0, previous_x = -1, previous_y = -1;

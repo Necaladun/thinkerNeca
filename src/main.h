@@ -190,6 +190,8 @@ struct Config {
     // Draw custom Ironstone during the native special-resource stage;
     // uses a runtime-verified renderer bonus_at callsite in Develop.
     int minor_native_ironstone = 1;
+    // Develop-only, expected-byte-validated native tile-inspector feature-line append.
+    int minor_native_inspector = 1;
     // Develop-only: original loaded Jungle textures, drawn at an overlay
     // stage until the internal native terrain predicate can be patched.
     int minor_native_jungle_preview = 1;

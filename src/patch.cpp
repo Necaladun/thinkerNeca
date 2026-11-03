@@ -5,6 +5,30 @@
 #include "savegame.h"
 
 
+// From the user's supported terranx.exe inspection:
+ // 0x4B7A07 pushes StrBuffer, then 0x4B7A0C calls strlen.
+ // The return value controls the native feature-text empty-line skip
+ // (JE 0x4B7C27), so appending here supports standalone minor terrain.
+static bool install_minor_native_inspector()
+{
+#if defined(__GNUC__) && defined(__i386__) && !defined(BUILD_REL)
+    const int site = 0x4B7A0C;
+    // A verified, complete five-byte native E8 call to strlen (0x6453E0).
+    const byte expected[5] = {0xE8, 0xCF, 0xD9, 0x18, 0x00};
+    const bool valid = !memcmp((const void*)site, expected, sizeof(expected));
+    minor_graphics_inspector_hook_result(site, valid);
+    if (!valid) {
+        // Fail closed for alternate executables/patch overlaps, not by
+        // redirecting arbitrary instructions or touching native LM state.
+        return false;
+    }
+    write_call(site, (int)minor_native_inspector_strlen_hook);
+    return true;
+#else
+    return false;
+#endif
+}
+
 static bool install_minor_native_ironstone()
 {
 #if defined(__GNUC__) && defined(__i386__) && !defined(BUILD_REL)
@@ -1464,6 +1488,12 @@ bool patch_setup(Config* cf) {
 #ifndef BUILD_REL
     if (cf->minor_native_ironstone && !cf->reduced_mode) {
         install_minor_native_ironstone();
+    }
+#endif
+
+#ifndef BUILD_REL
+    if (cf->minor_native_inspector && !cf->reduced_mode) {
+        install_minor_native_inspector();
     }
 #endif
 
