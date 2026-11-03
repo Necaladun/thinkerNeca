@@ -44,6 +44,8 @@ jobs:
           python tools/make_minor_terrain.py assets/minor_terrain.pcx build/ci/minor_terrain.pcx
       - name: Check independent terrain source contract
         run: python tools/test_minor_terrain_contract.py
+      - name: Check independent minor-terrain SAV decoder
+        run: python tools/test_minor_save.py
       - name: Upload Windows Develop binaries
         uses: actions/upload-artifact@v4
         with:
