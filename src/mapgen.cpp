@@ -620,6 +620,9 @@ void __cdecl world_rocky() {
                 && sq->code_at() != 20)) {
                     int value = mod_minerals_at(x, y);
                     assert(value == minerals_at(x, y));
+                    if ((sq->landmarks & (LM_URANIUM | LM_DISABLE)) == LM_URANIUM) {
+                        value = max(value, LEVEL_ROLLING);
+                    }
                     rocky_set(x, y, value);
                     if (!(sq->landmarks & LM_FRESH) || !is_ocean(sq)) {
                         if (is_ocean(sq)) {
