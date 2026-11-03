@@ -4,6 +4,112 @@
 // Due to internal implementation differences, any FILE* pointers must
 // never be passed directly from modified to original functions or vice versa.
 
+
+/*
+Minor terrain storage. Indexed exactly like MAP tiles but kept separate
+from the fixed-size MAP struct and all 16 original landmark flags.
+*/
+static std::vector<uint8_t> minor_landmarks;
+static const char MinorLandmarkMagic[8] = {'T', 'H', 'M', 'I', 'N', '0', '0', '1'};
+static const uint32_t MinorLandmarkVersion = 1;
+
+void minor_landmark_reset() {
+    if (*MapTiles && *MapAreaTiles > 0) {
+        minor_landmarks.assign(*MapAreaTiles, MINOR_NONE);
+    } else {
+        minor_landmarks.clear();
+    }
+}
+
+MinorLandmark minor_landmark_at(int x, int y) {
+    if (!*MapTiles || minor_landmarks.size() != (size_t)*MapAreaTiles) {
+        return MINOR_NONE;
+    }
+    MAP* tile = mapsq(x, y);
+    if (!tile) {
+        return MINOR_NONE;
+    }
+    return static_cast<MinorLandmark>(minor_landmarks[tile - *MapTiles]);
+}
+
+bool minor_landmark_set(int x, int y, MinorLandmark type) {
+    if (!*MapTiles || minor_landmarks.size() != (size_t)*MapAreaTiles) {
+        return false;
+    }
+    MAP* tile = mapsq(x, y);
+    if (!tile) {
+        return false;
+    }
+    minor_landmarks[tile - *MapTiles] = static_cast<uint8_t>(type);
+    return true;
+}
+
+void minor_landmark_clear(int x, int y) {
+    minor_landmark_set(x, y, MINOR_NONE);
+}
+
+static size_t minor_landmark_count() {
+    return std::count_if(minor_landmarks.begin(), minor_landmarks.end(),
+        [](uint8_t type) { return type != MINOR_NONE; });
+}
+
+/*
+Versioned extension follows original map blocks in SAV and MP files.
+The optional signature also permits reading original map/save files: when
+absent, rewind so the rest of game_data reads from the correct offset.
+*/
+static int minor_landmark_write(FILE* fp) {
+    if (minor_landmarks.size() != (size_t)*MapAreaTiles) {
+        debug("minor terrain write error: count=%u expected=%d\n",
+            (unsigned)minor_landmarks.size(), *MapAreaTiles);
+        return 1;
+    }
+    const uint32_t count = *MapAreaTiles;
+    if (!fwrite(MinorLandmarkMagic, sizeof(MinorLandmarkMagic), 1u, fp)
+        || !fwrite(&MinorLandmarkVersion, sizeof(MinorLandmarkVersion), 1u, fp)
+        || !fwrite(&count, sizeof(count), 1u, fp)
+        || !fwrite(minor_landmarks.data(), count, 1u, fp)) {
+        return 1;
+    }
+    debug_ver("minor terrain write: tiles=%u nonempty=%u first=%u\n",
+        count, (unsigned)minor_landmark_count(),
+        count ? (unsigned)minor_landmarks[0] : 0u);
+    return 0;
+}
+
+static int minor_landmark_read(FILE* fp) {
+    const long offset = ftell(fp);
+    if (offset < 0) {
+        return 1;
+    }
+    char marker[sizeof(MinorLandmarkMagic)];
+    if (fread(marker, sizeof(marker), 1u, fp)
+        && !memcmp(marker, MinorLandmarkMagic, sizeof(marker))) {
+        uint32_t version = 0;
+        uint32_t count = 0;
+        if (!fread(&version, sizeof(version), 1u, fp)
+            || !fread(&count, sizeof(count), 1u, fp)
+            || version != MinorLandmarkVersion || count != (uint32_t)*MapAreaTiles
+            || minor_landmarks.size() != count
+            || !fread(minor_landmarks.data(), count, 1u, fp)) {
+            debug("minor terrain read error: version=%u count=%u expected=%d\n",
+                version, count, *MapAreaTiles);
+            return 1;
+        }
+        debug_ver("minor terrain read: tiles=%u nonempty=%u first=%u\n",
+            count, (unsigned)minor_landmark_count(),
+            count ? (unsigned)minor_landmarks[0] : 0u);
+    } else {
+        clearerr(fp);
+        if (fseek(fp, offset, SEEK_SET)) {
+            return 1;
+        }
+        // map_init has set all minor tiles to MINOR_NONE.
+        debug_ver("minor terrain read: no extension, empty terrain\n");
+    }
+    return 0;
+}
+
 const char* FileExtMap = "MP";
 const char* FileExtScn = "SC";
 const char* FileExtSav = "SAV";
@@ -622,6 +728,7 @@ int __cdecl encrypt_read(void* dst_ptr, size_t len, size_t cnt, FILE* fp) {
 }
 
 void __cdecl map_shutdown() {
+    minor_landmarks.clear();
     if (*MapTiles) {
         mem_free(*MapTiles);
     }
@@ -648,6 +755,13 @@ void __cdecl map_wipe() {
         (*MapTiles)[i].val2 = 0xF;
         (*MapTiles)[i].owner = -1;
     }
+    minor_landmark_reset();
+    // Opt-in storage smoke test: Develop build with debug_verbose=1.
+    // Marker has no gameplay or graphic effects in Batch 1.
+    if (DEBUG && conf.debug_verbose && *MapAreaTiles > 0) {
+        minor_landmarks[0] = MINOR_IRONSTONE;
+        debug("minor terrain smoke test: set tile 0 to Ironstone\n");
+    }
     reset_state();
     mapdata.clear();
     mapnodes.clear();
@@ -672,6 +786,7 @@ int __cdecl map_init() {
     *MapAbstractCount = *MapAbstractY * ((*MapAbstractX + 1) / 2);
     *MapAbstract = static_cast<uint8_t*>(mem_get(*MapAbstractCount));
     if (*MapAbstract) {
+        minor_landmark_reset();
         mapwin_terrain_fixup();
         return 0;
     }
@@ -683,6 +798,7 @@ int __cdecl map_init() {
     }
     *MapTiles = nullptr;
     *MapAbstract = nullptr;
+    minor_landmarks.clear();
     return 1;
 }
 
@@ -693,7 +809,10 @@ int __cdecl map_write(FILE* fp) {
     if (!fwrite(*MapTiles, sizeof(MAP) * (*MapAreaTiles), 1u, fp)) {
         return 1;
     }
-    return fwrite(*MapAbstract, *MapAbstractCount, 1u, fp) == 0;
+    if (!fwrite(*MapAbstract, *MapAbstractCount, 1u, fp)) {
+        return 1;
+    }
+    return minor_landmark_write(fp);
 }
 
 int __cdecl map_read(FILE* fp) {
@@ -723,6 +842,9 @@ int __cdecl map_read(FILE* fp) {
         return 1;
     }
     if (!fread(*MapAbstract, *MapAbstractCount, 1u, fp)) {
+        return 1;
+    }
+    if (minor_landmark_read(fp)) {
         return 1;
     }
     fixup_landmarks();
