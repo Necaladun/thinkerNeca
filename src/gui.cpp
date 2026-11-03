@@ -1234,7 +1234,8 @@ extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x,
     }
     const size_t name_len = strlen(name);
     const size_t separator_len = length ? 2 : 0;
-    if (name_len >= capacity - length - separator_len) {
+    if (length + separator_len >= capacity
+        || name_len >= capacity - length - separator_len) {
         return static_cast<int>(length);
     }
     char* end = text + length;
