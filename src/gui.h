@@ -67,6 +67,7 @@ int __cdecl mod_blink_timer();
 void __cdecl mod_turn_timer();
 int __thiscall mod_calc_dim(Console* This);
 int __thiscall mod_gen_map(Console* This, int faction_id, int units_only);
+void __cdecl minor_terrain_overlay_thunk();
 void __thiscall MapWin_gen_overlays(Console* This, int x, int y);
 int __thiscall SetupWin_buffer_draw(Buffer* src, Buffer* dst, int a3, int a4, int a5, int a6, int a7);
 int __thiscall SetupWin_buffer_copy(
