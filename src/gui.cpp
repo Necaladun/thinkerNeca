@@ -1062,15 +1062,17 @@ void __thiscall MapWin_gen_overlays(Console* This, int x, int y)
         && StatusWin->tile_x == x && StatusWin->tile_y == y) {
         const char* name = minor_terrain_name_at(x, y);
         MAP* sq = mapsq(x, y);
-        if (name[0] && sq && sq->is_known(This->cOwner)
-            && This->cOwner >= 0 && This->cOwner < MaxPlayerNum) {
+        if (name[0] && sq && This->cOwner >= 0
+            && This->cOwner < MaxPlayerNum && sq->is_known(This->cOwner)) {
             RECT label_rect;
             MapWin_tile_to_pixel(This, x, y, &label_rect.left, &label_rect.top);
             label_rect.right = label_rect.left + This->PixelsPerTileX;
             label_rect.bottom = label_rect.top + This->PixelsPerTileY;
+            char label[64] = {};
+            strcpy_n(label, sizeof(label), name);
             Buffer_set_text_color(&This->oMainWin.oCanvas, ColorWhite, 0, 1, 1);
             Buffer_set_font(&This->oMainWin.oCanvas, &This->oFont2, 0, 0, 0);
-            Buffer_write_cent_l_7(&This->oMainWin.oCanvas, name, &label_rect, 20);
+            Buffer_write_cent_l_7(&This->oMainWin.oCanvas, label, &label_rect, 20);
         }
     }
 #endif
