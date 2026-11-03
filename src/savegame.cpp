@@ -756,12 +756,15 @@ void __cdecl map_wipe() {
         (*MapTiles)[i].owner = -1;
     }
     minor_landmark_reset();
-    // Opt-in storage smoke test: Develop build with debug_verbose=1.
-    // Marker has no gameplay or graphic effects in Batch 1.
-    if (DEBUG && conf.debug_verbose && *MapAreaTiles > 0) {
+    // Temporary storage smoke test: generated maps in the Develop/Debug
+    // builds have Ironstone (value 3) on tile index 0, for SAV/MP roundtrip
+    // verification. No resource or graphic effects exist in Batch 1.
+    // Remove this probe when minor-terrain generation is implemented.
+#ifndef BUILD_REL
+    if (*MapAreaTiles > 0) {
         minor_landmarks[0] = MINOR_IRONSTONE;
-        debug("minor terrain smoke test: set tile 0 to Ironstone\n");
     }
+#endif
     reset_state();
     mapdata.clear();
     mapnodes.clear();
