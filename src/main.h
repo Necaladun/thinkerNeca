@@ -181,6 +181,9 @@ struct Config {
     int world_mirror_x = 0;
     int world_mirror_y = 0;
     int modified_landmarks = 0;
+    int minor_jungle = 1;
+    int minor_uranium = 1;
+    int minor_ironstone = 1;
     int time_warp_mod = 1;
     int time_warp_techs = 5;
     int time_warp_projects = 1;

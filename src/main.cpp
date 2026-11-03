@@ -298,6 +298,12 @@ int option_handler(void* user, const char* section, const char* name, const char
         cf->landmarks.crater = max(0, atoi(value));
     } else if (MATCH("volcano")) {
         cf->landmarks.volcano = max(0, atoi(value));
+    } else if (MATCH("minor_jungle")) {
+        cf->minor_jungle = !!atoi(value);
+    } else if (MATCH("minor_uranium")) {
+        cf->minor_uranium = !!atoi(value);
+    } else if (MATCH("minor_ironstone")) {
+        cf->minor_ironstone = !!atoi(value);
     } else if (MATCH("jungle")) {
         cf->landmarks.jungle = max(0, atoi(value));
     } else if (MATCH("uranium")) {

@@ -812,6 +812,7 @@ int __cdecl mod_crop_yield(int faction_id, int base_id, int x, int y, int flag) 
     int alt = sq->alt_level();
     bool has_limit = false;
     bool bonus_landmark = false;
+    const int minor_nutrients = minor_terrain_definition(minor_landmark_at(x, y)).nutrient;
     bool bonus_nutrient = bonus_at(x, y) == RES_NUTRIENT;
     bool is_base = sq->is_base();
     int planet = Factions[faction_id].SE_planet_pending;
@@ -828,6 +829,7 @@ int __cdecl mod_crop_yield(int faction_id, int base_id, int x, int y, int flag) 
         if (bonus_landmark) {
             value++;
         }
+        value += minor_nutrients;
         if (has_fac_built(FAC_PRESSURE_DOME, base_id)
         || has_fac_built(FAC_RECYCLING_TANKS, base_id)) {
             value += ResInfo->recycling_tanks.nutrient;
@@ -863,6 +865,7 @@ int __cdecl mod_crop_yield(int faction_id, int base_id, int x, int y, int flag) 
             }
             if (bonus_landmark)
                 value++;
+            value += minor_nutrients;
             if (alt == ALT_OCEAN_SHELF || *ExpansionEnabled) {
                 if (sq->items & BIT_FARM) {
                     value += ResInfo->improved_sea.nutrient;
@@ -887,6 +890,7 @@ int __cdecl mod_crop_yield(int faction_id, int base_id, int x, int y, int flag) 
                 if (bonus_landmark) {
                     value++;
                 }
+                value += minor_nutrients;
             } else {
                 if (sq->is_rocky()) {
                     value = 0;
@@ -899,6 +903,7 @@ int __cdecl mod_crop_yield(int faction_id, int base_id, int x, int y, int flag) 
                 if (bonus_landmark) {
                     value++;
                 }
+                value += minor_nutrients;
                 if (value < 0) {
                     value = 0;
                 }
@@ -930,7 +935,8 @@ int __cdecl mod_crop_yield(int faction_id, int base_id, int x, int y, int flag) 
             value--;
         }
     }
-    assert((conf.soil_improve_value && sq->items & (BIT_CONDENSER|BIT_SOIL_ENRICHER))
+    assert(minor_nutrients
+        || (conf.soil_improve_value && sq->items & (BIT_CONDENSER|BIT_SOIL_ENRICHER))
         || (has_limit && !bonus_nutrient && conf.tile_output_limit[0] != 2)
         || value == crop_yield(faction_id, base_id, x, y, flag));
     return value;
@@ -941,12 +947,10 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
     if (!sq) {
         return 0;
     }
-    // Minor Ironstone is stored independently of the 16 native LM_* flags.
-    // Grant its mineral via the same landmark-bonus path as Garland Crater:
-    // base-square bonuses, mine interactions and mineral-cap rules match.
-    const bool minor_ironstone = minor_landmark_at(x, y) == MINOR_IRONSTONE;
+    // Minor minerals use the same cap/mine interaction as a landmark bonus.
+    const int minor_minerals = minor_terrain_definition(minor_landmark_at(x, y)).mineral;
     bool has_limit = true;
-    bool bonus_landmark = minor_ironstone;
+    bool bonus_landmark = false;
     bool bonus_mineral = bonus_at(x, y) == RES_MINERAL;
     bool is_base = sq->is_base();
     int alt = sq->alt_level();
@@ -958,7 +962,8 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
     || (sq->landmarks & LM_CANYON)) {
         bonus_landmark |= !(sq->landmarks & LM_DISABLE);
     }
-    int value = bonus_landmark + (bonus_mineral ? ResInfo->bonus_sq.mineral : 0);
+    int value = bonus_landmark + minor_minerals
+        + (bonus_mineral ? ResInfo->bonus_sq.mineral : 0);
 
     if (is_base) {
         value += ResInfo->base_sq.mineral;
@@ -1003,7 +1008,7 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
                 if (!modifier) {
                     modifier = 1;
                 }
-                if (bonus_mineral || bonus_landmark) {
+                if (bonus_mineral || bonus_landmark || minor_minerals) {
                     modifier++;
                 }
                 if (!(sq->items & BIT_ROAD) && !flag
@@ -1049,7 +1054,7 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
     // Original function can return inconsistent sea mineral output when base_id is not set
     // The unmodified executable does not know about our independent
     // minor-terrain array, so its baseline output is not expected to match.
-    assert(minor_ironstone
+    assert(minor_minerals
         || (base_id < 0 && alt == ALT_OCEAN_SHELF)
         || (has_limit && !bonus_mineral && conf.tile_output_limit[1] != 2)
         || (value == mine_yield(faction_id, base_id, x, y, flag)));
@@ -1064,6 +1069,7 @@ int __cdecl mod_energy_yield(int faction_id, int base_id, int x, int y, int flag
     bool is_fungus = false;
     bool has_limit = true;
     bool bonus_energy = bonus_at(x, y) == RES_ENERGY;
+    const int minor_energy = minor_terrain_definition(minor_landmark_at(x, y)).energy;
     bool is_base = sq->is_base();
     int economy = Factions[faction_id].SE_economy_pending
         + (base_id >= 0 && Bases[base_id].golden_age_active() ? 1 : 0);
@@ -1152,6 +1158,7 @@ int __cdecl mod_energy_yield(int faction_id, int base_id, int x, int y, int flag
         }
     }
     if (!is_fungus) {
+        value += minor_energy;
         if (sq->items & BIT_RIVER && alt >= ALT_SHORE_LINE) {
             value++;
         }
@@ -1198,7 +1205,8 @@ int __cdecl mod_energy_yield(int faction_id, int base_id, int x, int y, int flag
     value = (solar_flares ? 3 * value : value);
 
     // Original function can return inconsistent base output when economy is between 3 and 4
-    assert((is_base && economy >= 3 && economy <= 4)
+    assert(minor_energy
+        || (is_base && economy >= 3 && economy <= 4)
         || (!is_base && sq->items & BIT_MONOLITH && !has_tech(Rules->tech_preq_allow_3_energy_sq, faction_id))
         || (has_limit && !bonus_energy && conf.tile_output_limit[2] != 2)
         || (value == energy_yield(faction_id, base_id, x, y, flag)));
@@ -1561,7 +1569,10 @@ int item_yield(int x, int y, int faction_id, int bonus, MapItem item) {
         if (sq->items & BIT_RIVER && !is_ocean(sq)) {
             E++;
         }
-        if (minor_landmark_at(x, y) == MINOR_IRONSTONE) { M++; }
+        const MinorTerrainDefinition& minor = minor_terrain_definition(minor_landmark_at(x, y));
+        N += minor.nutrient;
+        M += minor.mineral;
+        E += minor.energy;
         if (sq->landmarks & LM_CRATER && sq->code_at() < 9) { M++; }
         if (sq->landmarks & LM_VOLCANO && sq->code_at() < 9) { M++; E++; }
         if (sq->landmarks & LM_JUNGLE) { N++; }
