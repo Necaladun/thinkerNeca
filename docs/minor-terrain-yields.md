@@ -27,9 +27,20 @@ regenerating terrain or altering `THMIN001` tile identifiers. Existing names
 are reused rather than duplicated. If the original 64-name array is full,
 the mineral bonus still works but the new name cannot be registered.
 
-The name is passed through the **native named-landmark lookup**; display in
-specific windows (particularly the tile-status text) still requires in-game
-verification.
+The name is passed through the **native named-landmark lookup**. The tile
+status window is a separate path: native `#NATURAL` short labels are normally
+shown only when a tile has an LM_* flag. The new `mod_StatusWin_draw_status`
+adapter supplies a temporary `LM_NEXUS` marker and short label while drawing,
+then restores both the tile flags and the native label pointers. Neither
+the map/save data nor resource computations are persistently changed.
+
+Future minor terrain types only need a new branch in
+`minor_terrain_square_label()` in `src/gui.cpp` to acquire a status label.
+
+**In-game verification pending**: direct call-site discovery, positioning,
+major-landmark coexistence, fog handling and save/reload require a rebuilt
+Develop DLL and inspection in the game. This code is not validated by the
+static source review alone.
 
 ## In-game tests
 
