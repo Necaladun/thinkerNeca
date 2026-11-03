@@ -845,6 +845,9 @@ void __cdecl mod_world_monsoon(int x, int y) {
     // Some candidate sites will be unusable on very dry or fragmented maps.
     // It is better to leave part of the budget unused than merge patches.
     for (int patch_no = 0; patch_no < 32 && num < limit; patch_no++) {
+        if (limit - num < 6) {
+            break; // Do not spend the remaining budget on tiny fragments
+        }
         int seed_x = -1;
         int seed_y = -1;
         int best_score = -1;
