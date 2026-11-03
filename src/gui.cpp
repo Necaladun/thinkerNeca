@@ -414,7 +414,30 @@ void check_scroll() {
     flushlog();
 }
 
+#ifndef BUILD_REL
+static void minor_graphics_trace(const char* message, int x, int y, int extra);
+static void draw_minor_ironstone_map(Console* win);
+#endif
+
 int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
+#ifndef BUILD_REL
+    static bool first_map_draw = true;
+    if (first_map_draw) {
+        first_map_draw = false;
+        minor_graphics_trace("MapWin_gen_map call routed via Thinker", 0, 0, units_only);
+    }
+#endif
+    // With smooth scrolling disabled, this must behave exactly like the
+    // original MapWin_gen_map call, apart from the development overlay.
+    if (!conf.smooth_scrolling) {
+        MapWin_gen_map(This, faction_id, units_only);
+#ifndef BUILD_REL
+        if (This == MapWin && !units_only) {
+            draw_minor_ironstone_map(This);
+        }
+#endif
+        return 0;
+    }
     if (This == MapWin) {
         // Save these values to restore them later
         int MapPixelLeft = This->MapPixelLeft;
@@ -454,6 +477,11 @@ int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
             }
         }
         MapWin_gen_map(This, faction_id, units_only);
+#ifndef BUILD_REL
+        if (!units_only) {
+            draw_minor_ironstone_map(This);
+        }
+#endif
         // Restore This's original values
         This->MapPixelLeft = MapPixelLeft;
         This->MapPixelTop = MapPixelTop;
@@ -952,19 +980,33 @@ void set_windowed(bool windowed)
 }
 
 #ifndef BUILD_REL
-// Temporary graphics diagnostic; remove after the PCX pipeline is verified.
-// Only a handful of events are recorded, never one line per rendered tile.
+// Resolve relative resources and diagnostics against the executable folder,
+// not the process working directory (which may differ in some installations).
+static std::string minor_graphics_file(const char* name)
+{
+    char path[MAX_PATH] = {};
+    DWORD len = GetModuleFileNameA(nullptr, path, MAX_PATH);
+    if (len && len < MAX_PATH) {
+        char* end = strrchr(path, '\\');
+        if (end) {
+            *(end + 1) = '\0';
+            return std::string(path) + name;
+        }
+    }
+    return name;
+}
+
+// Temporary graphics diagnostic; record only transition events.
 static void minor_graphics_trace(const char* message, int x, int y, int extra)
 {
-    FILE* fp = fopen("minor_terrain_render.log", "a");
+    const std::string path = minor_graphics_file("minor_terrain_render.log");
+    FILE* fp = fopen(path.c_str(), "a");
     if (fp) {
         fprintf(fp, "%s x=%d y=%d extra=%d\n", message, x, y, extra);
         fclose(fp);
     }
 }
 #endif
-
-static void draw_minor_ironstone(Console* win, int x, int y);
 
 /*
 Render custom debug overlays with original and additional goals.
@@ -975,15 +1017,9 @@ void __thiscall MapWin_gen_overlays(Console* This, int x, int y)
     static bool first_overlay_call = true;
     if (first_overlay_call) {
         first_overlay_call = false;
-        FILE* fp = fopen("minor_terrain_render.log", "w");
-        if (fp) {
-            fprintf(fp, "Thinker Ironstone graphics trace: overlay callback entered\n");
-            fclose(fp);
-        }
-        minor_graphics_trace("first overlay call", x, y, This == MapWin);
+        minor_graphics_trace("original overlay callback entered", x, y, This == MapWin);
     }
 #endif
-    draw_minor_ironstone(This, x, y);
     Buffer* Canvas = &This->oMainWin.oCanvas;
     RECT rt;
     if (*GameState & STATE_OMNISCIENT_VIEW && This->DrawFlags & MAPWIN_DRAW_GOALS)
@@ -1592,12 +1628,13 @@ static void draw_minor_ironstone(Console* win, int x, int y)
     static Sprite iron_sprite = {};
     if (!attempted) {
         attempted = true;
-        FILE* fp = fopen("minor_terrain.pcx", "rb");
+        const std::string path = minor_graphics_file("minor_terrain.pcx");
+        FILE* fp = fopen(path.c_str(), "rb");
         if (fp) {
             fclose(fp);
             Buffer image;
             Buffer_ctor(&image);
-            Buffer_load_pcx(&image, "minor_terrain.pcx", canvas->palette, 0, 0);
+            Buffer_load_pcx(&image, path.c_str(), canvas->palette, 0, 0);
             if (image.data && image.clipRect.right >= 116
                 && image.clipRect.bottom >= 60) {
                 Sprite_ctor(&iron_sprite);
@@ -1636,6 +1673,36 @@ static void draw_minor_ironstone(Console* win, int x, int y)
     (void)y;
 #endif
 }
+
+/*
+Draw minor terrain after the standard MapWin_gen_map pass. This uses the same
+known-good callsites as Thinker's smooth-scrolling wrapper; it does not need
+the optional debug-goals overlay callback to run. The per-map scan is limited
+to the saved minor-terrain byte array and a handful of small Ironstone sprites.
+*/
+#ifndef BUILD_REL
+static void draw_minor_ironstone_map(Console* win)
+{
+    if (conf.reduced_mode || win != MapWin || !*MapTiles
+        || *MapAreaTiles <= 0 || *MapHalfX <= 0) {
+        return;
+    }
+    static bool first_scan = true;
+    int deposits = 0;
+    for (int id = 0; id < *MapAreaTiles; id++) {
+        const int y = id / *MapHalfX;
+        const int x = 2 * (id % *MapHalfX) + (y & 1);
+        if (minor_landmark_at(x, y) == MINOR_IRONSTONE) {
+            deposits++;
+            draw_minor_ironstone(win, x, y);
+        }
+    }
+    if (first_scan) {
+        first_scan = false;
+        minor_graphics_trace("map scan finished; Ironstone tiles", 0, 0, deposits);
+    }
+}
+#endif
 
 int __cdecl MapWin_right_menu_arty(int veh_id, int x, int y)
 {
