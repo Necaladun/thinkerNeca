@@ -3,8 +3,9 @@
 #include "main.h"
 
 /*
-Minor terrain: an independent tile feature, not an LM_* landmark. Batch 1
-only establishes storage and persistence; no generation or yields yet.
+Minor terrain: an independent tile feature, not an LM_* landmark. Stored
+and saved separately from original landmarks. Yield/render hooks are future
+batches.
 */
 enum MinorLandmark : uint8_t {
     MINOR_NONE = 0,
