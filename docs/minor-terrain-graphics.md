@@ -47,9 +47,10 @@ This version reuses Thinker's known map redraw callsites. For a graphics
 crash, revert the Develop-only MapWin_gen_map calls in `src/patch.cpp`
 and report the details.
 
-Known limitations: only Ironstone is drawn; no yield modifiers or other minor
-sprites; no PRACX integration; the presentation/scale may require adjustment
-after actual in-game testing.
+Known limitations: only Ironstone is drawn; independent Jungle and Uranium
+now have type/code support on a migration branch but require atlas sprites
+and native-style layered drawing before they can be considered game-ready.
+No PRACX integration; presentation/scale require in-game testing.
 
 The diagnostics are written to `minor_terrain_render.log` in the same folder
 as the game executable (not necessarily the current working directory).

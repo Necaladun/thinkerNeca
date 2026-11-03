@@ -1,58 +1,88 @@
-# Ironstone minerals and native map labels
+# Independent minor terrain — generator and yield framework
 
-## Behaviour
+## Data model
 
-- Every `MINOR_IRONSTONE` tile grants **+1 mineral** through Thinker's
-  `mod_mine_yield` implementation.
-- The bonus uses the same **landmark mineral** calculation path as Garland
-  Crater, volcanoes, Fossil Field Ridge and canyon bonuses. It applies to
-  base-centre mineral production as well as worked tiles.
-- This is **not a special mineral resource**: early tile output caps still
-  apply where applicable, and mining improvements interact with landmark
-  bonuses under Thinker's existing formula.
-- The independent `item_yield` estimator counts +1 mineral for Ironstone
-  so AI evaluation is aligned with the new feature.
-- Existing jungle, uranium and major landmarks have not been changed.
+Minor terrain uses a separate per-tile `MinorTerrainTile { type, code }`
+record and **never requires** one of the original sixteen `LM_*` flags.
+The optional `code` field allows a minor feature to carry per-tile shape,
+strength, climate or other type-specific state.
 
-## Minor-terrain identity and display
+`THMIN001` saves now use **version 2**, storing two bytes per tile. Version 1
+extension saves are deliberately incompatible. Fresh maps and saves are the
+supported development target.
 
-Ironstone is a **minor terrain feature**, not a native named landmark.
-Its identity is the independent `MINOR_IRONSTONE` tile ID in `THMIN001`.
-Generation does **not** register an `Ironstone` name with `new_landmark()`;
-the native map's landmark-name table and its 64-entry limit are reserved for
-actual named landmarks.
+The type registry in `src/savegame.cpp` defines the common resource effects.
+Additional mechanics are handled in their relevant engine components, rather
+than assigning arbitrary meanings to the minor `code` byte globally.
 
-Jungle and Uranium are also treated as *minor* terrain conceptually. They
-currently use the original `LM_JUNGLE` and `LM_URANIUM` bits for their
-working engine effects, including native tile descriptions. This patch leaves
-both unchanged.
+| Minor type | Common effect | Special generation |
+| --- | --- | --- |
+| Jungle | +1 nutrient | Early, climate-aware, moisture/rainfall-sensitive patches |
+| Uranium | +1 energy | Late, small dispersed patches favouring lower elevations |
+| Ironstone | +1 mineral | Late, dispersed patches favouring rocky/rolling terrain |
 
-**Tile-inspector limitation:** the native status renderer does not yet show
-`Ironstone` as a terrain descriptor. The previous experimental wrapper of
-`StatusWin::draw_status` caused crashes when selecting Ironstone tiles and
-has been removed. The correct follow-up is a verified, narrow status-text
-integration that reads the independent minor-terrain ID without spoofing
-`LM_*` flags or temporarily rewriting the global `#NATURAL` table.
-Do not reintroduce unverified binary call-site scanning for this purpose.
+Jungle's previous Thinker patch algorithm is retained, including its size
+distribution, independent RNG seed, latitude/moisture preferences, and
+`minor_code % 121` pattern used by the rainfall algorithm. It also retains
+its special random-resource-placement behaviour in `world_rocky()`.
 
-The only Ironstone-specific UI at present is the map sprite; the mineral
-yield works independently of tile-status text.
+Uranium retains its existing weighted 3–9 tile deposit sizes and independent
+seed. Uranium and Ironstone currently use patch-local codes (0–8). Future
+specialised geology generators can replace their placement strategies without
+altering the shared terrain representation.
 
-## In-game tests
+## Generation ordering and options
 
-1. Pull `master`, rebuild **Develop**, and install the new `thinker.dll`.
-2. Start a fresh world with Ironstone. Click and hover Ironstone tiles and
-   confirm that the game no longer crashes.
-3. Confirm that Ironstone does not appear as a named map landmark. It should
-   remain visible via its custom sprite.
-4. Confirm Jungle and Uranium native status descriptions, resources, and map
-   graphics behave as before.
-5. Compare a flat non-Ironstone tile with a matching unimproved Ironstone
-   tile: expect +1 mineral, unless a normal mineral cap intervenes.
-6. Found a base on an Ironstone tile and compare the base-centre mineral
-   output to an equivalent ordinary base site.
-7. Save/reload a fresh game and verify Ironstone graphics and yield persist
-   without any new native landmark-name entries.
+Set `modified_landmarks=1`, `jungle=0`, `uranium=0`. These old options
+are no longer used to generate Jungle/Uranium in the modified world builder.
 
-Ironstone is *not yet* expected to appear in the tile-inspector terrain
-description; that is a separate unresolved UI integration.
+`minor_jungle=1` (default) invokes Jungle before the original major-landmark
+loop, allowing the later `world_climate()` / `world_rainfall()` pass to read
+the independent type/code. Major landmarks may replace occupied Jungle tiles;
+the post-landmark cleanup explicitly removes the replaced minor type.
+`minor_uranium=1` and `minor_ironstone=1` (defaults) invoke late generators
+after final climate and rockiness computation.
+
+One minor type per tile. The generators avoid major-landmark footprints and
+other minor terrain; patches keep separation buffers. No minor generator
+calls `new_landmark()`.
+
+Without `modified_landmarks=1`, the original native Jungle/Uranium
+generators remain available for vanilla-style world creation.
+
+## Resource effects
+
+Basic nutrient/mineral/energy bonuses feed `mod_crop_yield`,
+`mod_mine_yield`, `mod_energy_yield`, and the independent AI `item_yield`
+estimator. Native legacy `LM_*` effects remain available for existing
+scenarios and unmodified world generation. Minor features are independent
+from bonus resource icons. Standard output caps and improvement effects apply.
+
+## Incomplete integration — do not consider this a game-ready release
+
+- The separate Ironstone sprite is currently **Develop-only** and drawn after
+  the native map pass; layering/zoom require in-game verification.
+- Native Jungle and Uranium sprites **will not automatically render** for
+  tiles using independent minor IDs. The shared minor-terrain sprite atlas
+  and proper draw-layer integration must be completed.
+- The native tile inspector does **not** yet display independent minor names.
+  A prior speculative status-window hook caused crashes and was removed.
+- The map editor still has native Jungle/Uranium tools and `#NATURAL` entries.
+  Do not reuse original landmark flags or graphics yet.
+- Windows DLL compilation, in-game generation, yield, fog, and save/reload
+  tests have **not** been performed in this environment.
+
+The source migration is suitable for continued implementation on a feature
+branch, not yet for replacing a working Jungle/Uranium game build.
+
+## Verification checklist
+
+1. Build Develop and confirm type/code save and reload with fresh maps.
+2. Count Jungle, Uranium and Ironstone minor tiles; check that no generated
+   minor feature has a native Jungle/Uranium landmark flag or name.
+3. Compare Jungle rainfall and bonus-resource distribution against the
+   previous Thinker generator; verify per-tile code influences moisture.
+4. Verify +1 N/E/M from engine status yields and `item_yield`, respecting caps.
+5. Check patch counts, lengths, distance buffers and major-landmark overlap.
+6. Complete graphics, tile inspector and map editor before merging the entire
+   migration into a playable default.

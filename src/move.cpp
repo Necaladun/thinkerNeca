@@ -597,7 +597,8 @@ void land_raise_plan(int faction_id) {
                         + (region_at(mp.first.x, mp.first.y) == p.main_region ? 10 : 0)
                         + 4*coast_tiles(mp.first.x, mp.first.y)
                         + (sq->items & BIT_ROAD ? 4 : 0)
-                        - (sq->lm_items() & (LM_CRATER|LM_JUNGLE|LM_URANIUM) ? 16 : 0)
+                        - ((sq->lm_items() & (LM_CRATER|LM_JUNGLE|LM_URANIUM)
+                            || minor_landmark_at(mp.first.x, mp.first.y) != MINOR_NONE) ? 16 : 0)
                         - (m.sq->items & (BIT_FARM|BIT_MINE|BIT_SOLAR) ? 4 : 0)
                         - map_range(mp.first.x, mp.first.y, p.main_region_x, p.main_region_y);
                     shore.push({mp.first.x, mp.first.y, score});
@@ -1358,8 +1359,9 @@ int base_tile_score(int x, int y, int faction_id, MAP* sq) {
             int bn = bonus_at(m.x, m.y);
             int lm = m.sq->lm_items();
             int alt = m.sq->alt_level();
-            if (lm & ~(LM_DUNES|LM_SARGASSO|LM_UNITY)) {
-                score += (lm & LM_JUNGLE ? 3 : 2);
+            const MinorLandmark minor = minor_landmark_at(m.x, m.y);
+            if ((lm & ~(LM_DUNES|LM_SARGASSO|LM_UNITY)) || minor != MINOR_NONE) {
+                score += ((lm & LM_JUNGLE) || minor == MINOR_JUNGLE ? 3 : 2);
             }
             if (!m.i) {
                 score += (bn ? (bn != RES_ENERGY ? 4 : 3) : 0);
@@ -1542,7 +1544,8 @@ bool can_bridge(int x, int y, int faction_id, MAP* sq) {
     && near_sea_coast(x, y)) {
         return true;
     }
-    if (coast_tiles(x, y) < 3 || sq->landmarks & LM_JUNGLE) {
+    if (coast_tiles(x, y) < 3 || (sq->landmarks & LM_JUNGLE)
+    || minor_landmark_at(x, y) == MINOR_JUNGLE) {
         return false;
     }
     const int range = 4;
@@ -1617,7 +1620,8 @@ bool can_farm(int x, int y, int faction_id, int bonus, MAP* sq) {
         + (nearby_items(x, y, 0, 9, BIT_FARM | BIT_CONDENSER) < 2)
         + (sq->items & (BIT_FARM | BIT_CONDENSER) ? 1 : 0)
         + (sq->items & (BIT_FOREST) ? 0 : 2)
-        + (sq->landmarks & LM_JUNGLE ? 0 : 1) > 4);
+        + ((sq->landmarks & LM_JUNGLE)
+            || minor_landmark_at(x, y) == MINOR_JUNGLE ? 0 : 1) > 4);
 }
 
 bool can_solar(int x, int y, int faction_id, int bonus, MAP* sq) {
@@ -1634,7 +1638,8 @@ bool can_solar(int x, int y, int faction_id, int bonus, MAP* sq) {
     }
     if (!sea && has_terra(FORMER_FOREST, sea, faction_id) && ResInfo->forest_sq.energy > 0
     && !(sq->is_rocky() && bonus == RES_ENERGY && sq->alt_level() > ALT_TWO_ABOVE_SEA)
-    && (sq->landmarks & LM_JUNGLE
+    && ((sq->landmarks & LM_JUNGLE)
+    || minor_landmark_at(x, y) == MINOR_JUNGLE
     || (sq->is_rainy() + sq->is_rolling() + sq->is_rainy_or_moist()
     + (sq->items & BIT_FARM ? 1 : 0) < 3))) {
         return false;
@@ -1725,7 +1730,8 @@ bool can_level(int x, int y, int faction_id, int bonus, MAP* sq) {
         && sq->items & BIT_RIVER
         && !plans[faction_id].plant_fungus
         && nearby_items(x, y, 0, 9, BIT_FARM|BIT_FOREST)
-        < (sq->landmarks & LM_JUNGLE ? 4 : 2)));
+        < ((sq->landmarks & LM_JUNGLE)
+            || minor_landmark_at(x, y) == MINOR_JUNGLE ? 4 : 2)));
 }
 
 bool can_river(int x, int y, int faction_id, MAP* sq) {
