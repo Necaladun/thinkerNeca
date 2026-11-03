@@ -56,6 +56,13 @@ as the game executable (not necessarily the current working directory).
 The custom PCX is also loaded from that executable folder. The normal map
 render entrypoint, terrain scan, asset loading, and first draw are logged.
 
+Zoom/redraw diagnostic: minor terrain is reapplied after **both** full and
+`units_only` map passes in Develop builds. The log records up to 40 distinct
+`map redraw zoom / tile-pixels / units_only` transitions. This is an interim
+measure for the original map renderer; drawing over unit sprites or other
+layering glitches are possible until the feature has a dedicated terrain
+render stage.
+
 If the log reports `PCX file not found/open failed`, copy
 `assets/minor_terrain.pcx` from the repository into the **game installation**
 folder containing the actual running executable, not merely the project's
