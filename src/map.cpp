@@ -1336,6 +1336,22 @@ int __cdecl mod_bonus_at(int x, int y) {
     MAP* sq = mapsq(x, y);
     uint32_t bit = sq->items;
     uint32_t alt = sq->alt_level();
+
+    // Great Dunes only has the explicitly placed deposits: three energy
+    // resources and one freshwater oasis nutrient resource. Suppress the
+    // procedural resource pattern on every other Dunes tile.
+    if (sq->landmarks & LM_DUNES) {
+        if (bit & BIT_BONUS_RES) {
+            if (bit & BIT_NUTRIENT_RES) {
+                return RES_NUTRIENT;
+            }
+            if (bit & BIT_ENERGY_RES) {
+                return RES_ENERGY;
+            }
+        }
+        return RES_NONE;
+    }
+
     bool has_rsc_bonus = bit & BIT_BONUS_RES;
     if (!has_rsc_bonus && (!*MapRandomSeed || (alt >= ALT_SHORE_LINE
     && !conf.rare_supply_pods && !(*GameRules & RULES_NO_UNITY_SCATTERING)))) {
