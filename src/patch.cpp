@@ -333,6 +333,9 @@ static void init_video_config(Config* cf) {
 }
 
 bool patch_setup(Config* cf) {
+#ifndef BUILD_REL
+    minor_graphics_startup_trace();
+#endif
     DWORD attrs;
     DWORD oldattrs;
     cf->reduced_mode = strcmp((const char*)0x668165, "prax") == 0;
