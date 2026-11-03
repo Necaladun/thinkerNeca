@@ -2213,9 +2213,44 @@ void world_generate(uint32_t seed) {
     *WorldSkipTerritory = 0; // If this flag is false, reset_territory is run in world_climate
     world_climate(); // Run Path::continents
     world_rocky();
-    // Run the separate minor-terrain pass only after the original landmarks
-    // and natural terrain have reached their final generated state.
+    // Run the late minor-terrain pass after final climate and geology.
     generate_minor_landmarks();
+
+#ifdef BUILD_DEBUG
+    // Generated minor features must not consume native landmark flags.
+    // This summary also makes independent Jungle/Uranium testable while
+    // their separate sprite rendering and tile-inspector path are unfinished.
+    int minor_counts[4] = {};
+    int minor_native_overlap = 0;
+    int minor_bad_codes = 0;
+    if (*MapHalfX > 0) {
+        for (int tile_id = 0; tile_id < *MapAreaTiles; ++tile_id) {
+            const int ty = tile_id / *MapHalfX;
+            const int tx = 2 * (tile_id % *MapHalfX) + (ty & 1);
+            const MinorLandmark type = minor_landmark_at(tx, ty);
+            if (type == MINOR_NONE) {
+                continue;
+            }
+            const int index = static_cast<int>(type);
+            if (index < 1 || index > 3) {
+                minor_bad_codes++;
+                continue;
+            }
+            minor_counts[index]++;
+            if ((*MapTiles)[tile_id].lm_items()) {
+                minor_native_overlap++;
+            }
+            const int code = minor_landmark_code_at(tx, ty);
+            if ((type == MINOR_JUNGLE && code > 120)
+                || (type != MINOR_JUNGLE && code > 8)) {
+                minor_bad_codes++;
+            }
+        }
+    }
+    debug("minor generation Jungle=%d Uranium=%d Ironstone=%d native_overlap=%d bad_codes=%d\n",
+        minor_counts[MINOR_JUNGLE], minor_counts[MINOR_URANIUM],
+        minor_counts[MINOR_IRONSTONE], minor_native_overlap, minor_bad_codes);
+#endif
 
     if (!*GameHalted) {
         MapWin_clear_terrain(MapWin);
