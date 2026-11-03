@@ -5,7 +5,11 @@ on:
   push:
     branches:
       - master
-      - 'feature/**'
+
+# One build per live PR revision; cancel superseded CI jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-develop:
