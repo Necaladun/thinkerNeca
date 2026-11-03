@@ -1508,6 +1508,99 @@ int __cdecl mod_design_new_veh(int faction_id, int unit_id) {
     return DesignWin_exec(DesignWin, faction_id, unit_id);
 }
 
+
+
+/*
+Experimental separate PCX map overlay for independently stored minor terrain.
+Based on the SMACX per-tile call site also documented by PRACX. This first
+version only draws MINOR_IRONSTONE; resource effects are intentionally absent.
+The separate indexed 128x64 minor_terrain.pcx uses source rect 12,4,104,56,
+with palette index 253 as the transparent key.
+*/
+extern "C" int __cdecl minor_terrain_render_overlay(
+Buffer* canvas, MapWindow* window, int x, int y, int left, int top)
+{
+    // The displaced SMACX call returns this value. PRACX uses the same
+    // convention for its overlay callback at 0x466C70.
+    const int zoom_num = *(int*)0x691E6C;
+    if (!canvas || !window || window != static_cast<MapWindow*>(MapWin)
+        || !*MapTiles || minor_landmark_at(x, y) != MINOR_IRONSTONE) {
+        return zoom_num;
+    }
+    MAP* tile = mapsq(x, y);
+    if (!tile || !tile->is_visible(MapWin->cOwner)) {
+        return zoom_num;
+    }
+
+    static bool attempted = false;
+    static bool ready = false;
+    static Sprite iron_sprite = {};
+    if (!attempted) {
+        attempted = true;
+        // Missing custom assets must not prevent the original map rendering.
+        FILE* fp = fopen("minor_terrain.pcx", "rb");
+        if (fp) {
+            fclose(fp);
+            Buffer image;
+            Buffer_ctor(&image);
+            Buffer_load_pcx(&image, "minor_terrain.pcx", canvas->palette, 0, 0);
+            if (image.data && image.clipRect.right >= 116
+                && image.clipRect.bottom >= 60) {
+                Sprite_ctor(&iron_sprite);
+                Sprite_extract_2(&iron_sprite, &image, 0x1FD,
+                    12, 4, 104, 56, nullptr);
+                ready = iron_sprite.data != nullptr && iron_sprite.width == 104;
+            }
+            Buffer_dtor(&image);
+        }
+        debug("minor terrain sprite load: %s\n", ready ? "ready" : "missing or invalid");
+    }
+    if (!ready) {
+        return zoom_num;
+    }
+
+    // Render at the map's zoom scale, above the native terrain artwork.
+    long px = left;
+    long py = top;
+    MapWin_tile_to_pixel(window, x, y, &px, &py);
+    const int tile_width = window->PixelsPerTileX;
+    if (tile_width > 0) {
+        const int draw_width = max(1, tile_width * 3 / 4);
+        Sprite_draw_2(&iron_sprite, canvas, 253,
+            (int)px + (tile_width - draw_width) / 2,
+            (int)py + window->PixelsPerTileY / 8,
+            draw_width, 104);
+    }
+    return zoom_num;
+}
+
+/*
+A naked thunk is necessary because the original callsite does not pass
+ordinary C arguments: it exposes tile/canvas parameters through EBP.
+The stack offsets match SMACX's MapWin::gen_terrain_poly() call documented
+in the PRACX renderer. All additions are cdecl and clean their own stack.
+*/
+void __attribute__((naked)) __cdecl minor_terrain_overlay_thunk()
+{
+    __asm__ __volatile__(
+        "pushl %ecx\n\t"
+        "pushl %es\n\t"
+        "pushl %gs\n\t"
+        "pushl 0x2c(%ebp)\n\t" // top
+        "pushl 0x28(%ebp)\n\t" // left
+        "pushl 0x24(%ebp)\n\t" // tile y
+        "pushl 0x20(%ebp)\n\t" // tile x
+        "pushl 0x0c(%ebp)\n\t" // MapWindow
+        "pushl 0x08(%ebp)\n\t" // destination Buffer
+        "call _minor_terrain_render_overlay\n\t"
+        "addl $24, %esp\n\t"
+        "popl %gs\n\t"
+        "popl %es\n\t"
+        "popl %ecx\n\t"
+        "ret\n\t"
+    );
+}
+
 int __cdecl MapWin_right_menu_arty(int veh_id, int x, int y)
 {
     VEH* veh = &Vehs[veh_id];
