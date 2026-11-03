@@ -22,8 +22,8 @@ and `assets/minor_terrain.pcx` into the project's `patch/` folder.
 
 If running the game from another installation directory, copy **both**
 `thinker.dll` and `minor_terrain.pcx` into the game directory (next to
-`terranx.exe`). The runtime loader uses the relative filename
-`minor_terrain.pcx`.
+`terranx.exe`). The runtime loader resolves `minor_terrain.pcx` relative to the game
+executable's directory, independently of the working directory.
 
 The Develop renderer routes the normal MapWin_gen_map calls through Thinker's
 existing smooth-scrolling wrapper, including when `smooth_scrolling=0`.
