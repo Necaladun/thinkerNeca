@@ -951,6 +951,19 @@ void set_windowed(bool windowed)
     }
 }
 
+#ifndef BUILD_REL
+// Temporary graphics diagnostic; remove after the PCX pipeline is verified.
+// Only a handful of events are recorded, never one line per rendered tile.
+static void minor_graphics_trace(const char* message, int x, int y, int extra)
+{
+    FILE* fp = fopen("minor_terrain_render.log", "a");
+    if (fp) {
+        fprintf(fp, "%s x=%d y=%d extra=%d\n", message, x, y, extra);
+        fclose(fp);
+    }
+}
+#endif
+
 static void draw_minor_ironstone(Console* win, int x, int y);
 
 /*
@@ -958,6 +971,18 @@ Render custom debug overlays with original and additional goals.
 */
 void __thiscall MapWin_gen_overlays(Console* This, int x, int y)
 {
+#ifndef BUILD_REL
+    static bool first_overlay_call = true;
+    if (first_overlay_call) {
+        first_overlay_call = false;
+        FILE* fp = fopen("minor_terrain_render.log", "w");
+        if (fp) {
+            fprintf(fp, "Thinker Ironstone graphics trace: overlay callback entered\n");
+            fclose(fp);
+        }
+        minor_graphics_trace("first overlay call", x, y, This == MapWin);
+    }
+#endif
     draw_minor_ironstone(This, x, y);
     Buffer* Canvas = &This->oMainWin.oCanvas;
     RECT rt;
@@ -1522,20 +1547,44 @@ static void draw_minor_ironstone(Console* win, int x, int y)
 {
 #ifndef BUILD_REL
     // PRACX has its own rendering hooks; defer integration with that mode.
+    static bool skip_logged = false;
     if (conf.reduced_mode || win != MapWin || !*MapTiles
-        || win->cOwner < 0 || win->cOwner >= MaxPlayerNum
-        || minor_landmark_at(x, y) != MINOR_IRONSTONE) {
+        || win->cOwner < 0 || win->cOwner >= MaxPlayerNum) {
+        if (!skip_logged) {
+            skip_logged = true;
+            minor_graphics_trace("skipped window or mode", x, y,
+                conf.reduced_mode ? 1 : (win != MapWin ? 2 : 3));
+        }
         return;
+    }
+    if (minor_landmark_at(x, y) != MINOR_IRONSTONE) {
+        return;
+    }
+    static bool found_logged = false;
+    if (!found_logged) {
+        found_logged = true;
+        minor_graphics_trace("Ironstone tile reached renderer", x, y, *GameState);
     }
     MAP* tile = mapsq(x, y);
     // Match the engine's revealed-map and scenario-editor display rules.
     // Ordinary faction fog of war still hides unexplored minor terrain.
     if (!tile || !(tile->is_known(win->cOwner)
         || (*GameState & STATE_OMNISCIENT_VIEW))) {
+        static bool fog_logged = false;
+        if (!fog_logged) {
+            fog_logged = true;
+            minor_graphics_trace("Ironstone skipped by fog", x, y,
+                tile ? tile->visibility : -1);
+        }
         return;
     }
     Buffer* canvas = &win->oMainWin.oCanvas;
     if (!canvas->palette) {
+        static bool palette_logged = false;
+        if (!palette_logged) {
+            palette_logged = true;
+            minor_graphics_trace("Ironstone canvas has no palette", x, y, 0);
+        }
         return;
     }
     static bool attempted = false;
@@ -1558,6 +1607,8 @@ static void draw_minor_ironstone(Console* win, int x, int y)
             }
             Buffer_dtor(&image);
         }
+        minor_graphics_trace(ready ? "PCX sprite loaded" : "PCX missing or invalid",
+            x, y, iron_sprite.width);
         debug("minor terrain sprite load: %s\n", ready ? "ready" : "missing or invalid");
     }
     if (!ready) {
@@ -1569,9 +1620,15 @@ static void draw_minor_ironstone(Console* win, int x, int y)
     int tile_width = win->PixelsPerTileX;
     if (tile_width > 0 && win->PixelsPerTileY > 0) {
         int draw_width = max(1, tile_width * 3 / 4);
-        Sprite_draw_2(&iron_sprite, canvas, 253,
+        const int result = Sprite_draw_2(&iron_sprite, canvas, 253,
             (int)px + (tile_width - draw_width) / 2,
             (int)py + win->PixelsPerTileY / 8, draw_width, 104);
+        static bool draw_logged = false;
+        if (!draw_logged) {
+            draw_logged = true;
+            minor_graphics_trace("Ironstone Sprite_draw_2 invoked", x, y, result);
+            minor_graphics_trace("draw position x/y", (int)px, (int)py, draw_width);
+        }
     }
 #else
     (void)win;
