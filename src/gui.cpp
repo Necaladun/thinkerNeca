@@ -1523,10 +1523,16 @@ Buffer* canvas, MapWindow* window, int x, int y, int left, int top)
     // The displaced SMACX call returns this value. PRACX uses the same
     // convention for its overlay callback at 0x466C70.
     const int zoom_num = *(int*)0x691E6C;
-    if (!canvas || !canvas->palette || !window
-        || window != static_cast<MapWindow*>(MapWin)
+    if (!canvas || !window || window != static_cast<MapWindow*>(MapWin)
         || !*MapTiles || MapWin->cOwner < 0 || MapWin->cOwner >= MaxPlayerNum
         || minor_landmark_at(x, y) != MINOR_IRONSTONE) {
+        return zoom_num;
+    }
+    // As in the existing MapWin_gen_overlays and PRACX overlay paths,
+    // draw directly onto the map window's canvas, not the transient
+    // terrain-generation buffer passed to MapWin_gen_terrain_poly.
+    Buffer* output = &MapWin->oMainWin.oCanvas;
+    if (!output->palette) {
         return zoom_num;
     }
     MAP* tile = mapsq(x, y);
@@ -1545,7 +1551,7 @@ Buffer* canvas, MapWindow* window, int x, int y, int left, int top)
             fclose(fp);
             Buffer image;
             Buffer_ctor(&image);
-            Buffer_load_pcx(&image, "minor_terrain.pcx", canvas->palette, 0, 0);
+            Buffer_load_pcx(&image, "minor_terrain.pcx", output->palette, 0, 0);
             if (image.data && image.clipRect.right >= 116
                 && image.clipRect.bottom >= 60) {
                 Sprite_ctor(&iron_sprite);
@@ -1568,7 +1574,7 @@ Buffer* canvas, MapWindow* window, int x, int y, int left, int top)
     const int tile_width = window->PixelsPerTileX;
     if (tile_width > 0 && window->PixelsPerTileY > 0) {
         const int draw_width = max(1, tile_width * 3 / 4);
-        Sprite_draw_2(&iron_sprite, canvas, 253,
+        Sprite_draw_2(&iron_sprite, output, 253,
             (int)px + (tile_width - draw_width) / 2,
             (int)py + window->PixelsPerTileY / 8,
             draw_width, 104);
