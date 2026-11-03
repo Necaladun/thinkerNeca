@@ -9,13 +9,26 @@
 Minor terrain storage. Indexed exactly like MAP tiles but kept separate
 from the fixed-size MAP struct and all 16 original landmark flags.
 */
-static std::vector<uint8_t> minor_landmarks;
+static std::vector<MinorTerrainTile> minor_landmarks;
 static const char MinorLandmarkMagic[8] = {'T', 'H', 'M', 'I', 'N', '0', '0', '1'};
-static const uint32_t MinorLandmarkVersion = 1;
+static const uint32_t MinorLandmarkVersion = 2;
+
+// Common resource effects. Complex mechanics remain in type-specific hooks.
+static const MinorTerrainDefinition MinorTerrainDefinitions[] = {
+    {"", 0, 0, 0},
+    {"Jungle", 1, 0, 0},
+    {"Uranium", 0, 0, 1},
+    {"Ironstone", 0, 1, 0},
+};
+
+const MinorTerrainDefinition& minor_terrain_definition(MinorLandmark type) {
+    const unsigned id = static_cast<unsigned>(type);
+    return MinorTerrainDefinitions[id < 4 ? id : 0];
+}
 
 void minor_landmark_reset() {
     if (*MapTiles && *MapAreaTiles > 0) {
-        minor_landmarks.assign(*MapAreaTiles, MINOR_NONE);
+        minor_landmarks.assign(*MapAreaTiles, MinorTerrainTile{MINOR_NONE, 0});
     } else {
         minor_landmarks.clear();
     }
@@ -29,10 +42,18 @@ MinorLandmark minor_landmark_at(int x, int y) {
     if (!tile) {
         return MINOR_NONE;
     }
-    return static_cast<MinorLandmark>(minor_landmarks[tile - *MapTiles]);
+    return static_cast<MinorLandmark>(minor_landmarks[tile - *MapTiles].type);
 }
 
-bool minor_landmark_set(int x, int y, MinorLandmark type) {
+uint8_t minor_landmark_code_at(int x, int y) {
+    if (!*MapTiles || minor_landmarks.size() != (size_t)*MapAreaTiles) {
+        return 0;
+    }
+    MAP* tile = mapsq(x, y);
+    return tile ? minor_landmarks[tile - *MapTiles].code : 0;
+}
+
+bool minor_landmark_set(int x, int y, MinorLandmark type, uint8_t code) {
     if (!*MapTiles || minor_landmarks.size() != (size_t)*MapAreaTiles) {
         return false;
     }
@@ -40,7 +61,7 @@ bool minor_landmark_set(int x, int y, MinorLandmark type) {
     if (!tile) {
         return false;
     }
-    minor_landmarks[tile - *MapTiles] = static_cast<uint8_t>(type);
+    minor_landmarks[tile - *MapTiles] = MinorTerrainTile{static_cast<uint8_t>(type), code};
     return true;
 }
 
@@ -50,7 +71,7 @@ void minor_landmark_clear(int x, int y) {
 
 static size_t minor_landmark_count() {
     return std::count_if(minor_landmarks.begin(), minor_landmarks.end(),
-        [](uint8_t type) { return type != MINOR_NONE; });
+        [](const MinorTerrainTile& tile) { return tile.type != MINOR_NONE; });
 }
 
 /*
@@ -68,12 +89,12 @@ static int minor_landmark_write(FILE* fp) {
     if (!fwrite(MinorLandmarkMagic, sizeof(MinorLandmarkMagic), 1u, fp)
         || !fwrite(&MinorLandmarkVersion, sizeof(MinorLandmarkVersion), 1u, fp)
         || !fwrite(&count, sizeof(count), 1u, fp)
-        || !fwrite(minor_landmarks.data(), count, 1u, fp)) {
+        || !fwrite(minor_landmarks.data(), sizeof(MinorTerrainTile), count, fp)) {
         return 1;
     }
     debug_ver("minor terrain write: tiles=%u nonempty=%u first=%u\n",
         count, (unsigned)minor_landmark_count(),
-        count ? (unsigned)minor_landmarks[0] : 0u);
+        count ? (unsigned)minor_landmarks[0].type : 0u);
     return 0;
 }
 
@@ -91,14 +112,14 @@ static int minor_landmark_read(FILE* fp) {
             || !fread(&count, sizeof(count), 1u, fp)
             || version != MinorLandmarkVersion || count != (uint32_t)*MapAreaTiles
             || minor_landmarks.size() != count
-            || !fread(minor_landmarks.data(), count, 1u, fp)) {
+            || !fread(minor_landmarks.data(), sizeof(MinorTerrainTile), count, fp)) {
             debug("minor terrain read error: version=%u count=%u expected=%d\n",
                 version, count, *MapAreaTiles);
             return 1;
         }
         debug_ver("minor terrain read: tiles=%u nonempty=%u first=%u\n",
             count, (unsigned)minor_landmark_count(),
-            count ? (unsigned)minor_landmarks[0] : 0u);
+            count ? (unsigned)minor_landmarks[0].type : 0u);
     } else {
         clearerr(fp);
         if (fseek(fp, offset, SEEK_SET)) {
@@ -106,6 +127,12 @@ static int minor_landmark_read(FILE* fp) {
         }
         // map_init has set all minor tiles to MINOR_NONE.
         debug_ver("minor terrain read: no extension, empty terrain\n");
+    }
+    for (const MinorTerrainTile& tile : minor_landmarks) {
+        if (tile.type > MINOR_IRONSTONE) {
+            debug("minor terrain read error: invalid type=%u\n", (unsigned)tile.type);
+            return 1;
+        }
     }
     return 0;
 }

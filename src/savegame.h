@@ -14,8 +14,24 @@ enum MinorLandmark : uint8_t {
     MINOR_IRONSTONE = 3,
 };
 
+// Independent per-tile type and type-specific code, without native LM_* bits.
+struct MinorTerrainTile {
+    uint8_t type;
+    uint8_t code;
+};
+static_assert(sizeof(MinorTerrainTile) == 2, "Minor terrain save layout");
+
+struct MinorTerrainDefinition {
+    const char* name;
+    int nutrient;
+    int mineral;
+    int energy;
+};
+const MinorTerrainDefinition& minor_terrain_definition(MinorLandmark type);
+
 MinorLandmark minor_landmark_at(int x, int y);
-bool minor_landmark_set(int x, int y, MinorLandmark type);
+uint8_t minor_landmark_code_at(int x, int y);
+bool minor_landmark_set(int x, int y, MinorLandmark type, uint8_t code = 0);
 void minor_landmark_clear(int x, int y);
 void minor_landmark_reset();
 
