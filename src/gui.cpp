@@ -1479,66 +1479,6 @@ void __thiscall ReportWin_close_handler(SubInterface* This)
 }
 
 /*
-The native tile-status renderer only prints #NATURAL short names for tiles
-bearing one of the original LM_* flags. Minor terrain deliberately lives in
-a separate savegame extension, so named-landmark entries alone cannot make
-its name appear in that status text.
-
-Give each minor terrain type a square label here. This is the only lookup
-that must grow when new minor terrain types are added.
-*/
-static const char* minor_terrain_square_label(MinorLandmark type)
-{
-    switch (type) {
-    case MINOR_IRONSTONE: return "Ironstone";
-    default: return NULL;
-    }
-}
-
-/*
-Called from the native StatusWin::draw_status call sites. Supply an ephemeral
-Nexus terrain flag and short label solely while that function is drawing the
-tile's status. The original tile flags and #NATURAL strings are always
-restored before control returns, so saves, yields, AI and map rendering
-continue to use independent minor terrain without LM_* bits.
-
-Skip tiles with major landmarks rather than masking their native description.
-*/
-void __thiscall mod_StatusWin_draw_status(
-    StatusWindow* This, int a2, int a3, int a4, int y, int a6)
-{
-    MAP* sq = mapsq(This->tile_x, This->tile_y);
-    if (!sq || (sq->landmarks & (LM_DISABLE | 0xFFFF))
-        || (!(*GameState & (STATE_SCENARIO_EDITOR | STATE_OMNISCIENT_VIEW))
-            && !sq->is_visible(MapWin->cOwner))) {
-        StatusWin_draw_status(This, a2, a3, a4, y, a6);
-        return;
-    }
-    const char* const label = minor_terrain_square_label(
-        minor_landmark_at(This->tile_x, This->tile_y));
-    if (!label) {
-        StatusWin_draw_status(This, a2, a3, a4, y, a6);
-        return;
-    }
-
-    // Index 13 is LM_NEXUS in #NATURAL. Unlike Crater or Fossil, it
-    // has no intrinsic tile mineral/nutrient/energy yield modifier.
-    const int nexus_natural_index = 13;
-    const uint32_t original_flags = sq->landmarks;
-    char* const original_name = Natural[nexus_natural_index].name;
-    char* const original_short = Natural[nexus_natural_index].name_short;
-    sq->landmarks |= LM_NEXUS;
-    Natural[nexus_natural_index].name = const_cast<char*>(label);
-    Natural[nexus_natural_index].name_short = const_cast<char*>(label);
-
-    StatusWin_draw_status(This, a2, a3, a4, y, a6);
-
-    Natural[nexus_natural_index].name_short = original_short;
-    Natural[nexus_natural_index].name = original_name;
-    sq->landmarks = original_flags;
-}
-
-/*
 Fix foreign base names being visible in unexplored tiles when issuing move to or patrol
 orders to the tiles. This version adds visibility checks for all base tiles.
 */
