@@ -25,10 +25,11 @@ If running the game from another installation directory, copy **both**
 `terranx.exe`). The runtime loader uses the relative filename
 `minor_terrain.pcx`.
 
-The Ironstone rendering uses the already-installed Thinker
-`MapWin_gen_overlays` hook (0x4688E0). No separate binary patch at
-0x466C70 is needed. Drawing remains disabled in Release builds and
-PRACX/reduced mode.
+The Develop renderer routes the normal MapWin_gen_map calls through Thinker's
+existing smooth-scrolling wrapper, including when `smooth_scrolling=0`.
+Ironstone draws after the normal map pass. The optional debug-goals overlay
+(`MapWin_gen_overlays`) is not used for custom terrain painting. No patch at
+0x466C70 is needed. Drawing remains disabled in Release and PRACX/reduced mode.
 
 ## Verification
 
@@ -42,10 +43,15 @@ PRACX/reduced mode.
    ensure a new game still renders without the custom sprite.
 
 Rendering is experimental and **has not yet been compiled or run in SMACX**.
-This version uses Thinker's existing map overlay function, not a new
-binary patch site. If the build fails or a rendering crash occurs, revert
-`draw_minor_ironstone(This, x, y)` in `src/gui.cpp` and report the details.
+This version reuses Thinker's known map redraw callsites. For a graphics
+crash, revert the Develop-only MapWin_gen_map calls in `src/patch.cpp`
+and report the details.
 
 Known limitations: only Ironstone is drawn; no yield modifiers or other minor
 sprites; no PRACX integration; the presentation/scale may require adjustment
 after actual in-game testing.
+
+The diagnostics are written to `minor_terrain_render.log` in the same folder
+as the game executable (not necessarily the current working directory).
+The custom PCX is also loaded from that executable folder. The normal map
+render entrypoint, terrain scan, asset loading, and first draw are logged.
