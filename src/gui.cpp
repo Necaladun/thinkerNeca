@@ -1523,8 +1523,10 @@ Buffer* canvas, MapWindow* window, int x, int y, int left, int top)
     // The displaced SMACX call returns this value. PRACX uses the same
     // convention for its overlay callback at 0x466C70.
     const int zoom_num = *(int*)0x691E6C;
-    if (!canvas || !window || window != static_cast<MapWindow*>(MapWin)
-        || !*MapTiles || minor_landmark_at(x, y) != MINOR_IRONSTONE) {
+    if (!canvas || !canvas->palette || !window
+        || window != static_cast<MapWindow*>(MapWin)
+        || !*MapTiles || MapWin->cOwner < 0 || MapWin->cOwner >= MaxPlayerNum
+        || minor_landmark_at(x, y) != MINOR_IRONSTONE) {
         return zoom_num;
     }
     MAP* tile = mapsq(x, y);
@@ -1564,7 +1566,7 @@ Buffer* canvas, MapWindow* window, int x, int y, int left, int top)
     long py = top;
     MapWin_tile_to_pixel(window, x, y, &px, &py);
     const int tile_width = window->PixelsPerTileX;
-    if (tile_width > 0) {
+    if (tile_width > 0 && window->PixelsPerTileY > 0) {
         const int draw_width = max(1, tile_width * 3 / 4);
         Sprite_draw_2(&iron_sprite, canvas, 253,
             (int)px + (tile_width - draw_width) / 2,
