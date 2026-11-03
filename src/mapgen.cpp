@@ -1375,6 +1375,14 @@ static void generate_minor_ironstone() {
         }
         centers.push_back({seed_x, seed_y});
         completed++;
+        // Named landmark instances are separate from the 16 original LM_*
+        // terrain flags. This lets the native map/status display identify
+        // Ironstone without consuming a major-landmark type. Naming is
+        // optional when the original 64-instance list is already full.
+        if (new_landmark(seed_x, seed_y, "Ironstone") < 0) {
+            debug("minor Ironstone name skipped: landmark list full at %d,%d\n",
+                seed_x, seed_y);
+        }
         debug("minor Ironstone patch %d/%d: %d tiles at %d,%d\n",
             completed, patch_count, target, seed_x, seed_y);
     }
