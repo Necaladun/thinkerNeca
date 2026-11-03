@@ -1864,7 +1864,7 @@ extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* fram
     if (quarter <= 0) {
         return original;
     }
-    MapWindow* win = reinterpret_cast<MapWindow*>(static_cast<uintptr_t>(frame[3]));
+    Console* win = reinterpret_cast<Console*>(static_cast<uintptr_t>(frame[3]));
     const int lift =
         (pfncMapGetCornerYOffset(win, x, y, 1)
         + pfncMapGetCornerYOffset(win, x, y, 2)
