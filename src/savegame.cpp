@@ -15,15 +15,15 @@ static const uint32_t MinorLandmarkVersion = 2;
 
 // Common resource effects. Complex mechanics remain in type-specific hooks.
 static const MinorTerrainDefinition MinorTerrainDefinitions[] = {
-    {"", 0, 0, 0},
-    {"Jungle", 1, 0, 0},
-    {"Uranium", 0, 0, 1},
-    {"Ironstone", 0, 1, 0},
+    {"", 0, 0, 0, -1},
+    {"Jungle", 1, 0, 0, 1},
+    {"Uranium", 0, 0, 1, 2},
+    {"Ironstone", 0, 1, 0, 0},
 };
 
 const MinorTerrainDefinition& minor_terrain_definition(MinorLandmark type) {
     const unsigned id = static_cast<unsigned>(type);
-    return MinorTerrainDefinitions[id < 4 ? id : 0];
+    return MinorTerrainDefinitions[id < MINOR_TYPE_COUNT ? id : 0];
 }
 
 void minor_landmark_reset() {
@@ -58,7 +58,7 @@ bool minor_landmark_set(int x, int y, MinorLandmark type, uint8_t code) {
         return false;
     }
     MAP* tile = mapsq(x, y);
-    if (!tile) {
+    if (!tile || static_cast<unsigned>(type) >= MINOR_TYPE_COUNT) {
         return false;
     }
     minor_landmarks[tile - *MapTiles] = MinorTerrainTile{static_cast<uint8_t>(type), code};
@@ -129,7 +129,7 @@ static int minor_landmark_read(FILE* fp) {
         debug_ver("minor terrain read: no extension, empty terrain\n");
     }
     for (const MinorTerrainTile& tile : minor_landmarks) {
-        if (tile.type > MINOR_IRONSTONE) {
+        if (tile.type >= MINOR_TYPE_COUNT) {
             debug("minor terrain read error: invalid type=%u\n", (unsigned)tile.type);
             return 1;
         }

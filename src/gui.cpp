@@ -1609,8 +1609,8 @@ This is still a Develop-only post-map overlay, NOT a verified terrain-layer
 hook: drawing over units/base graphics and PRACX support remain unresolved.
 */
 #ifndef BUILD_REL
-static Sprite minor_sprites[4] = {};
-static bool minor_sprite_ready[4] = {};
+static Sprite minor_sprites[MINOR_TYPE_COUNT] = {};
+static bool minor_sprite_ready[MINOR_TYPE_COUNT] = {};
 static bool minor_sprites_attempted = false;
 
 static void load_minor_terrain_sprites(Buffer* canvas)
@@ -1635,16 +1635,18 @@ static void load_minor_terrain_sprites(Buffer* canvas)
 
     // Retain legacy Ironstone at x=12 so existing 128x64 assets continue
     // to render it. The new 384x64 atlas adds Jungle and Uranium to the right.
-    const int sprite_x[4] = {0, 140, 268, 12};
-    for (int id = MINOR_JUNGLE; id <= MINOR_IRONSTONE; ++id) {
-        if (image.clipRect.right >= sprite_x[id] + 104
+    for (int id = MINOR_JUNGLE; id < MINOR_TYPE_COUNT; ++id) {
+        const int slot = minor_terrain_definition(static_cast<MinorLandmark>(id)).sprite_slot;
+        const int sprite_x = 12 + slot * 128;
+        if (slot >= 0 && image.clipRect.right >= sprite_x + 104
             && image.clipRect.bottom >= 60) {
             Sprite_ctor(&minor_sprites[id]);
             const int result = Sprite_extract_2(
                 &minor_sprites[id], &image, 0x1FD,
-                sprite_x[id], 4, 104, 56, nullptr);
-            minor_sprite_ready[id] = result >= 0
-                && minor_sprites[id].data != nullptr
+                sprite_x, 4, 104, 56, nullptr);
+            // The engine return-code convention is not established;
+            // follow the previously working data-pointer/width criteria.
+            minor_sprite_ready[id] = minor_sprites[id].data != nullptr
                 && minor_sprites[id].width == 104;
             minor_graphics_trace("minor sprite id / extract result / ready",
                 id, result, minor_sprite_ready[id]);
@@ -1663,7 +1665,7 @@ static void draw_minor_terrain_tile(Console* win, int x, int y)
         return;
     }
     const MinorLandmark type = minor_landmark_at(x, y);
-    if (type <= MINOR_NONE || type > MINOR_IRONSTONE) {
+    if (type <= MINOR_NONE || type >= MINOR_TYPE_COUNT) {
         return;
     }
     MAP* tile = mapsq(x, y);
@@ -1700,19 +1702,19 @@ static void draw_minor_terrain_map(Console* win)
         return;
     }
     static bool first_scan = true;
-    int counts[4] = {};
+    int counts[MINOR_TYPE_COUNT] = {};
     for (int id = 0; id < *MapAreaTiles; ++id) {
         const int y = id / *MapHalfX;
         const int x = 2 * (id % *MapHalfX) + (y & 1);
         const MinorLandmark type = minor_landmark_at(x, y);
-        if (type > MINOR_NONE && type <= MINOR_IRONSTONE) {
+        if (type > MINOR_NONE && type < MINOR_TYPE_COUNT) {
             counts[type]++;
             draw_minor_terrain_tile(win, x, y);
         }
     }
     if (first_scan) {
         first_scan = false;
-        for (int id = MINOR_JUNGLE; id <= MINOR_IRONSTONE; ++id) {
+        for (int id = MINOR_JUNGLE; id < MINOR_TYPE_COUNT; ++id) {
             minor_graphics_trace("minor terrain scan id / total tiles",
                 id, counts[id], *MapAreaTiles);
         }

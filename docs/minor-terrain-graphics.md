@@ -29,8 +29,9 @@ requires further engine/artwork investigation.
 
 The game loads `minor_terrain.pcx` from the **same directory as
 `terranx.exe`**, not the working directory. Put the newly generated
-384x64 file there. Avoid accidentally overwriting it with the
-repository's 128x64 legacy asset during a post-build copy step.
+384x64 file there. The Code::Blocks post-build copy now
+installs the 128x64 legacy asset **only if no PCX exists in the patch
+directory**; it will not overwrite a locally generated three-type atlas.
 
 ## Current rendering integration
 

@@ -12,6 +12,7 @@ enum MinorLandmark : uint8_t {
     MINOR_JUNGLE = 1,
     MINOR_URANIUM = 2,
     MINOR_IRONSTONE = 3,
+    MINOR_TYPE_COUNT = 4,
 };
 
 // Independent per-tile type and type-specific code, without native LM_* bits.
@@ -26,6 +27,7 @@ struct MinorTerrainDefinition {
     int nutrient;
     int mineral;
     int energy;
+    int sprite_slot; // -1 means no atlas sprite; slots are 128x64.
 };
 const MinorTerrainDefinition& minor_terrain_definition(MinorLandmark type);
 
