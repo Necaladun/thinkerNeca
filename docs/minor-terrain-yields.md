@@ -12,8 +12,11 @@ extension saves are deliberately incompatible. Fresh maps and saves are the
 supported development target.
 
 The type registry in `src/savegame.cpp` defines the common resource effects.
-Additional mechanics are handled in their relevant engine components, rather
-than assigning arbitrary meanings to the minor `code` byte globally.
+Each type also declares its generation phase (early, before final climate,
+or late, after rockiness), and sprite slot. The map generator dispatches
+to a specialised algorithm for each type. Additional mechanics are handled
+in their relevant engine components, rather than assigning arbitrary meanings
+to the minor `code` byte globally.
 
 | Minor type | Common effect | Special generation |
 | --- | --- | --- |
@@ -45,7 +48,8 @@ after final climate and rockiness computation.
 
 One minor type per tile. The generators avoid major-landmark footprints and
 other minor terrain; patches keep separation buffers. No minor generator
-calls `new_landmark()`.
+calls `new_landmark()`. Mirrored maps currently skip all independent minor
+generators until symmetric placement is implemented.
 
 Without `modified_landmarks=1`, the original native Jungle/Uranium
 generators remain available for vanilla-style world creation.

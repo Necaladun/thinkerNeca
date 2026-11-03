@@ -1392,14 +1392,42 @@ static void generate_minor_ironstone() {
         completed, patch_count);
 }
 
-// Late minor terrain is placed after final climate/rockiness. Jungle is
-// generated before the native major landmarks so it can influence rainfall.
-static void generate_minor_landmarks() {
-    if (conf.modified_landmarks && conf.minor_uranium) {
-        mod_world_diamond(-1, -1);
+// Each type selects a generation phase in the central minor-terrain
+// registry; specialised algorithms remain separate and replaceable.
+static bool minor_generator_enabled(MinorLandmark type) {
+    switch (type) {
+    case MINOR_JUNGLE: return conf.minor_jungle && conf.modified_landmarks;
+    case MINOR_URANIUM: return conf.minor_uranium && conf.modified_landmarks;
+    case MINOR_IRONSTONE: return conf.minor_ironstone;
+    default: return false;
     }
-    if (conf.minor_ironstone) {
-        generate_minor_ironstone();
+}
+
+static void generate_minor_landmarks(MinorGenerationPhase phase) {
+    // Mirrored worlds need symmetric minor patches, not single-sided
+    // random placement. Match the native landmark loop's exclusion.
+    if (conf.world_mirror_x || conf.world_mirror_y) {
+        return;
+    }
+    for (int id = MINOR_JUNGLE; id < MINOR_TYPE_COUNT; ++id) {
+        const MinorLandmark type = static_cast<MinorLandmark>(id);
+        if (!minor_generator_enabled(type)
+            || minor_terrain_definition(type).generation_phase != phase) {
+            continue;
+        }
+        switch (type) {
+        case MINOR_JUNGLE:
+            mod_world_monsoon(-1, -1);
+            break;
+        case MINOR_URANIUM:
+            mod_world_diamond(-1, -1);
+            break;
+        case MINOR_IRONSTONE:
+            generate_minor_ironstone();
+            break;
+        default:
+            break;
+        }
     }
 }
 
@@ -2094,12 +2122,9 @@ void world_generate(uint32_t seed) {
     mod_world_fungus(noise);
     Path_continents(Paths);
 
-    // Climate-aware Jungle exists before the major landmarks and final
-    // world_climate pass. The old "jungle" knob controls native landmarks
-    // only; minor_jungle is independently enabled by default.
-    if (conf.modified_landmarks && conf.minor_jungle) {
-        mod_world_monsoon(-1, -1);
-    }
+    // Climate-sensitive features must exist before the major landmark
+    // loop and final world_climate pass (Jungle influences rainfall).
+    generate_minor_landmarks(MINOR_GENERATE_EARLY);
 
     LMConfig lm;
     memcpy(&lm, &conf.landmarks, sizeof(lm));
@@ -2214,7 +2239,7 @@ void world_generate(uint32_t seed) {
     world_climate(); // Run Path::continents
     world_rocky();
     // Run the late minor-terrain pass after final climate and geology.
-    generate_minor_landmarks();
+    generate_minor_landmarks(MINOR_GENERATE_LATE);
 
 #ifdef BUILD_DEBUG
     // Generated minor features must not consume native landmark flags.

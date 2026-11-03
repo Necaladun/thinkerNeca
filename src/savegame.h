@@ -22,12 +22,19 @@ struct MinorTerrainTile {
 };
 static_assert(sizeof(MinorTerrainTile) == 2, "Minor terrain save layout");
 
+enum MinorGenerationPhase : uint8_t {
+    MINOR_GENERATE_NEVER = 0,
+    MINOR_GENERATE_EARLY = 1,
+    MINOR_GENERATE_LATE = 2,
+};
+
 struct MinorTerrainDefinition {
     const char* name;
     int nutrient;
     int mineral;
     int energy;
     int sprite_slot; // -1 means no atlas sprite; slots are 128x64.
+    MinorGenerationPhase generation_phase;
 };
 const MinorTerrainDefinition& minor_terrain_definition(MinorLandmark type);
 
