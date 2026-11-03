@@ -184,6 +184,9 @@ struct Config {
     int minor_jungle = 1;
     int minor_uranium = 1;
     int minor_ironstone = 1;
+    // Render-only native uranium special-resource sprite via the original
+    // MapWin_gen_terrain_poly -> bonus_at call (does not change stored flags).
+    int minor_native_uranium = 1;
     // Develop-only diagnostic: 0=post-map proof of concept,
     // 1=existing per-tile MapWin_gen_overlays callback.
     int minor_render_mode = 0;

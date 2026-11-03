@@ -97,3 +97,25 @@ This is appropriate for engine smoke tests without requiring Python or
 Uranium or Jungle graphics**. To override it, run the generator using
 the locally installed original `ter1.pcx` and copy the output alongside
 the executable instead.
+
+## Native Uranium sprite (new, no extra PCX)
+
+`minor_native_uranium=1` (default) makes `mod_bonus_at` return the
+native renderer's **display-only bonus 4** for an independent Uranium tile
+when the direct caller belongs to `MapWin_gen_terrain_poly` (supported
+32-bit executable at `0x4632D0..0x466FFF`). The original renderer then
+draws the loaded `kSprSpecial` sprite at its usual depth, scale, and zoom.
+Other callers — including resource yields and AI — still receive the
+normal 0..3 result. **Neither native LM bits nor save data change.**
+
+Where the tile already has a real native bonus, that bonus takes priority
+and the legacy Uranium preview sprite is retained in Develop builds.
+The default avoids drawing duplicate atlas Uranium on ordinary deposits.
+Turn the option off to restore the previous atlas behaviour.
+
+This technique uses a return-address boundary because the original
+renderer calls `bonus_at` directly. It needs in-game verification on
+the supported GOG `terranx.exe` that the return address falls within
+that reconstructed function; the Windows compile check alone cannot
+establish the runtime callsite. It is an incremental integration, not a
+general mechanism for Jungle or arbitrary native landmarks.

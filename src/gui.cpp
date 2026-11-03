@@ -1701,6 +1701,12 @@ static void draw_minor_terrain_tile(Console* win, int x, int y)
         return;
     }
     MAP* tile = mapsq(x, y);
+    if (type == MINOR_URANIUM && conf.minor_native_uranium
+        && tile && !(tile->items & BIT_BONUS_RES)) {
+        // The native renderer already drew Uranium at the correct
+        // resource stage; never paint a second PCX sprite over it.
+        return;
+    }
     if (!tile || !(tile->is_known(win->cOwner)
         || (*GameState & STATE_OMNISCIENT_VIEW))
         || tile->is_base() || (tile->items & BIT_VEH_IN_TILE)) {

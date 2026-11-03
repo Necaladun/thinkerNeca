@@ -1349,6 +1349,32 @@ Return Value: 0 (no bonus), 1 (nutrient), 2 (mineral), 3 (energy)
 */
 int __cdecl mod_bonus_at(int x, int y) {
     MAP* sq = mapsq(x, y);
+    if (!sq) {
+        return RES_NONE;
+    }
+
+    // The native map renderer uses bonus_at(x,y)==4 to draw its already
+    // loaded terrestrial special-resource sprite (same art as Uranium).
+    // Present 4 ONLY at that renderer's direct callsite. All real resource
+    // calculations and AI calls still receive ordinary 0..3 bonuses, so
+    // the independent Uranium +1 energy is not counted a second time.
+    //
+    // OpenSMAC reconstructs this path in MapWin_gen_terrain_poly
+    // (0x4632D0, before the next MapWin functions). The bounded return
+    // address check is intentionally specific to the supported terranx.exe
+    // image; never globally turn independent Uranium into resource type 4.
+    // If a native resource bonus exists, preserve its normal icon and yield.
+#if defined(__GNUC__)
+    const uintptr_t caller = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
+#else
+    const uintptr_t caller = 0; // Unsupported compiler: skip native visual shortcut.
+#endif
+    if (conf.minor_native_uranium
+        && caller >= 0x4632D0u && caller < 0x467000u
+        && minor_landmark_at(x, y) == MINOR_URANIUM
+        && !(sq->items & BIT_BONUS_RES)) {
+        return 4;
+    }
     uint32_t bit = sq->items;
     uint32_t alt = sq->alt_level();
 
