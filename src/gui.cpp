@@ -1528,7 +1528,10 @@ static void draw_minor_ironstone(Console* win, int x, int y)
         return;
     }
     MAP* tile = mapsq(x, y);
-    if (!tile || !tile->is_visible(win->cOwner)) {
+    // Match the engine's revealed-map and scenario-editor display rules.
+    // Ordinary faction fog of war still hides unexplored minor terrain.
+    if (!tile || !(tile->is_known(win->cOwner)
+        || (*GameState & STATE_OMNISCIENT_VIEW))) {
         return;
     }
     Buffer* canvas = &win->oMainWin.oCanvas;
