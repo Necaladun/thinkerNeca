@@ -118,9 +118,10 @@ def main() -> None:
             and 'matches != 1' in patches,
             'Ironstone must require a unique verified native bonus_at call')
     require('write_call(site, (int)minor_native_ironstone_bonus_hook)' in patches
-            and 'sprite_x, sprite_y, dest_scale, source_scale' in renderer,
+            and 'sprite_x, sprite_y, draw_scale, source_scale' in renderer,
             'Ironstone must paint at native tile sprite origin')
-    require('MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py)' in renderer
+    require('frame[4] <= -8' not in renderer
+            and 'MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py)' in renderer
             and 'const bool far_zoom = zoom <= -6;' in renderer
             and 'draw_scale, source_scale' in renderer
             and 'sprite_y = static_cast<int>(tile_py) - lift' in renderer,
