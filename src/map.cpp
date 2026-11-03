@@ -726,27 +726,6 @@ Search for the first landmark found within the radius range of the specified til
 Return Value: Landmark offset or -1 if none found
 */
 int __cdecl find_landmark(int x, int y, size_t range_offset) {
-    // The native named-landmark table is independent of the 16 LM_* flags.
-    // Prefer this patch's Ironstone name while inspecting an Ironstone tile,
-    // even if its centre is beyond the requested small search radius.
-    // A deposit can extend several tiles from its generated seed.
-    if (minor_landmark_at(x, y) == MINOR_IRONSTONE) {
-        int best = -1;
-        int best_range = 9; // generated patches contain at most 9 tiles
-        for (int lm = 0; lm < *MapLandmarkCount; lm++) {
-            if (strcmp(Landmarks[lm].name, "Ironstone")) {
-                continue;
-            }
-            int dist = map_range(x, y, Landmarks[lm].x, Landmarks[lm].y);
-            if (dist < best_range) {
-                best = lm;
-                best_range = dist;
-            }
-        }
-        if (best >= 0) {
-            return best;
-        }
-    }
     int offset = TableRange[range_offset];
     for (int i = 0; i < offset; i++) {
         int x2 = wrap(x + TableOffsetX[i]);
@@ -776,37 +755,6 @@ int __cdecl new_landmark(int x, int y, const char* name) {
     Landmarks[offset].y = y;
     strcpy_n(&Landmarks[offset].name[0], 32, name);
     return offset;
-}
-
-/*
-Backfill native landmark *names* for existing SAV/MP maps that were created
-before Ironstone names were registered during generation. We do not set any
-LM_* terrain flag: minor-terrain identity remains in the THMIN001 extension.
-Most maps require one name per deposit, not one name per tile.
-*/
-void ensure_minor_ironstone_names() {
-    if (!*MapTiles || *MapHalfX <= 0 || *MapAreaTiles <= 0) {
-        return;
-    }
-    for (int id = 0; id < *MapAreaTiles; ++id) {
-        const int y = id / *MapHalfX;
-        const int x = 2 * (id % *MapHalfX) + (y & 1);
-        if (minor_landmark_at(x, y) != MINOR_IRONSTONE) {
-            continue;
-        }
-        bool named = false;
-        for (int lm = 0; lm < *MapLandmarkCount; ++lm) {
-            if (!strcmp(Landmarks[lm].name, "Ironstone")
-                && map_range(x, y, Landmarks[lm].x, Landmarks[lm].y) <= 8) {
-                named = true;
-                break;
-            }
-        }
-        if (!named && new_landmark(x, y, "Ironstone") < 0) {
-            debug("minor Ironstone label backfill stopped: 64-name limit reached\n");
-            break;
-        }
-    }
 }
 
 /*

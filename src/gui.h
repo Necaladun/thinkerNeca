@@ -83,8 +83,6 @@ void __thiscall ReportWin_draw_ops_color(Buffer* This, int UNUSED(a2), int a3, i
 int __thiscall mod_MapWin_focus(MapWindow* This, int x, int y);
 void __thiscall mod_MapWin_set_center(MapWindow* This, int x, int y, int flag);
 void __thiscall ReportWin_close_handler(SubInterface* This);
-void __thiscall mod_StatusWin_draw_status(
-    StatusWindow* This, int a2, int a3, int a4, int y, int a6);
 void __cdecl say_loc(char* dest, int x, int y, int a4, int a5, int a6);
 void __cdecl mod_diplomacy_caption(int faction1, int faction2);
 void __cdecl reset_netmsg_status();

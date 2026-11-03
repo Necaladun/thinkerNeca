@@ -1082,9 +1082,6 @@ int __cdecl mod_load_daemon(const char* filename, int flag) {
     }
     rebuild_vehicle_bits();
     rebuild_base_bits();
-    // Support older minor-terrain saves whose generated deposits did not
-    // yet receive native names. The independent tile IDs remain unchanged.
-    ensure_minor_ironstone_names();
     // Fix: removed leftover original debug code that activated debug mode and scenario editor
     // when any save with the string "multi" in the filename was opened
     *ControlTurnMove = MapWin->cOwner;
@@ -1161,7 +1158,6 @@ int __cdecl mod_load_map_daemon(const char* filename) {
                 MapWin->field_23BE4 = 0;
                 status = 4;
                 if (!map_data(fp, 0, is_save)) {
-                    ensure_minor_ironstone_names();
                     *BaseCount = 0;
                     *VehCount = 0;
                     MapWin->InVehMode = 0;

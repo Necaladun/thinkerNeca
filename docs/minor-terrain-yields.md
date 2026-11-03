@@ -14,49 +14,45 @@
   so AI evaluation is aligned with the new feature.
 - Existing jungle, uranium and major landmarks have not been changed.
 
-## Names
+## Minor-terrain identity and display
 
-A generated Ironstone deposit uses one of the engine's native **named landmark
-instances**, with the name `Ironstone`. This is separate from the 16 native
-landmark type bits; there are up to 64 native named instances per map.
-The customized `find_landmark` lookup prioritizes a named Ironstone deposit
-when the queried tile is itself Ironstone.
+Ironstone is a **minor terrain feature**, not a native named landmark.
+Its identity is the independent `MINOR_IRONSTONE` tile ID in `THMIN001`.
+Generation does **not** register an `Ironstone` name with `new_landmark()`;
+the native map's landmark-name table and its 64-entry limit are reserved for
+actual named landmarks.
 
-Older SAV and MP files receive missing names at successful load, without
-regenerating terrain or altering `THMIN001` tile identifiers. Existing names
-are reused rather than duplicated. If the original 64-name array is full,
-the mineral bonus still works but the new name cannot be registered.
+Jungle and Uranium are also treated as *minor* terrain conceptually. They
+currently use the original `LM_JUNGLE` and `LM_URANIUM` bits for their
+working engine effects, including native tile descriptions. This patch leaves
+both unchanged.
 
-The name is passed through the **native named-landmark lookup**. The tile
-status window is a separate path: native `#NATURAL` short labels are normally
-shown only when a tile has an LM_* flag. The new `mod_StatusWin_draw_status`
-adapter supplies a temporary `LM_NEXUS` marker and short label while drawing,
-then restores both the tile flags and the native label pointers. Neither
-the map/save data nor resource computations are persistently changed.
+**Tile-inspector limitation:** the native status renderer does not yet show
+`Ironstone` as a terrain descriptor. The previous experimental wrapper of
+`StatusWin::draw_status` caused crashes when selecting Ironstone tiles and
+has been removed. The correct follow-up is a verified, narrow status-text
+integration that reads the independent minor-terrain ID without spoofing
+`LM_*` flags or temporarily rewriting the global `#NATURAL` table.
+Do not reintroduce unverified binary call-site scanning for this purpose.
 
-Future minor terrain types only need a new branch in
-`minor_terrain_square_label()` in `src/gui.cpp` to acquire a status label.
-
-**In-game verification pending**: direct call-site discovery, positioning,
-major-landmark coexistence, fog handling and save/reload require a rebuilt
-Develop DLL and inspection in the game. This code is not validated by the
-static source review alone.
+The only Ironstone-specific UI at present is the map sprite; the mineral
+yield works independently of tile-status text.
 
 ## In-game tests
 
 1. Pull `master`, rebuild **Develop**, and install the new `thinker.dll`.
-   The diagnostic `minor_terrain.pcx` does not need to change.
-2. Load an existing save with Ironstone. Verify the existing Ironstone tiles
-   are still present. Hover/select a known Ironstone tile and inspect the
-   terrain/landmark text for `Ironstone`. Test the centre and edge of a patch.
-3. Compare a flat non-Ironstone tile with a matching unimproved Ironstone
+2. Start a fresh world with Ironstone. Click and hover Ironstone tiles and
+   confirm that the game no longer crashes.
+3. Confirm that Ironstone does not appear as a named map landmark. It should
+   remain visible via its custom sprite.
+4. Confirm Jungle and Uranium native status descriptions, resources, and map
+   graphics behave as before.
+5. Compare a flat non-Ironstone tile with a matching unimproved Ironstone
    tile: expect +1 mineral, unless a normal mineral cap intervenes.
-4. Found a base on an Ironstone tile and compare the base-centre mineral
-   output to an equivalent ordinary base site. Base-centre yields have no
-   ordinary tile cap.
-5. Try a mine/road and an Ironstone tile with 2+ minerals; verify Thinker's
-   normal mine bonus and mineral-cap logic is maintained.
-6. Save/reload and ensure the mineral yield and name persist. Loading older
-   saves will backfill names in memory and saving will persist them.
+6. Found a base on an Ironstone tile and compare the base-centre mineral
+   output to an equivalent ordinary base site.
+7. Save/reload a fresh game and verify Ironstone graphics and yield persist
+   without any new native landmark-name entries.
 
-This change requires no new custom PCX or extra native landmark type.
+Ironstone is *not yet* expected to appear in the tile-inspector terrain
+description; that is a separate unresolved UI integration.
