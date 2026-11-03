@@ -1274,7 +1274,7 @@ void __cdecl mod_world_ridge(int x, int y) {
         int x2 = wrap(x + TableOffsetX[WorldRidgeOffset[i]]);
         int y2 = y + TableOffsetY[WorldRidgeOffset[i]];
         if (mapsq(x2, y2)) {
-            world_alt_set(x2, y2, ALT_ONE_ABOVE_SEA, true);
+            world_alt_set(x2, y2, ALT_TWO_ABOVE_SEA, true);
             bit2_set(x2, y2, LM_RIDGE, true); // rolled these two into single loop with
             code_set(x2, y2, WorldRidgeOffset[i]); // the above world_alt_set()
         }
