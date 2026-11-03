@@ -27,7 +27,25 @@ def main() -> None:
         for slot in range(3):
             pixels = atlas.crop((slot*128+12, 4, slot*128+116, 60))
             assert any(pixel != 253 for pixel in pixels.getdata()), slot
-        print('Three sprites, indexed palette, dimensions and transparency verified')
+        print('Native-format source: three sprites, dimensions and transparency verified')
+
+        # The repository's 128x64 legacy Ironstone asset is also a valid
+        # source; no installed game artwork is needed for CI/dev previews.
+        legacy = Path('assets/minor_terrain.pcx')
+        if legacy.exists():
+            fallback = Path(tmp) / 'minor_terrain_fallback.pcx'
+            subprocess.run([sys.executable, str(generator), str(legacy),
+                            str(fallback)], check=True)
+            preview = Image.open(fallback)
+            assert preview.mode == 'P' and preview.size == (384, 64)
+            source_sprite = Image.open(legacy).crop((12, 4, 116, 60))
+            iron_sprite = preview.crop((12, 4, 116, 60))
+            assert iron_sprite.tobytes() == source_sprite.tobytes(), (
+                'Fallback must preserve Ironstone pixels exactly')
+            for slot in range(3):
+                subimage = preview.crop((slot*128+12, 4, slot*128+116, 60))
+                assert any(pixel != 253 for pixel in subimage.getdata()), slot
+            print('Legacy asset: three sprites and unchanged Ironstone verified')
 
 
 if __name__ == '__main__':

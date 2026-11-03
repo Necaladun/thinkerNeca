@@ -83,3 +83,17 @@ For visual debugging, `minor_debug_tile_names=1` paints the definition's
 name on a hovered map tile through the same supported per-tile drawing
 callback (Develop only). This is **not** the native tile-inspector label,
 and deliberately makes no claim to solve that outstanding integration.
+
+## CI test atlas (no local art required)
+
+GitHub Actions now generates a **384x64 fallback atlas** from the existing
+`assets/minor_terrain.pcx` and bundles it with the Develop DLL artifact.
+That fallback preserves the existing Ironstone sprite pixel-for-pixel,
+draws the provisional Jungle canopy, and tints the Ironstone shape
+yellow-green as temporary Uranium art.
+
+This is appropriate for engine smoke tests without requiring Python or
+`ter1.pcx` on the player's computer, but **does not yet reproduce native
+Uranium or Jungle graphics**. To override it, run the generator using
+the locally installed original `ter1.pcx` and copy the output alongside
+the executable instead.

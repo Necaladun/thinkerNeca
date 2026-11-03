@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Build a three-type PCX atlas from a locally installed SMAC ter1.pcx.
+"""Build a three-type PCX atlas from game art or the existing Ironstone asset.
 
-Usage: python tools/make_minor_terrain.py <ter1.pcx> <minor_terrain.pcx>
-Needs Pillow. The original game artwork is never committed to the repository.
+Usage: python tools/make_minor_terrain.py <source.pcx> <minor_terrain.pcx>
+Sources: installed SMAC ter1.pcx (1024x768), or legacy minor_terrain.pcx
+(128x64). Requires Pillow. The original game artwork is not committed.
 
 Layout: three 128x64 slots: Ironstone, Jungle, Uranium.
 Each sprite uses slot + (12,4), size 104x56. Transparency index 253.
@@ -19,11 +20,12 @@ TRANSPARENT = 253
 
 def main() -> None:
     if len(sys.argv) != 3:
-        sys.exit('Usage: make_minor_terrain.py <ter1.pcx> <output.pcx>')
+        sys.exit('Usage: make_minor_terrain.py <ter1.pcx|legacy minor_terrain.pcx> <output.pcx>')
     source, output = Path(sys.argv[1]), Path(sys.argv[2])
     original = Image.open(source)
-    if original.mode != 'P' or original.size != (1024, 768):
-        sys.exit('Expected the original 1024x768 indexed ter1.pcx')
+    if original.mode != 'P' or original.size not in ((1024, 768), (128, 64)):
+        sys.exit('Expected 1024x768 ter1.pcx or 128x64 legacy minor_terrain.pcx')
+    native_source = original.size == (1024, 768)
 
     palette = original.getpalette()
     if not palette or len(palette) < 768:
@@ -38,25 +40,36 @@ def main() -> None:
                 sum((colors[index][j] - rgb[j]) ** 2 for j in range(3)))
         return nearest_cache[rgb]
 
-    # The known native Uranium rectangle. Preserve its indexed palette.
-    uranium = original.crop((815, 256, 919, 312))
     clean = list(range(256))
     for index in (252, 253, 254, 255):
         clean[index] = TRANSPARENT
-    uranium = uranium.point(clean)
 
-    # Retain the existing Ironstone appearance: rust-coloured Uranium.
-    recolor = []
-    for index in range(256):
-        if index in (252, 253, 254, 255):
-            recolor.append(TRANSPARENT)
-        else:
-            red, green, blue = colors[index]
-            light = 0.299*red + 0.587*green + 0.114*blue
-            recolor.append(palette_index((min(245, int(24 + 1.10*light)),
-                                          min(152, int(4 + 0.43*light)),
-                                          min(118, int(3 + 0.32*light)))))
-    ironstone = original.crop((815, 256, 919, 312)).point(recolor)
+    def tint(sprite, colour):
+        # Map pixel luminance to the source palette while preserving
+        # transparency. This creates distinguishable *test* art only.
+        recolor = []
+        for index in range(256):
+            if index in (252, 253, 254, 255):
+                recolor.append(TRANSPARENT)
+            else:
+                red, green, blue = colors[index]
+                light = 0.299*red + 0.587*green + 0.114*blue
+                recolor.append(palette_index(tuple(
+                    max(0, min(245, int(base + multiplier*light)))
+                    for base, multiplier in colour)))
+        return sprite.point(recolor)
+
+    if native_source:
+        # Native Uranium art from the user's local installation.
+        uranium = original.crop((815, 256, 919, 312)).point(clean)
+        ironstone = tint(original.crop((815, 256, 919, 312)),
+                         ((24, 1.10), (4, 0.43), (3, 0.32)))
+    else:
+        # Existing Ironstone art lives in the repository; no game art is
+        # extracted or redistributed. Fallback Uranium is a provisional
+        # yellow-green recolour, NOT the native graphic.
+        ironstone = original.crop((12, 4, 116, 60)).point(clean)
+        uranium = tint(ironstone, ((15, 0.55), (35, 0.94), (6, 0.37)))
 
     # Provisional canopy marker; this is NOT extracted native Jungle art.
     # Transparent gaps leave much of the normal terrain visible.
