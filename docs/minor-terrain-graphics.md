@@ -211,3 +211,32 @@ has a guarded callsite hook, plus an explicit escape hatch:
 `minor_native_ironstone=0` restores the old sprite renderer.
 The original custom 104x56 art remains experimental; palette,
 distinctness and final pixel alignment still require in-game review.
+
+## Ironstone position and artwork correction (next test)
+
+The first native-stage wrapper mistakenly drew at the incoming
+`MapWin_gen_terrain_poly` arguments `px,py`. These are **tile polygon
+origins**, not sprite origins. The original renderer adjusts by
+`px -= 4*q`, `py -= average_corner_lift + 2*q`, where
+`q=(zoom_unit(zoom)+1)/4`, before drawing its resource sprites.
+The new Ironstone wrapper reproduces that adjustment using the
+original zoom argument and corner elevations. This should fix the
+apparent drift when zooming or focusing on a tile.
+
+The old Ironstone artwork was a very sparse, translucent-looking
+recolour of the native Uranium graphic. The atlas generator now draws
+original, substantially opaque iron-rich mineral outcrops with angular
+edges, distinct rust faces and a darker base/shadow; it works with the
+local game's indexed palette or the legacy fallback palette.
+
+**Deploy BOTH files:** `thinker.dll` AND the newly generated
+`minor_terrain.pcx`, from the *same* CI build. Merely updating the DLL
+will leave the previous ghostly asset in place.
+
+`Sprite_extract_2` trims transparent margins; its readiness check now
+accepts positive bounded width/height rather than requiring the
+full source rectangle width. It retains the original sprite's trim
+offsets and transparently blits at palette index 253.
+
+Neither Jungle/Uranium's native graphics, terrain generation,
+resource yields, nor the inspector are changed by this iteration.

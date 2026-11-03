@@ -120,6 +120,12 @@ def main() -> None:
     require('write_call(site, (int)minor_native_ironstone_bonus_hook)' in patches
             and 'frame[10], frame[11]' in renderer,
             'Ironstone must paint at native tile sprite origin')
+    require('sprite_x = frame[10] - 4 * quarter' in renderer
+            and 'sprite_y = frame[11] - lift - 2 * quarter' in renderer,
+            'Ironstone must use native sprite origin, not unshifted tile arguments')
+    require('minor_sprites[id].width > 0' in renderer
+            and 'minor_sprites[id].height <= 56' in renderer,
+            'Transparent trimming must not disable solid Ironstone art')
     print('Minor-terrain structural/source invariants passed')
 
 

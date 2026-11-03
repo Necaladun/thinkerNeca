@@ -1715,10 +1715,14 @@ static void load_minor_terrain_sprites(Buffer* canvas)
             const int result = Sprite_extract_2(
                 &minor_sprites[id], &image, 0x1FD,
                 sprite_x, 4, 104, 56, nullptr);
-            // The engine return-code convention is not established;
-            // follow the previously working data-pointer/width criteria.
+            // The sprite extractor trims transparent borders while retaining
+            // offset_x/offset_y for the final blit. Requiring width==104
+            // wrongly rejected properly cropped artwork.
             minor_sprite_ready[id] = minor_sprites[id].data != nullptr
-                && minor_sprites[id].width == 104;
+                && minor_sprites[id].width > 0
+                && minor_sprites[id].width <= 104
+                && minor_sprites[id].height > 0
+                && minor_sprites[id].height <= 56;
             minor_graphics_trace("minor sprite id / extract result / ready",
                 id, result, minor_sprite_ready[id]);
         } else {
@@ -1839,15 +1843,46 @@ extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* fram
     if (!minor_sprite_ready[MINOR_IRONSTONE]) {
         return original;
     }
-    // MapWin_gen_terrain_poly passes the *unshifted* native sprite
-    // origin at [EBP+0x28, +0x2C]. Both blit scale globals have already
-    // been established at its native resource-rendering stage.
+    // EBP+0x28/+0x2C are the unshifted tile polygon origin,
+    // NOT the resource-sprite origin. In original MapWin_gen_terrain_poly
+    // it applies:
+    //   q = (zoom_unit(zoom)+1)/4
+    //   px -= 4*q
+    //   py -= lift + 2*q
+    // immediately before all sprite rendering. Omitting these offsets
+    // made Ironstone float away from its tile as zoom/height changed.
+    const int zoom = frame[4]; // [EBP+0x10]
+    const int zoom_num = *piZoomNum;
+    const int zoom_den = *piZoomDenom;
+    if (zoom_num >= 1 && zoom_den <= 0) {
+        return original;
+    }
+    const int scaled_zoom = zoom_num < 1
+        ? (zoom + 16) * 50 / 16
+        : zoom_num * 50 / zoom_den;
+    const int quarter = (scaled_zoom + 1) / 4;
+    if (quarter <= 0) {
+        return original;
+    }
+    MapWindow* win = reinterpret_cast<MapWindow*>(static_cast<uintptr_t>(frame[3]));
+    const int lift =
+        (pfncMapGetCornerYOffset(win, x, y, 1)
+        + pfncMapGetCornerYOffset(win, x, y, 2)
+        + pfncMapGetCornerYOffset(win, x, y, 3)
+        + pfncMapGetCornerYOffset(win, x, y, 4)) >> 2;
+    const int sprite_x = frame[10] - 4 * quarter;
+    const int sprite_y = frame[11] - lift - 2 * quarter;
+
+    // Both blit scale globals have already been established at the
+    // game's native resource-sprite stage.
     const int dest_scale = *piDestScale;
     const int source_scale = *piSourceScale;
     if (dest_scale > 0 && source_scale > 0) {
         Sprite* sprite = &minor_sprites[MINOR_IRONSTONE];
-        Sprite_draw_2(sprite, dest, sprite->color_index[0],
-            frame[10], frame[11], dest_scale, source_scale);
+        // Atlas pixels use explicit transparent palette index 253.
+        // The native drawing routine applies extracted trimming offsets.
+        Sprite_draw_2(sprite, dest, 253,
+            sprite_x, sprite_y, dest_scale, source_scale);
     }
     return original;
 }

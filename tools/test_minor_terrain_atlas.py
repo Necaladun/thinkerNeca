@@ -27,6 +27,9 @@ def main() -> None:
         for slot in range(3):
             pixels = atlas.crop((slot*128+12, 4, slot*128+116, 60))
             assert any(pixel != 253 for pixel in pixels.getdata()), slot
+        native_iron = atlas.crop((12, 4, 116, 60))
+        assert sum(px != 253 for px in native_iron.getdata()) > 1600, (
+            'Native-source Ironstone should be opaque and distinguishable')
         print('Native-format source: three sprites, dimensions and transparency verified')
 
         # The repository's 128x64 legacy Ironstone asset is also a valid
@@ -40,8 +43,12 @@ def main() -> None:
             assert preview.mode == 'P' and preview.size == (384, 64)
             source_sprite = Image.open(legacy).crop((12, 4, 116, 60))
             iron_sprite = preview.crop((12, 4, 116, 60))
-            assert iron_sprite.tobytes() == source_sprite.tobytes(), (
-                'Fallback must preserve Ironstone pixels exactly')
+            assert iron_sprite.tobytes() != source_sprite.tobytes(), (
+                'Fallback Ironstone must replace ghostly legacy artwork')
+            opaque = sum(1 for pixel in iron_sprite.getdata() if pixel != 253)
+            assert opaque > 1600, ('Ironstone outcrop is too sparse', opaque)
+            assert iron_sprite.getpixel((0, 0)) == 253, (
+                'Transparent border must be retained')
             for slot in range(3):
                 subimage = preview.crop((slot*128+12, 4, slot*128+116, 60))
                 assert any(pixel != 253 for pixel in subimage.getdata()), slot
