@@ -19,7 +19,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build g++-mingw-w64-i686 binutils-mingw-w64-i686
-          python -m pip install 'cmake>=3.31,<4'
+          python -m pip install 'cmake>=3.31,<4' pillow
       - name: Configure 32-bit Windows target
         run: |
           cat > win32-toolchain.cmake <<'EOF'
@@ -33,5 +33,15 @@ jobs:
             -DCMAKE_BUILD_TYPE=Develop
       - name: Compile Develop DLL and launcher
         run: cmake --build build/ci --parallel 2
-      - name: Validate atlas generator syntax
-        run: python -m py_compile tools/make_minor_terrain.py
+      - name: Test indexed minor-terrain atlas generation
+        run: |
+          python -m py_compile tools/make_minor_terrain.py
+          python tools/test_minor_terrain_atlas.py
+      - name: Upload Windows Develop binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: thinker-develop-win32
+          path: |
+            build/ci/thinker.dll
+            build/ci/thinker.exe
+          if-no-files-found: error
