@@ -313,3 +313,9 @@ the running game and MUST NOT be resurrected.
 This commit is intentionally a diagnostic prerequisite rather than
 a claim of completed inspector integration. No new INI setting,
 save format, gameplay yield or rendering graphics changes are needed.
+
+The Develop cursor-hover path also exercises a *format-only* text
+composer, logging `INSPECTOR HOVER ... sample_feature_line=Forest, Ironstone`
+(or Jungle/Uranium) for discovered minor tiles. This confirms the
+independent name lookup and intended comma-separated presentation; it
+does not claim the native status panel has been altered.

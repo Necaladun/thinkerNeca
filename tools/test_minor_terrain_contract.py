@@ -129,6 +129,11 @@ def main() -> None:
     require('minor_sprites[id].width > 0' in renderer
             and 'minor_sprites[id].height <= 56' in renderer,
             'Transparent trimming must not disable solid Ironstone art')
+    require('minor_inspector_feature_line(const char* native, int x, int y)' in renderer
+            and 'minor_terrain_name_at(x, y)' in renderer
+            and 'line += ", ";' in renderer
+            and 'minor_inspector_trace_hover(ptTile.x, ptTile.y);' in renderer,
+            'Build a format-only feature-line seam without native landmark spoofing')
     require('minor_inspector_scan_native(fp);' in renderer
             and 'INSPECTOR SCAN' in renderer
             and '0x4B6570' in renderer

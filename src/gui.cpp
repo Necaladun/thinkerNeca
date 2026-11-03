@@ -176,6 +176,10 @@ static GameWinState current_window() {
     return GW_None;
 }
 
+#ifndef BUILD_REL
+static void minor_inspector_trace_hover(int x, int y);
+#endif
+
 void mouse_over_tile(POINT* p) {
     static POINT ptLastTile = {0, 0};
     POINT ptTile;
@@ -187,6 +191,9 @@ void mouse_over_tile(POINT* p) {
     && memcmp(&ptTile, &ptLastTile, sizeof(POINT)) != 0) {
         StatusWin->tile_x = ptTile.x;
         StatusWin->tile_y = ptTile.y;
+#ifndef BUILD_REL
+        minor_inspector_trace_hover(ptTile.x, ptTile.y);
+#endif
         StatusWin_on_redraw(StatusWin);
         memcpy(&ptLastTile, &ptTile, sizeof(POINT));
     }
@@ -1048,7 +1055,7 @@ static void minor_inspector_scan_native(FILE* fp)
         {0x5DB580, "Buffer_write_l", 0},
         {0x6169A0, "Strings_get", 0}
     };
-    fprintf(fp, "INSPECTOR SCAN StatusWin_draw_status 0x%08X..0x%08X (read-only)\\n",
+    fprintf(fp, "INSPECTOR SCAN StatusWin_draw_status 0x%08X..0x%08X (read-only)\n",
         (unsigned)start, (unsigned)end);
     const uint8_t* begin = reinterpret_cast<const uint8_t*>(start);
     const uint8_t* finish = reinterpret_cast<const uint8_t*>(end);
@@ -1079,7 +1086,7 @@ static void minor_inspector_scan_native(FILE* fp)
         }
     }
     for (const TextTarget& target : targets) {
-        fprintf(fp, "INSPECTOR CALL COUNT %s = %d\\n", target.name, target.count);
+        fprintf(fp, "INSPECTOR CALL COUNT %s = %d\n", target.name, target.count);
     }
     const struct {
         uint8_t literal[4];
@@ -1108,9 +1115,9 @@ static void minor_inspector_scan_native(FILE* fp)
             }
             fputc('\n', fp);
         }
-        fprintf(fp, "INSPECTOR MASK COUNT %s = %d\\n", mask.name, matches);
+        fprintf(fp, "INSPECTOR MASK COUNT %s = %d\n", mask.name, matches);
     }
-    fprintf(fp, "INSPECTOR SCAN END. Bytes are candidates, not verified hooks.\\n");
+    fprintf(fp, "INSPECTOR SCAN END. Bytes are candidates, not verified hooks.\n");
 }
 
 // Write a fresh diagnostic header at DLL startup so a missing map callback
@@ -1154,6 +1161,56 @@ void minor_graphics_startup_trace()
         fprintf(fp, "Native mask literals: Jungle=%d Uranium=%d\n",
             jungle_hits, uranium_hits);
         minor_inspector_scan_native(fp);
+        fclose(fp);
+    }
+}
+
+
+/*
+Ready-to-use native feature-line composition, kept outside the engine
+until the original local text-buffer callsite and capacity are verified.
+No native LM bits, Natural[] entries or MAP fields are ever modified.
+*/
+static std::string minor_inspector_feature_line(const char* native, int x, int y)
+{
+    std::string line = native ? native : "";
+    const char* minor = minor_terrain_name_at(x, y);
+    if (minor && minor[0]) {
+        if (!line.empty()) {
+            line += ", ";
+        }
+        line += minor;
+    }
+    return line;
+}
+
+// Confirm the independent registry returns the intended text for the
+// exact hovered/inspected tile. This does NOT alter StatusWin contents.
+static void minor_inspector_trace_hover(int x, int y)
+{
+    static int reports = 0, previous_x = -1, previous_y = -1;
+    if (reports >= 20 || (x == previous_x && y == previous_y)) {
+        return;
+    }
+    MAP* sq = mapsq(x, y);
+    if (!sq || MapWin->cOwner < 0 || MapWin->cOwner >= MaxPlayerNum
+        || !(sq->is_known(MapWin->cOwner)
+            || (*GameState & STATE_OMNISCIENT_VIEW))) {
+        return;
+    }
+    const char* name = minor_terrain_name_at(x, y);
+    if (!name || !*name) {
+        return;
+    }
+    previous_x = x;
+    previous_y = y;
+    ++reports;
+    const std::string expected = minor_inspector_feature_line("Forest", x, y);
+    const std::string path = minor_graphics_file("minor_terrain_render.log");
+    FILE* fp = fopen(path.c_str(), "a");
+    if (fp) {
+        fprintf(fp, "INSPECTOR HOVER x=%d y=%d minor=%s sample_feature_line=%s\n",
+            x, y, name, expected.c_str());
         fclose(fp);
     }
 }
