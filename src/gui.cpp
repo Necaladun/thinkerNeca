@@ -1641,24 +1641,65 @@ static void draw_minor_ironstone(Console* win, int x, int y)
     if (!attempted) {
         attempted = true;
         const std::string path = minor_graphics_file("minor_terrain.pcx");
+        // The previous single "missing or invalid" message concealed which
+        // stage failed. Record the actual path and the loader/extractor state.
+        {
+            const std::string log_path = minor_graphics_file("minor_terrain_render.log");
+            FILE* log = fopen(log_path.c_str(), "a");
+            if (log) {
+                fprintf(log, "PCX requested path: %s\n", path.c_str());
+                fclose(log);
+            }
+        }
         FILE* fp = fopen(path.c_str(), "rb");
-        if (fp) {
+        if (!fp) {
+            minor_graphics_trace("PCX file not found/open failed", x, y, GetLastError());
+        } else {
+            fseek(fp, 0, SEEK_END);
+            long pcx_size = ftell(fp);
+            fseek(fp, 0, SEEK_SET);
+            uint8_t header[128] = {};
+            size_t header_read = fread(header, 1, sizeof(header), fp);
             fclose(fp);
+            minor_graphics_trace("PCX exists; size in bytes", x, y, (int)pcx_size);
+            if (header_read == sizeof(header)) {
+                minor_graphics_trace("PCX header identifier/version/planes",
+                    (int)header[0], (int)header[1], (int)header[65]);
+                minor_graphics_trace("PCX header coordinates",
+                    (int)header[8] + ((int)header[9] << 8),
+                    (int)header[10] + ((int)header[11] << 8),
+                    (int)header[3]);
+            }
             Buffer image;
             Buffer_ctor(&image);
-            Buffer_load_pcx(&image, path.c_str(), canvas->palette, 0, 0);
-            if (image.data && image.clipRect.right >= 116
-                && image.clipRect.bottom >= 60) {
+            const int load_result = Buffer_load_pcx(
+                &image, path.c_str(), canvas->palette, 0, 0);
+            minor_graphics_trace("PCX Buffer_load_pcx return", x, y, load_result);
+            minor_graphics_trace("PCX Buffer clip right/bottom",
+                image.clipRect.right, image.clipRect.bottom, image.data != nullptr);
+            minor_graphics_trace("PCX Buffer size right/bottom",
+                image.sizeRect.right, image.sizeRect.bottom,
+                image.ddSurface != nullptr);
+
+            // Buffer::data can be null for some backends; the PCX loader may
+            // have populated a DirectDraw surface. Only validate dimensions
+            // before asking the engine to extract a sprite.
+            if (image.clipRect.right >= 116 && image.clipRect.bottom >= 60) {
                 Sprite_ctor(&iron_sprite);
-                Sprite_extract_2(&iron_sprite, &image, 0x1FD,
-                    12, 4, 104, 56, nullptr);
+                const int extract_result = Sprite_extract_2(
+                    &iron_sprite, &image, 0x1FD, 12, 4, 104, 56, nullptr);
+                minor_graphics_trace("Sprite_extract_2 return",
+                    extract_result, iron_sprite.width, iron_sprite.data != nullptr);
                 ready = iron_sprite.data != nullptr && iron_sprite.width == 104;
+            } else {
+                minor_graphics_trace("PCX loaded without expected dimensions",
+                    image.clipRect.right, image.clipRect.bottom, load_result);
             }
             Buffer_dtor(&image);
         }
-        minor_graphics_trace(ready ? "PCX sprite loaded" : "PCX missing or invalid",
+        minor_graphics_trace(ready ? "PCX sprite loaded" : "PCX unavailable for drawing",
             x, y, iron_sprite.width);
-        debug("minor terrain sprite load: %s\n", ready ? "ready" : "missing or invalid");
+        debug("minor terrain sprite load: %s\n", ready ? "ready" : "failed");
     }
     if (!ready) {
         return;
