@@ -1,0 +1,37 @@
+name: Windows 32-bit build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - 'feature/**'
+
+jobs:
+  build-develop:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install MinGW and CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++-mingw-w64-i686 binutils-mingw-w64-i686
+          python -m pip install 'cmake>=3.31,<4'
+      - name: Configure 32-bit Windows target
+        run: |
+          cat > win32-toolchain.cmake <<'EOF'
+          set(CMAKE_SYSTEM_NAME Windows)
+          set(CMAKE_C_COMPILER i686-w64-mingw32-gcc)
+          set(CMAKE_CXX_COMPILER i686-w64-mingw32-g++)
+          set(CMAKE_RC_COMPILER i686-w64-mingw32-windres)
+          EOF
+          cmake -S . -B build/ci -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=win32-toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Develop
+      - name: Compile Develop DLL and launcher
+        run: cmake --build build/ci --parallel 2
+      - name: Validate atlas generator syntax
+        run: python -m py_compile tools/make_minor_terrain.py
