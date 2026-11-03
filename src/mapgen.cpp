@@ -811,84 +811,130 @@ void __cdecl mod_world_monsoon(int x, int y) {
         name_landmark(x, y, LM_JUNGLE);
         return;
     }
-    struct TileInfo {
-        uint8_t valid;
-        uint8_t valid_near;
-        uint8_t sea;
-        uint8_t sea_near;
+    // Use a smaller overall Jungle budget and grow several separated,
+    // bounded patches instead of repeatedly stamping large random-walk areas.
+    const int y_a = *MapAreaY * 5 / 16;
+    const int y_b = *MapAreaY * 11 / 16;
+    const int limit = max(1024, *MapAreaTiles) * (2 + *MapCloudCover) / 192;
+    int num = 0;
+
+    // An independent seed keeps changes to Jungle shape from shifting the
+    // placement of later landmarks through the shared map generator RNG.
+    GameRandom jungle_rand;
+    jungle_rand.reseed(pair_hash((uint32_t)*MapRandomSeed ^ 0x4A554E47u,
+        (uint32_t)*MapAreaTiles));
+
+    auto eligible = [&](int tx, int ty) -> bool {
+        MAP* tile = mapsq(tx, ty);
+        return tile && ty >= y_a && ty <= y_b && !tile->lm_items()
+            && (tile->alt_level() == ALT_SHORE_LINE
+                || tile->alt_level() == ALT_ONE_ABOVE_SEA);
     };
-    std::unordered_map<Point, TileInfo> tiles;
 
-    int i = 0, j = 0, x2 = 0, y2 = 0, num = 0;
-    const int y_a = *MapAreaY * 5/16;
-    const int y_b = *MapAreaY * 11/16;
-    const int limit = max(1024, *MapAreaTiles) * (2 + *MapCloudCover) / 128;
+    // A candidate cannot be within two tiles of a previously completed
+    // Jungle patch, leaving at least two ordinary tiles between patches.
+    auto separated = [&](int tx, int ty) -> bool {
+        for (auto& tile : iterate_tiles(tx, ty, 0, TableRange[2])) {
+            if (tile.sq->landmarks & LM_JUNGLE) {
+                return false;
+            }
+        }
+        return true;
+    };
 
-    for (y = 0; y < *MapAreaY; y++) {
-        for (x = y&1; x < *MapAreaX; x+=2) {
-            if (!(sq = mapsq(x, y))) {
+    // Some candidate sites will be unusable on very dry or fragmented maps.
+    // It is better to leave part of the budget unused than merge patches.
+    for (int patch_no = 0; patch_no < 32 && num < limit; patch_no++) {
+        int seed_x = -1;
+        int seed_y = -1;
+        int best_score = -1;
+
+        // Prefer pre-existing moist/rainy areas, but do not require them.
+        // The mild coast bonus maintains Thinker's coastal-jungle tendency.
+        for (int attempt = 0; attempt < 64; attempt++) {
+            int sy = y_a + jungle_rand.get(y_b - y_a + 1);
+            int sx = jungle_rand.get(*MapAreaX);
+            sx = ((sx ^ sy) & 1) ^ sx;
+            if (!eligible(sx, sy) || !separated(sx, sy)) {
                 continue;
             }
-            tiles[{x, y}].sea = sq->alt_level() < ALT_SHORE_LINE
-                && Continents[sq->region].tile_count > 15;
-            tiles[{x, y}].valid = !sq->lm_items()
-                && (sq->alt_level() == ALT_SHORE_LINE || sq->alt_level() == ALT_ONE_ABOVE_SEA);
+            MAP* tile = mapsq(sx, sy);
+            int score = jungle_rand.get(6)
+                + (tile->is_rainy() ? 5 : (tile->is_moist() ? 3 : 0))
+                + (is_coast(sx, sy, true) ? 1 : 0);
+            if (score > best_score) {
+                seed_x = sx;
+                seed_y = sy;
+                best_score = score;
+            }
         }
-    }
-    for (y = 0; y < *MapAreaY; y++) {
-        for (x = y&1; x < *MapAreaX; x+=2) {
-            if (tiles[{x, y}].valid) {
-                for (auto& p : iterate_tiles(x, y, 0, 45)) {
-                    if (tiles[{p.x, p.y}].valid) {
-                        tiles[{x, y}].valid_near++;
-                    }
-                    if (tiles[{p.x, p.y}].sea) {
-                        tiles[{x, y}].sea_near++;
+        if (seed_x < 0) {
+            break;
+        }
+
+        int target = 8 + jungle_rand.get(9); // Most patches: 8-16 tiles
+        if (jungle_rand.get(6) == 0) {
+            target = 17 + jungle_rand.get(6); // Occasionally: 17-22
+        }
+        target = min(target, limit - num);
+
+        std::vector<Point> patch;
+        std::set<Point> selected;
+        patch.push_back({seed_x, seed_y});
+        selected.insert({seed_x, seed_y});
+
+        while ((int)patch.size() < target) {
+            std::set<Point> frontier;
+            for (const Point& from : patch) {
+                for (auto& tile : iterate_tiles(from.x, from.y, 1, 9)) {
+                    Point p = {tile.x, tile.y};
+                    if (!selected.count(p) && eligible(p.x, p.y)
+                        && separated(p.x, p.y)) {
+                        frontier.insert(p);
                     }
                 }
             }
-        }
-    }
-    int loc_all = 0;
-    int loc_cur = map_rand.get(4);
-    for (i = 0; i < 512 && num < limit; i++) {
-        if (loc_all == 15) {
-            loc_all = 0;
-            loc_cur = map_rand.get(4);
-        }
-        if (i % 16 == 0 || loc_all & (1 << loc_cur)) {
-            while (loc_all & (1 << loc_cur)) {
-                loc_cur = map_rand.get(4);
+            if (frontier.empty()) {
+                break;
             }
+
+            // Weight compact growth and naturally wet terrain, while
+            // keeping enough randomness for irregular patch outlines.
+            std::vector<std::pair<Point, int>> choices;
+            int total_weight = 0;
+            for (const Point& p : frontier) {
+                int neighbours = 0;
+                for (auto& tile : iterate_tiles(p.x, p.y, 1, 9)) {
+                    neighbours += selected.count({tile.x, tile.y}) != 0;
+                }
+                MAP* tile = mapsq(p.x, p.y);
+                int weight = 1 + (neighbours >= 2 ? 3 : 0)
+                    + (tile->is_rainy() ? 2 : (tile->is_moist() ? 1 : 0));
+                choices.push_back({p, weight});
+                total_weight += weight;
+            }
+
+            int draw = jungle_rand.get(total_weight);
+            Point chosen = choices.back().first;
+            for (const auto& choice : choices) {
+                if (draw < choice.second) {
+                    chosen = choice.first;
+                    break;
+                }
+                draw -= choice.second;
+            }
+            patch.push_back(chosen);
+            selected.insert(chosen);
         }
-        y = (map_rand.get(y_b - y_a) + y_a);
-        x = wrap(((map_rand.get(*MapAreaX / 4) + loc_cur * *MapAreaX / 4) &~1) + (y&1));
-        if (!tiles[{x, y}].valid
-        || tiles[{x, y}].sea_near < 8 - i/16
-        || tiles[{x, y}].valid_near < 16 - i/32) {
+
+        // Do not leave tiny isolated Jungle specks if a seed is blocked.
+        if ((int)patch.size() < min(6, target)) {
             continue;
         }
-        int goal = num + max(21, limit/4);
-        for (j = 0; j < 32 && num < goal && num < limit; j++) {
-            if (j % 4 == 0) {
-                y2 = y;
-                x2 = x;
-            }
-            y2 = y2 + map_rand.get(8);
-            x2 = wrap(((x2 + map_rand.get(8)) &~1) + (y2&1));
-            if (y2 >= y_a && y2 <= y_b
-            && tiles[{x2, y2}].valid
-            && tiles[{x2, y2}].valid_near > 8 - i/32) {
-                for (auto& p : iterate_tiles(x2, y2, 0, 21)) {
-                    if (tiles[{p.x, p.y}].valid && !(p.sq->landmarks & LM_JUNGLE)) {
-                        assert(!is_ocean(p.sq));
-                        bit2_set(p.x, p.y, LM_JUNGLE, 1);
-                        code_set(p.x, p.y, num % 121);
-                        loc_all |= (1 << loc_cur);
-                        num++;
-                    }
-                }
-            }
+        for (const Point& p : patch) {
+            bit2_set(p.x, p.y, LM_JUNGLE, true);
+            code_set(p.x, p.y, num % 121);
+            num++;
         }
     }
 }
