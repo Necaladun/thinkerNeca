@@ -118,7 +118,7 @@ def main() -> None:
             and 'matches != 1' in patches,
             'Ironstone must require a unique verified native bonus_at call')
     require('write_call(site, (int)minor_native_ironstone_bonus_hook)' in patches
-            and 'frame[10], frame[11]' in renderer,
+            and 'sprite_x, sprite_y, dest_scale, source_scale' in renderer,
             'Ironstone must paint at native tile sprite origin')
     require('MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py)' in renderer
             and 'sprite_x = static_cast<int>(tile_px) - 4 * quarter' in renderer

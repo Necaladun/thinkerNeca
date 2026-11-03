@@ -1830,7 +1830,8 @@ extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* fram
     }
     if (!conf.minor_native_ironstone
         || minor_landmark_at(x, y) != MINOR_IRONSTONE
-        || !frame || frame[8] != x || frame[9] != y
+        || !frame || frame[4] <= -8
+        || frame[8] != x || frame[9] != y
         || reinterpret_cast<uintptr_t>(MapWin) != static_cast<uintptr_t>(frame[3])) {
         return original;
     }

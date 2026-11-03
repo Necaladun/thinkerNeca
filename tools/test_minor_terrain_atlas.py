@@ -52,7 +52,7 @@ def main() -> None:
             for slot in range(3):
                 subimage = preview.crop((slot*128+12, 4, slot*128+116, 60))
                 assert any(pixel != 253 for pixel in subimage.getdata()), slot
-            print('Legacy asset: three sprites and unchanged Ironstone verified')
+            print('Legacy asset: regenerated solid Ironstone and valid atlas verified')
 
 
 if __name__ == '__main__':
