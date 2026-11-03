@@ -113,6 +113,13 @@ def main() -> None:
     require('const byte original[6] = {0x81, 0xE2, 0x04, 0, 0, 0x80};' in patches
             and 'write_bytes(site.addr, original, redirect' in patches,
             'Never install native Jungle hooks without expected-byte validation')
+    require('native Ironstone bonus_at site' in renderer
+            and 'minor_native_ironstone_bonus_hook' in renderer
+            and 'matches != 1' in patches,
+            'Ironstone must require a unique verified native bonus_at call')
+    require('write_call(site, (int)minor_native_ironstone_bonus_hook)' in patches
+            and 'frame[10], frame[11]' in renderer,
+            'Ironstone must paint at native tile sprite origin')
     print('Minor-terrain structural/source invariants passed')
 
 

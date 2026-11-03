@@ -306,6 +306,8 @@ int option_handler(void* user, const char* section, const char* name, const char
         cf->minor_ironstone = !!atoi(value);
     } else if (MATCH("minor_native_uranium")) {
         cf->minor_native_uranium = !!atoi(value);
+    } else if (MATCH("minor_native_ironstone")) {
+        cf->minor_native_ironstone = !!atoi(value);
     } else if (MATCH("minor_native_jungle_preview")) {
         cf->minor_native_jungle_preview = !!atoi(value);
     } else if (MATCH("minor_native_jungle")) {

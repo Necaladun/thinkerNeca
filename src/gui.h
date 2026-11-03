@@ -69,6 +69,12 @@ int __thiscall mod_calc_dim(Console* This);
 int __thiscall mod_gen_map(Console* This, int faction_id, int units_only);
 #ifndef BUILD_REL
 void minor_graphics_startup_trace();
+extern bool minor_native_ironstone_installed;
+void minor_graphics_ironstone_hook_result(int addr, int matches);
+#if defined(__GNUC__) && defined(__i386__)
+extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* frame);
+extern "C" void minor_native_ironstone_bonus_hook();
+#endif
 #endif
 void __thiscall MapWin_gen_overlays(Console* This, int x, int y);
 int __thiscall SetupWin_buffer_draw(Buffer* src, Buffer* dst, int a3, int a4, int a5, int a6, int a7);

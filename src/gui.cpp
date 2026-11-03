@@ -1676,6 +1676,13 @@ hook: drawing over units/base graphics and PRACX support remain unresolved.
 static Sprite minor_sprites[MINOR_TYPE_COUNT] = {};
 static bool minor_sprite_ready[MINOR_TYPE_COUNT] = {};
 static bool minor_sprites_attempted = false;
+bool minor_native_ironstone_installed = false;
+
+void minor_graphics_ironstone_hook_result(int addr, int matches)
+{
+    minor_graphics_trace("native Ironstone bonus_at site / count / active",
+        addr, matches, minor_native_ironstone_installed);
+}
 
 static void load_minor_terrain_sprites(Buffer* canvas)
 {
@@ -1797,6 +1804,73 @@ static void draw_native_minor_jungle(Console* win, int x, int y)
     *texture_key = old_key;
 }
 
+// Native bonus_at call adapter: the caller still gets exactly the usual
+// resource value, apart from the existing display-only Uranium=4 case.
+// Its native EBP frame supplies the real destination canvas, map window,
+// tile coordinates and sprite origin. Draw Ironstone at the same stage as
+// native resource icons, not during a late whole-map repaint.
+#if defined(__GNUC__) && defined(__i386__)
+extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* frame)
+{
+    const int original = mod_bonus_at(x, y);
+    MAP* tile = mapsq(x, y);
+    if (!tile) {
+        return original;
+    }
+    if (conf.minor_native_uranium
+        && minor_landmark_at(x, y) == MINOR_URANIUM
+        && !(tile->items & BIT_BONUS_RES)) {
+        // The original renderer-facing bonus_at returned this sentinel
+        // directly; the new wrapper would otherwise obscure its caller.
+        return 4;
+    }
+    if (!conf.minor_native_ironstone
+        || minor_landmark_at(x, y) != MINOR_IRONSTONE
+        || !frame || frame[8] != x || frame[9] != y
+        || reinterpret_cast<uintptr_t>(MapWin) != static_cast<uintptr_t>(frame[3])) {
+        return original;
+    }
+
+    Buffer* dest = reinterpret_cast<Buffer*>(static_cast<uintptr_t>(frame[2]));
+    if (!dest || !dest->palette) {
+        return original;
+    }
+    load_minor_terrain_sprites(dest);
+    if (!minor_sprite_ready[MINOR_IRONSTONE]) {
+        return original;
+    }
+    // MapWin_gen_terrain_poly passes the *unshifted* native sprite
+    // origin at [EBP+0x28, +0x2C]. Both blit scale globals have already
+    // been established at its native resource-rendering stage.
+    const int dest_scale = *piDestScale;
+    const int source_scale = *piSourceScale;
+    if (dest_scale > 0 && source_scale > 0) {
+        Sprite* sprite = &minor_sprites[MINOR_IRONSTONE];
+        Sprite_draw_2(sprite, dest, sprite->color_index[0],
+            frame[10], frame[11], dest_scale, source_scale);
+    }
+    return original;
+}
+
+// This thunk is invoked only after verifying a native E8 call from
+// MapWin_gen_terrain_poly to bonus_at(0x592030). At thunk entry EBP
+// belongs to the original renderer. Its cdecl arguments are x and y;
+// the saved EBP pointer is an additional internal argument for drawing.
+extern "C" __attribute__((naked, used)) void minor_native_ironstone_bonus_hook()
+{
+    __asm__ __volatile__(
+        "pushl %ebp\n\t"
+        "pushl %ebp\n\t"
+        "pushl 16(%esp)\n\t"
+        "pushl 16(%esp)\n\t"
+        "call _minor_ironstone_bonus_inner\n\t"
+        "addl $12, %esp\n\t"
+        "popl %ebp\n\t"
+        "ret\n\t"
+    );
+}
+#endif
+
 static void draw_minor_terrain_tile(Console* win, int x, int y)
 {
     if (conf.reduced_mode || win != MapWin || !*MapTiles
@@ -1808,6 +1882,11 @@ static void draw_minor_terrain_tile(Console* win, int x, int y)
         return;
     }
     MAP* tile = mapsq(x, y);
+    if (type == MINOR_IRONSTONE && minor_native_ironstone_installed) {
+        // The native resource stage now handles this custom sprite,
+        // including focus/partial redraws and correct unit layering.
+        return;
+    }
     if (type == MINOR_JUNGLE && conf.minor_native_jungle) {
         // The original terrain function draws native Jungle from the
         // game's texture array before resources, fungus and improvements.

@@ -182,3 +182,32 @@ with the same compiled DLL, set `minor_native_jungle=0` and use
 
 The trampoline is enabled only for MinGW i386 builds and does not hook
 PRACX reduced-mode rendering.
+
+## Native-stage Ironstone test (Develop only)
+
+`minor_native_ironstone=1` (default) now seeks the unique native
+direct `E8` call from `MapWin_gen_terrain_poly` to `bonus_at`
+(`0x592030`), in the original function's range. Only if *exactly
+one* target is found does Thinker redirect that call to a cdecl
+thunk. A missing or ambiguous site installs **no hook** and retains
+the old drawing fallback. The result is appended to
+`minor_terrain_render.log` as `native Ironstone bonus_at site`.
+
+The thunk preserves the native renderer EBP and argument stack, calls
+the existing gameplay `mod_bonus_at`, and draws the current independent
+Ironstone sprite into the **native renderer's destination Buffer** with
+its existing terrain sprite position and native zoom factors. The
+caller receives the original resource result. The current Uranium
+special sentinel (4) is explicitly preserved even though the wrapper
+changes the direct calling address.
+
+The original terrain stage is after fungus and before subsequent
+resource/improvement sprites and units; this avoids both late-overdraw
+and units-only focus wipes. Native LM flags, resource values and
+minor save extension are untouched.
+
+**This has not been validated in the running game yet**. The source
+has a guarded callsite hook, plus an explicit escape hatch:
+`minor_native_ironstone=0` restores the old sprite renderer.
+The original custom 104x56 art remains experimental; palette,
+distinctness and final pixel alignment still require in-game review.

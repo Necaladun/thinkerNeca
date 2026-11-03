@@ -5,6 +5,42 @@
 #include "savegame.h"
 
 
+static bool install_minor_native_ironstone()
+{
+#if defined(__GNUC__) && defined(__i386__) && !defined(BUILD_REL)
+    // The reconstructed original MapWin_gen_terrain_poly makes one
+    // direct E8 call to bonus_at (0x592030) immediately before drawing
+    // its native resource icons. Find the exact *direct call target*
+    // rather than assuming the site's byte address.
+    const int first = 0x4632D0;
+    const int end = 0x466600;
+    int site = 0;
+    int matches = 0;
+    for (int addr = first; addr <= end - 5; ++addr) {
+        if (*(const uint8_t*)addr != 0xE8) {
+            continue;
+        }
+        const int32_t rel = *(const int32_t*)(addr + 1);
+        if (addr + 5 + rel == 0x592030) {
+            site = addr;
+            ++matches;
+        }
+    }
+    if (matches != 1) {
+        minor_graphics_ironstone_hook_result(site, matches);
+        return false;
+    }
+    // write_call verifies that the location is a native direct call.
+    // No patch at all if the number of candidates isn't exactly one.
+    write_call(site, (int)minor_native_ironstone_bonus_hook);
+    minor_native_ironstone_installed = true;
+    minor_graphics_ironstone_hook_result(site, matches);
+    return true;
+#else
+    return false;
+#endif
+}
+
 /*
 The supported SMAX executable checks native Jungle at three locations
 inside MapWin_gen_terrain_poly. Original instruction (6 bytes):
@@ -1420,6 +1456,14 @@ bool patch_setup(Config* cf) {
 #if defined(__GNUC__) && defined(__i386__)
     if (cf->minor_native_jungle && !cf->reduced_mode) {
         install_minor_native_jungle();
+    }
+#endif
+
+    // Ironstone uses the same native stage as resource icons, retaining
+    // the user's independent type/code/yield and all legacy LM flags.
+#ifndef BUILD_REL
+    if (cf->minor_native_ironstone && !cf->reduced_mode) {
+        install_minor_native_ironstone();
     }
 #endif
 
