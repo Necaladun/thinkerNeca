@@ -540,6 +540,7 @@ bool patch_setup(Config* cf) {
     write_jump(0x591D60, (int)bit_set);
     write_jump(0x591DB0, (int)bit2_set);
     write_jump(0x591E50, (int)synch_bit);
+    write_jump(0x592030, (int)mod_bonus_at);
     write_jump(0x592250, (int)say_loc);
     write_jump(0x592550, (int)find_landmark);
     write_jump(0x592600, (int)new_landmark);
