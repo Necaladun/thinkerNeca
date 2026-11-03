@@ -250,3 +250,25 @@ the normal MapWin drawing path. It does not assume that the original
 parameters by the resource stage. It then applies the native elevation/
 zoom sprite adjustment. This avoids a fragile dependency on compiler
 choices about parameter storage in the original executable.
+
+## Minimum-zoom visibility correction
+
+In-game testing showed Ironstone deposits vanished near maximum zoom-out.
+The current native-stage wrapper explicitly rejected `zoom <= -8`, matching
+the original engine's optional ordinary resource-icon cutoff. Independent
+geological Ironstone is terrain and should **remain visible**. That cutoff
+has been removed from the wrapper.
+
+At zoom levels `-8` and `-6`, the adapter draws its existing custom
+ore sprite at two-thirds of the native zoom-dependent sprite scale,
+repositioning the sprite origin by the same ratio to preserve tile
+alignment. This keeps clusters legible without larger overlapped ore
+shapes obscuring the zoomed-out map. Other zoom levels are unaffected.
+
+The user's Deirdre 2101 save (`THMIN001` v2, 160x160) was independently
+decoded for diagnosis: a four-tile Ironstone deposit near (147,37)
+occupies (148,38), (145,39), (147,39), (149,39); a seven-tile deposit
+near (60,112) occupies (59,111), (61,111), (59,113), (61,113),
+(60,114), (62,114), (63,115). The save and original game's art are
+not committed to the repository. Runtime min-zoom visuals still need
+confirmation by the user.

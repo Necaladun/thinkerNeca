@@ -1830,7 +1830,7 @@ extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* fram
     }
     if (!conf.minor_native_ironstone
         || minor_landmark_at(x, y) != MINOR_IRONSTONE
-        || !frame || frame[4] <= -8
+        || !frame
         || frame[8] != x || frame[9] != y
         || reinterpret_cast<uintptr_t>(MapWin) != static_cast<uintptr_t>(frame[3])) {
         return original;
@@ -1876,19 +1876,27 @@ extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* fram
     // before the resource pass, so frame[10]/frame[11] aren't reliable.
     long tile_px = 0, tile_py = 0;
     MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py);
-    const int sprite_x = static_cast<int>(tile_px) - 4 * quarter;
-    const int sprite_y = static_cast<int>(tile_py) - lift - 2 * quarter;
-
-    // Both blit scale globals have already been established at the
-    // game's native resource-sprite stage.
+    // The native renderer normally suppresses *ordinary* resource
+    // sprites at zoom <= -8. Ironstone is a map feature, so keep it
+    // visible at maximum zoom-out as well. Use a smaller glyph at -8/-6
+    // to prevent dense geological clusters merging into a large blotch.
+    // Adjust sprite origins by the same scaling ratio so the deposit
+    // stays centred over its actual tile, rather than drifting.
     const int dest_scale = *piDestScale;
     const int source_scale = *piSourceScale;
     if (dest_scale > 0 && source_scale > 0) {
+        const bool far_zoom = zoom <= -6;
+        const int draw_scale = far_zoom
+            ? max(1, (2 * dest_scale) / 3) : dest_scale;
+        const int sprite_x = static_cast<int>(tile_px)
+            - (4 * quarter * draw_scale) / dest_scale;
+        const int sprite_y = static_cast<int>(tile_py) - lift
+            - (2 * quarter * draw_scale) / dest_scale;
         Sprite* sprite = &minor_sprites[MINOR_IRONSTONE];
         // Atlas pixels use explicit transparent palette index 253.
         // The native drawing routine applies extracted trimming offsets.
         Sprite_draw_2(sprite, dest, 253,
-            sprite_x, sprite_y, dest_scale, source_scale);
+            sprite_x, sprite_y, draw_scale, source_scale);
     }
     return original;
 }
