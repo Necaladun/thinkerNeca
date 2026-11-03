@@ -120,9 +120,10 @@ def main() -> None:
     require('write_call(site, (int)minor_native_ironstone_bonus_hook)' in patches
             and 'frame[10], frame[11]' in renderer,
             'Ironstone must paint at native tile sprite origin')
-    require('sprite_x = frame[10] - 4 * quarter' in renderer
-            and 'sprite_y = frame[11] - lift - 2 * quarter' in renderer,
-            'Ironstone must use native sprite origin, not unshifted tile arguments')
+    require('MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py)' in renderer
+            and 'sprite_x = static_cast<int>(tile_px) - 4 * quarter' in renderer
+            and 'sprite_y = static_cast<int>(tile_py) - lift - 2 * quarter' in renderer,
+            'Ironstone must use tile-aligned native sprite origin')
     require('minor_sprites[id].width > 0' in renderer
             and 'minor_sprites[id].height <= 56' in renderer,
             'Transparent trimming must not disable solid Ironstone art')

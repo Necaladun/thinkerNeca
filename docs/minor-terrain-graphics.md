@@ -240,3 +240,13 @@ offsets and transparently blits at palette index 253.
 
 Neither Jungle/Uranium's native graphics, terrain generation,
 resource yields, nor the inspector are changed by this iteration.
+
+### Coordinate-source hardening
+
+The native sprite adapter now obtains its raw tile position through
+`MapWin_tile_to_pixel`, which is the same coordinate conversion used by
+the normal MapWin drawing path. It does not assume that the original
+`MapWin_gen_terrain_poly` stack slots retain unmodified `px,py`
+parameters by the resource stage. It then applies the native elevation/
+zoom sprite adjustment. This avoids a fragile dependency on compiler
+choices about parameter storage in the original executable.

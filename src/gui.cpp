@@ -1843,8 +1843,8 @@ extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* fram
     if (!minor_sprite_ready[MINOR_IRONSTONE]) {
         return original;
     }
-    // EBP+0x28/+0x2C are the unshifted tile polygon origin,
-    // NOT the resource-sprite origin. In original MapWin_gen_terrain_poly
+    // The tile polygon position is NOT the resource-sprite origin.
+    // In original MapWin_gen_terrain_poly
     // it applies:
     //   q = (zoom_unit(zoom)+1)/4
     //   px -= 4*q
@@ -1870,8 +1870,13 @@ extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* fram
         + pfncMapGetCornerYOffset(win, x, y, 2)
         + pfncMapGetCornerYOffset(win, x, y, 3)
         + pfncMapGetCornerYOffset(win, x, y, 4)) >> 2;
-    const int sprite_x = frame[10] - 4 * quarter;
-    const int sprite_y = frame[11] - lift - 2 * quarter;
+    // Recompute the raw tile position from the native map window.
+    // The original renderer may reuse/modify its stack argument slots
+    // before the resource pass, so frame[10]/frame[11] aren't reliable.
+    long tile_px = 0, tile_py = 0;
+    MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py);
+    const int sprite_x = static_cast<int>(tile_px) - 4 * quarter;
+    const int sprite_y = static_cast<int>(tile_py) - lift - 2 * quarter;
 
     // Both blit scale globals have already been established at the
     // game's native resource-sprite stage.
