@@ -422,9 +422,22 @@ static void draw_minor_ironstone_map(Console* win);
 int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
 #ifndef BUILD_REL
     static bool first_map_draw = true;
+    static int last_zoom = -99999;
+    static int last_partial = -1;
+    static int zoom_reports = 0;
     if (first_map_draw) {
         first_map_draw = false;
         minor_graphics_trace("MapWin_gen_map call routed via Thinker", 0, 0, units_only);
+    }
+    // Zoom can redraw the map through both full and units-only passes.
+    // Record transitions (not individual frames) to diagnose lost overlays.
+    if (This == MapWin && zoom_reports < 40
+        && (This->ZoomFactor != last_zoom || units_only != last_partial)) {
+        last_zoom = This->ZoomFactor;
+        last_partial = units_only;
+        zoom_reports++;
+        minor_graphics_trace("map redraw zoom / tile-pixels / units_only",
+            This->ZoomFactor, This->PixelsPerTileX, units_only);
     }
 #endif
     // With smooth scrolling disabled, this must behave exactly like the
@@ -432,7 +445,9 @@ int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
     if (!conf.smooth_scrolling) {
         MapWin_gen_map(This, faction_id, units_only);
 #ifndef BUILD_REL
-        if (This == MapWin && !units_only) {
+        if (This == MapWin) {
+            // Redraw the minor layer after both full and partial passes.
+            // Temporary until minor terrain has a dedicated engine layer.
             draw_minor_ironstone_map(This);
         }
 #endif
@@ -478,9 +493,8 @@ int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
         }
         MapWin_gen_map(This, faction_id, units_only);
 #ifndef BUILD_REL
-        if (!units_only) {
-            draw_minor_ironstone_map(This);
-        }
+        // Reapply the custom layer after a partial redraw as well.
+        draw_minor_ironstone_map(This);
 #endif
         // Restore This's original values
         This->MapPixelLeft = MapPixelLeft;
