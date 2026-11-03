@@ -80,8 +80,8 @@ Both modes suppress overlay sprites on tiles containing bases/vehicles to
 avoid covering unit artwork while rendering order remains uncertain.
 
 For visual debugging, `minor_debug_tile_names=1` paints the definition's
-name on a hovered map tile through the same supported per-tile drawing
-callback (Develop only). This is **not** the native tile-inspector label,
+name on revealed minor tiles at readable zoom levels through the same
+supported per-tile drawing callback (Develop only). This is **not** the native tile-inspector label,
 and deliberately makes no claim to solve that outstanding integration.
 
 ## CI test atlas (no local art required)

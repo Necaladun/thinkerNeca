@@ -1056,10 +1056,12 @@ void __thiscall MapWin_gen_overlays(Console* This, int x, int y)
     if (This == MapWin && conf.minor_render_mode == 1) {
         draw_minor_terrain_tile(This, x, y);
     }
-    // Diagnostic name is shown on the map only, never written to the
-    // native status panel or its landmark table.
+    // Diagnostic labels are painted on all discovered minor tiles
+    // at readable zoom levels. Hovering a tile does not itself guarantee
+    // a full map redraw, so do not depend on StatusWin's cursor position.
+    // This does not touch the native status panel or landmark table.
     if (This == MapWin && conf.minor_debug_tile_names
-        && StatusWin->tile_x == x && StatusWin->tile_y == y) {
+        && This->PixelsPerTileX >= 60) {
         const char* name = minor_terrain_name_at(x, y);
         MAP* sq = mapsq(x, y);
         if (name[0] && sq && This->cOwner >= 0
