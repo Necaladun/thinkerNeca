@@ -982,7 +982,52 @@ void __cdecl mod_world_dune(int x, int y) {
             bit2_set(x2, y2, LM_DUNES, true);
             rocky_set(x2, y2, LEVEL_FLAT);
             code_set(x2, y2, i);
+
+            // Dunes have only three designated energy deposits and one oasis.
+            sq->items &= ~(BIT_BONUS_RES | BIT_NUTRIENT_RES | BIT_MINERAL_RES | BIT_ENERGY_RES);
+            if (i == 2 || i == 7 || i == 4) {
+                sq->items |= BIT_BONUS_RES | BIT_ENERGY_RES;
+            }
         }
+    }
+
+    // Put the oasis away from the two raised dune crests. Otherwise a later
+    // shoreline pass can raise a shallow lake back into dry land.
+    const int crest1_x = wrap(x + TableOffsetX[2]);
+    const int crest1_y = y + TableOffsetY[2];
+    const int crest2_x = wrap(x + TableOffsetX[7]);
+    const int crest2_y = y + TableOffsetY[7];
+    int oasis_x = -1;
+    int oasis_y = -1;
+
+    // Prefer an enclosed lake within the inner ring, then other inland
+    // locations; accept a coastal location only as a last resort.
+    for (int pass = 0; pass < 3 && oasis_x < 0; pass++) {
+        for (int i = 1; i < TableRange[2]; i++) {
+            if (i == 2 || i == 7 || i == 4) {
+                continue; // Reserved energy deposits
+            }
+            int x2 = wrap(x + TableOffsetX[i]);
+            int y2 = y + TableOffsetY[i];
+            MAP* tile = mapsq(x2, y2);
+            if (!tile || !(tile->landmarks & LM_DUNES)
+                || is_ocean(tile) || tile->alt_level() != ALT_SHORE_LINE
+                || map_range(x2, y2, crest1_x, crest1_y) <= 1
+                || map_range(x2, y2, crest2_x, crest2_y) <= 1) {
+                continue;
+            }
+            if ((pass == 0 && i >= 9) || (pass < 2 && is_coast(x2, y2, false))) {
+                continue;
+            }
+            oasis_x = x2;
+            oasis_y = y2;
+            break;
+        }
+    }
+    if (oasis_x >= 0) {
+        world_alt_set(oasis_x, oasis_y, ALT_OCEAN_SHELF, true);
+        bit2_set(oasis_x, oasis_y, LM_FRESH, true);
+        bit_set(oasis_x, oasis_y, BIT_BONUS_RES | BIT_NUTRIENT_RES, true);
     }
     name_landmark(x, y + 2, LM_DUNES);
 }
