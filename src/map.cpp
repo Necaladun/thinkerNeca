@@ -779,6 +779,37 @@ int __cdecl new_landmark(int x, int y, const char* name) {
 }
 
 /*
+Backfill native landmark *names* for existing SAV/MP maps that were created
+before Ironstone names were registered during generation. We do not set any
+LM_* terrain flag: minor-terrain identity remains in the THMIN001 extension.
+Most maps require one name per deposit, not one name per tile.
+*/
+void ensure_minor_ironstone_names() {
+    if (!*MapTiles || *MapHalfX <= 0 || *MapAreaTiles <= 0) {
+        return;
+    }
+    for (int id = 0; id < *MapAreaTiles; ++id) {
+        const int y = id / *MapHalfX;
+        const int x = 2 * (id % *MapHalfX) + (y & 1);
+        if (minor_landmark_at(x, y) != MINOR_IRONSTONE) {
+            continue;
+        }
+        bool named = false;
+        for (int lm = 0; lm < *MapLandmarkCount; ++lm) {
+            if (!strcmp(Landmarks[lm].name, "Ironstone")
+                && map_range(x, y, Landmarks[lm].x, Landmarks[lm].y) <= 8) {
+                named = true;
+                break;
+            }
+        }
+        if (!named && new_landmark(x, y, "Ironstone") < 0) {
+            debug("minor Ironstone label backfill stopped: 64-name limit reached\n");
+            break;
+        }
+    }
+}
+
+/*
 Check whether the specified faction has permission to name a landmark on the provided tile.
 Return Value: Does the faction have control of the tile to set a landmark? true/false
 */
