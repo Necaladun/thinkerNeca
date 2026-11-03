@@ -2,6 +2,22 @@
 
 #include "main.h"
 
+/*
+Minor terrain: an independent tile feature, not an LM_* landmark. Batch 1
+only establishes storage and persistence; no generation or yields yet.
+*/
+enum MinorLandmark : uint8_t {
+    MINOR_NONE = 0,
+    MINOR_JUNGLE = 1,
+    MINOR_URANIUM = 2,
+    MINOR_IRONSTONE = 3,
+};
+
+MinorLandmark minor_landmark_at(int x, int y);
+bool minor_landmark_set(int x, int y, MinorLandmark type);
+void minor_landmark_clear(int x, int y);
+void minor_landmark_reset();
+
 enum SaveLoadStatus {
     SAVE_LOAD_VALID = 0,
     SAVE_LOAD_NONE = 1,
