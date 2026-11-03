@@ -1808,6 +1808,12 @@ static void draw_minor_terrain_tile(Console* win, int x, int y)
         return;
     }
     MAP* tile = mapsq(x, y);
+    if (type == MINOR_JUNGLE && conf.minor_native_jungle) {
+        // The original terrain function draws native Jungle from the
+        // game's texture array before resources, fungus and improvements.
+        // Never repeat Jungle in our late sprite/diagnostic overlay.
+        return;
+    }
     if (type == MINOR_URANIUM && conf.minor_native_uranium
         && tile && !(tile->items & BIT_BONUS_RES)) {
         // The native renderer already drew Uranium at the correct

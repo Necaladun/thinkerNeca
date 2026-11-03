@@ -106,6 +106,13 @@ def main() -> None:
     require('write_jump(0x4B6570' not in patches
             and 'write_call(0x4B6570' not in patches,
             'Do not restore a speculative native status-window hook')
+    require('minor_native_jungle' in patches
+            and all(f'0x{x}' in patches for x in
+                    ('463CC5', '463D93', '464E78')),
+            'Expected three stage-native Jungle flag checks')
+    require('const byte original[6] = {0x81, 0xE2, 0x04, 0, 0, 0x80};' in patches
+            and 'write_bytes(site.addr, original, redirect' in patches,
+            'Never install native Jungle hooks without expected-byte validation')
     print('Minor-terrain structural/source invariants passed')
 
 

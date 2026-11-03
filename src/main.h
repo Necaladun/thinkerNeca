@@ -190,6 +190,9 @@ struct Config {
     // Develop-only: original loaded Jungle textures, drawn at an overlay
     // stage until the internal native terrain predicate can be patched.
     int minor_native_jungle_preview = 1;
+    // Recognise independent Jungle in the original terrain renderer via
+    // three expected-byte-validated instruction hooks (no map mutation).
+    int minor_native_jungle = 1;
     // Develop-only diagnostic: 0=post-map proof of concept,
     // 1=existing per-tile MapWin_gen_overlays callback.
     int minor_render_mode = 0;

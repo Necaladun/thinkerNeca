@@ -2,6 +2,127 @@
 #include "patch.h"
 #include "patchdata.h"
 #include "patchveh.h"
+#include "savegame.h"
+
+
+/*
+The supported SMAX executable checks native Jungle at three locations
+inside MapWin_gen_terrain_poly. Original instruction (6 bytes):
+    and edx, 0x80000004
+The original following comparison checks edx == 4 (LM_JUNGLE on and
+LM_DISABLE off). Preserve that test and its flags, but OR in independent
+Jungle *only for rendering*. Never change MAP::landmarks or the 16
+native landmark slots.
+
+Exact 6-byte sites, verified against the user's Develop mask log:
+  current tile         0x463CC5 (resume 0x463CCB)
+  neighbour transition 0x463D93 (resume 0x463D99)
+  later neighbour pass 0x464E78 (resume 0x464E7E)
+
+The two neighbour sites already have a MAP* in EAX. The current-tile
+site uses x=[EBP+0x20], y=[EBP+0x24]. Each naked trampoline preserves
+all registers, alters saved EDX only for independent Jungle, replays
+the original AND and returns with exactly the same stack shape.
+*/
+#if defined(__GNUC__) && defined(__i386__)
+extern "C" int __cdecl minor_render_jungle_xy(int x, int y)
+{
+    return minor_landmark_at(x, y) == MINOR_JUNGLE;
+}
+
+extern "C" int __cdecl minor_render_jungle_map(const MAP* sq)
+{
+    if (!sq || !*MapTiles || !*MapHalfX || *MapAreaTiles <= 0) {
+        return 0;
+    }
+    const uintptr_t first = reinterpret_cast<uintptr_t>(*MapTiles);
+    const uintptr_t pointer = reinterpret_cast<uintptr_t>(sq);
+    if (pointer < first || pointer - first >=
+        static_cast<size_t>(*MapAreaTiles) * sizeof(MAP)) {
+        return 0;
+    }
+    const size_t offset = pointer - first;
+    if (offset % sizeof(MAP)) {
+        return 0;
+    }
+    const size_t id = offset / sizeof(MAP);
+    const int y = static_cast<int>(id / *MapHalfX);
+    const int x = static_cast<int>(2 * (id % *MapHalfX) + (y & 1));
+    return minor_landmark_at(x, y) == MINOR_JUNGLE;
+}
+
+extern "C" __attribute__((naked, used))
+void minor_native_jungle_current_hook()
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl 0x24(%%ebp)\n\t"
+        "pushl 0x20(%%ebp)\n\t"
+        "call _minor_render_jungle_xy\n\t"
+        "addl $8, %%esp\n\t"
+        "testl %%eax, %%eax\n\t"
+        "jz 1f\n\t"
+        "movl $4, 20(%%esp)\n\t"
+        "1: popal\n\t"
+        "andl $0x80000004, %%edx\n\t"
+        "pushl $0x463CCB\n\t"
+        "ret\n\t"
+    );
+}
+
+extern "C" __attribute__((naked, used))
+void minor_native_jungle_neighbour_hook_1()
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl %%eax\n\t"
+        "call _minor_render_jungle_map\n\t"
+        "addl $4, %%esp\n\t"
+        "testl %%eax, %%eax\n\t"
+        "jz 1f\n\t"
+        "movl $4, 20(%%esp)\n\t"
+        "1: popal\n\t"
+        "andl $0x80000004, %%edx\n\t"
+        "pushl $0x463D99\n\t"
+        "ret\n\t"
+    );
+}
+
+extern "C" __attribute__((naked, used))
+void minor_native_jungle_neighbour_hook_2()
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl %%eax\n\t"
+        "call _minor_render_jungle_map\n\t"
+        "addl $4, %%esp\n\t"
+        "testl %%eax, %%eax\n\t"
+        "jz 1f\n\t"
+        "movl $4, 20(%%esp)\n\t"
+        "1: popal\n\t"
+        "andl $0x80000004, %%edx\n\t"
+        "pushl $0x464E7E\n\t"
+        "ret\n\t"
+    );
+}
+
+static void install_minor_native_jungle()
+{
+    const byte original[6] = {0x81, 0xE2, 0x04, 0, 0, 0x80};
+    const byte redirect[6] = {0xE9, 0, 0, 0, 0, 0x90};
+    // Fail closed if the executable or another mod changed these
+    // instructions; write_jump itself does not validate original bytes.
+    const struct { int addr; int target; } locations[] = {
+        {0x463CC5, (int)minor_native_jungle_current_hook},
+        {0x463D93, (int)minor_native_jungle_neighbour_hook_1},
+        {0x464E78, (int)minor_native_jungle_neighbour_hook_2},
+    };
+    for (const auto& site : locations) {
+        write_bytes(site.addr, original, redirect, sizeof(original));
+        write_jump(site.addr, site.target);
+    }
+}
+#endif
 
 
 int __cdecl BaseWin_random_seed() {
@@ -1288,6 +1409,19 @@ bool patch_setup(Config* cf) {
         const byte old_bytes[] = {0x0F,0x85,0x99,0x04,0x00,0x00};
         write_bytes(0x5AAEE0, old_bytes, NULL, sizeof(old_bytes));
     }
+
+    /*
+    Integrate independent Jungle into the original terrain pass.
+    The three patched AND instructions are unique, verified six-byte
+    instructions from the user's exact supported terranx.exe.
+    Do not enable a binary patch with unknown instruction boundaries.
+    PRACX/reduced mode retains its own renderer and stays unpatched.
+    */
+#if defined(__GNUC__) && defined(__i386__)
+    if (cf->minor_native_jungle && !cf->reduced_mode) {
+        install_minor_native_jungle();
+    }
+#endif
 
     /*
     Fix engine rendering issue where ocean fungus tiles displayed

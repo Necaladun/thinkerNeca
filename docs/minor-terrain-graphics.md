@@ -155,3 +155,30 @@ insertion hook we still must inspect instruction boundaries, branches,
 register/stack liveness and existing Thinker/PRACX patch overlaps. The
 binary bytes are not copied into the repository; a developer can inspect
 the short diagnostic log from the supported local executable.
+
+## Independent Jungle at original native terrain stage (next integration)
+
+`minor_native_jungle=1` (default) now installs three instruction-verified
+trampolines in the native `MapWin_gen_terrain_poly` function at:
+`0x463CC5` (current tile), `0x463D93` (neighbour transition), and
+`0x464E78` (later neighbour pass). Each patches only the complete
+6-byte `and edx,0x80000004` instruction. The expected original bytes
+are validated *before* writing the 5-byte JMP plus NOP. Wrong versions
+fail closed rather than patch unrelated instructions.
+
+The helper returns an independent-Jungle match while the trampoline
+retains the original register values and executes the original masked
+landmark check. No native landmark flags or code bits are ever modified.
+The game's original `RainTransition` texture/rotation selection then
+runs unchanged, before forest, fungus, resources and improvements.
+
+**Important:** This is the first executable-level native Jungle patch
+and has not yet been run in-game. The compilation validates the ABI and
+naked stubs, but runtime behaviour still needs testing. If the hook
+fails at startup on an unsupported executable version, do not force
+it on; use the previous build. For an explicit late-overlay A/B test
+with the same compiled DLL, set `minor_native_jungle=0` and use
+`minor_native_jungle_preview=1`. The late overlay remains Develop-only.
+
+The trampoline is enabled only for MinGW i386 builds and does not hook
+PRACX reduced-mode rendering.
