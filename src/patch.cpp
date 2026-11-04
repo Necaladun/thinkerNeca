@@ -177,7 +177,7 @@ void minor_native_jungle_neighbour_hook_2()
     );
 }
 
-static void install_minor_native_jungle()
+static bool install_minor_native_jungle()
 {
     const byte original[6] = {0x81, 0xE2, 0x04, 0, 0, 0x80};
     const byte redirect[6] = {0xE9, 0, 0, 0, 0, 0x90};
@@ -188,10 +188,21 @@ static void install_minor_native_jungle()
         {0x463D93, (int)minor_native_jungle_neighbour_hook_1},
         {0x464E78, (int)minor_native_jungle_neighbour_hook_2},
     };
+    // All three predicates are required for coherent Jungle edges. Validate
+    // every preimage before changing any instruction; an alternate executable
+    // or another patch must not leave only part of the Jungle hook installed.
+    for (const auto& site : locations) {
+        if (memcmp((const void*)site.addr, original, sizeof(original))) {
+            debug("minor Jungle native hook skipped: byte mismatch at 0x%08X\n",
+                site.addr);
+            return false;
+        }
+    }
     for (const auto& site : locations) {
         write_bytes(site.addr, original, redirect, sizeof(original));
         write_jump(site.addr, site.target);
     }
+    return true;
 }
 #endif
 

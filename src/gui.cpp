@@ -456,7 +456,9 @@ int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
         if (This == MapWin) {
             // Redraw the minor layer after both full and partial passes.
             // Temporary until minor terrain has a dedicated engine layer.
-            if (conf.minor_render_mode == 0) {
+            if (conf.minor_render_mode == 0
+                && (!conf.minor_native_jungle || !conf.minor_native_uranium
+                    || !conf.minor_native_titanium)) {
                 draw_minor_terrain_map(This);
             }
         }
@@ -504,7 +506,9 @@ int __thiscall mod_gen_map(Console* This, int faction_id, int units_only) {
         MapWin_gen_map(This, faction_id, units_only);
 #ifndef BUILD_REL
         // Reapply the custom layer after a partial redraw as well.
-        if (conf.minor_render_mode == 0) {
+        if (conf.minor_render_mode == 0
+            && (!conf.minor_native_jungle || !conf.minor_native_uranium
+                || !conf.minor_native_titanium)) {
             draw_minor_terrain_map(This);
         }
 #endif
@@ -1115,6 +1119,18 @@ extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x,
         *end++ = ' ';
     }
     memcpy(end, name, name_len + 1);
+    // Unlike hover-only diagnostics, this verifies the native Inspector
+    // hook actually appended the label. Limit writes on frequent redraws.
+    static int append_reports = 0;
+    if (append_reports < 24) {
+        ++append_reports;
+        FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+        if (fp) {
+            fprintf(fp, "INSPECTOR APPEND x=%d y=%d minor=%s native_len=%u\n",
+                x, tile_y, name, (unsigned)length);
+            fclose(fp);
+        }
+    }
     return static_cast<int>(length + separator_len + name_len);
 }
 

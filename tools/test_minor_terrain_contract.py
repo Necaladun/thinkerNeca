@@ -117,9 +117,18 @@ def main() -> None:
             and all(f'0x{x}' in patches for x in
                     ('463CC5', '463D93', '464E78')),
             'Expected three stage-native Jungle flag checks')
-    require('const byte original[6] = {0x81, 0xE2, 0x04, 0, 0, 0x80};' in patches
-            and 'write_bytes(site.addr, original, redirect' in patches,
-            'Never install native Jungle hooks without expected-byte validation')
+    jungle_install = body_between(patches, 'static bool install_minor_native_jungle()', '#endif')
+    require('const byte original[6] = {0x81, 0xE2, 0x04, 0, 0, 0x80};' in jungle_install
+            and jungle_install.count('for (const auto& site : locations)') == 2
+            and 'if (memcmp((const void*)site.addr, original, sizeof(original)))' in jungle_install
+            and jungle_install.index('if (memcmp(') < jungle_install.index('write_bytes(site.addr')
+            and 'return false;' in jungle_install
+            and 'return true;' in jungle_install
+            and 'write_bytes(site.addr, original, redirect' in jungle_install,
+            'Jungle native hooks must preflight all three sites before any write')
+    require(renderer.count('&& (!conf.minor_native_jungle || !conf.minor_native_uranium') == 2
+            and '|| !conf.minor_native_titanium))' in renderer,
+            'Do not scan every tile when all native types are enabled')
     require('const bool native_geology' in yields
             and '(minor_type == MINOR_URANIUM && conf.minor_native_uranium)' in yields
             and '(minor_type == MINOR_TITANIUM && conf.minor_native_titanium)' in yields
@@ -236,6 +245,7 @@ def main() -> None:
             and 'minor_inspector_length_inner(char* text, int tile_half_x, int tile_y)' in renderer
             and "const size_t capacity = 256;" in renderer
             and "memcpy(end, name, name_len + 1);" in renderer
+            and 'INSPECTOR APPEND x=%d y=%d' in renderer
             and '"INSPECTOR HOOK native feature strlen' in renderer,
             'Feature-line append needs native ABI, bounded output and logging')
     require('sq->is_known(MapWin->cOwner)' in renderer
