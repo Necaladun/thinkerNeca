@@ -26,3 +26,59 @@
 ### Explicit non-ideas
 
 Old-save/scenario compatibility is not a target. Strong Solar output by itself is not a bug. Changing `tile_output_limit` to 3/3/3 is **already an active trial** (BAL-001), not merely a hypothetical.
+
+## Native ecology and fungal forests — future exploration
+
+**Ideas only; not approved implementation work.** This records the November 2026 *Landmark Ideas Comparison* discussion for later design. It does **not** add tasks to the work queue, change gameplay, or assert that the following systems exist. The intended **Fungal Forest** is a living native-ecology region, **not a major landmark**, not the independent Jungle minor terrain, and not the ordinary human-built Forest improvement. It should not consume a landmark slot.
+
+### Desired experience
+
+- Make Planet's fungus and wildlife feel like a **living, locally reactive ecosystem** rather than isolated random worm encounters. Its reaction should resemble an **immune response**: no humanlike strategy, faction recognition, omniscient revenge, or sapient decision to attack a particular colony.
+- Have distinct **Nests**, **Fungal Forests**, and **Strongholds** with recognisable territorial depth. Illustrative, **unapproved** sizes discussed were a Nest of roughly 5–10 tiles with one tower, a Forest around 25–40 tiles with several towers, and a larger Stronghold with many towers. These are scale sketches, not generation constants.
+- Differentiate fungal ground into **ordinary**, **mature**, and **dense/hardened** fungus. Dense growth would depend on surrounding fungal territory and towers; in extreme cases it might obstruct non-native movement while remaining traversable to native life. This requires explicit movement/pathfinding rules, not merely an art swap.
+- Make alien forests **something the player can fight, contain, bypass, or exploit indirectly**. Conquering a region opens land, access and possibly existing resources or supply pods; no automatic new landmark-style tile yield is assumed.
+
+### Local behavioural states (conceptual, not AI implemented)
+
+| State | Possible behaviour |
+| --- | --- |
+| **Undisturbed** | Slow growth/maturation, low baseline native activity, limited defensive expenditure. |
+| **Encroaching** | Territory expands at its frontier; mature fungus and towers may spread or reproduce; moderate native activity. |
+| **Threatened** | Nearby destruction/clearing/combat creates local stress; the organism may shift resources away from expansion into defence, repair and native spawning. |
+
+State should be **local to an ecological network/region**, not a single global “Planet is angry” flag. Attribution is deliberately crude: the ecosystem reacts to disturbances **regardless of which human faction caused them**. An army might intentionally stir wildlife in an opponent's territory, but the fungus would not know or care who initiated it.
+
+### Finite ecology and native-life population
+
+- Explore a **finite local biological reserve/biomass budget**, supported by fungal extent, maturity, towers and recovery. Expenditure competes among new fungal growth, thickening, tower reproduction, regeneration and native-unit spawning.
+- **Native spawns, combat losses and captures** must be accounted for; killing or harvesting worms should not produce an endlessly replenished stream of attackers or easy captured units/planetpearls. How captured natives affect the wild budget remains open.
+- Local stress could redirect a reserve into defence, but **destroying units or towers should impose a real cost** on the ecosystem. A depleted region should have a recovery period rather than infinite retaliation.
+- **Perihelion** could accelerate growth, activity or stress responses, but its effect must respect the chosen reserve model; avoid free, unbounded spawning.
+- Decide later whether regional networks are contiguous fungus, tower-linked clusters or a simpler bounded catchment. Save/reload of any new persistent state is essential, including continuing new games on the same build.
+
+### Possible wildlife roles — not new unit commitments
+
+- **Existing native units:** mind worms, spore launchers, locusts, Isles, sealurks and fungal towers could interact differently with regional ecology; preserve their existing roles unless deliberately redesigned.
+- **Fungal Guardian (proposed):** slow, durable local defender or living barrier, especially near dense growth/towers.
+- **Fungal Seeder (proposed):** slow, hard-to-stop native creature that plants/spreads fungus or helps a damaged network re-establish.
+- **Spore artillery/defence (proposed role):** investigate whether the existing Spore Launcher already provides the desired ranged pressure before designing a duplicate new unit.
+- No assumed graphics, executable hooks, costs, stats, production rules or AI controls for these hypothetical roles.
+
+### How fighting a fungal forest might work
+
+- **Formers as principal tools:** clear *ordinary perimeter fungus* to cut the surrounding network and weaken dense central growth; combat units escort and protect the Formers.
+- Consider **Trance Formers/high-morale Formers** as specialist expedition assets, subject to actual unit-design and combat rules.
+- Artillery and aircraft might attack towers, defenders or growth indirectly; feasibility depends on the real engine's unit/terrain attack and targeting systems. Do not assume terrain bombardment already works.
+- Alternative strategies could include containment, clearing corridors, maintaining conventional Forest or open-land buffers, avoiding strongholds until better technology, or provoking an ecological response near an enemy. Risk and benefit must remain local and non-omniscient.
+- Avoid turning ecology into a simple exponential death spiral that makes the map unplayable, especially on higher native-life settings or during Perihelion.
+
+### Later design/research questions (not queued tasks)
+
+- **Existing baseline:** inspect `src/gameturn.cpp` native spawning / `do_fungal_towers()`, `src/mapgen.cpp` fungus/tower placement, `src/veh.cpp` native lifecycle and pod events, native-unit counts, configuration and AI. The current branch already has random/event-based wild spawning and tower-driven fungus spread; this proposed territorial-budget system does **not** exist.
+- **Map and simulation:** how to derive nest/forest/stronghold identity, maturity and network membership cheaply across map sizes; whether it emerges dynamically or receives generation-time seeds; what happens at coastlines, roads, bases, landmark/minor-terrain overlaps and destroyed/rebuilt fungus.
+- **Budget accounting:** exact accounting for captured wild units, faction-built natives, cross-region movement, dormant units, native losses, towers, eco-damage events, unit limits and repeatable farming. Avoid spawning economies with an exploitable positive feedback loop.
+- **AI:** when human and native AI should defend, clear, contain, flee or expand; pathfinding through hardened fungus; how Gaian/native-friendly factions interact without effortless free recruitment or immunity.
+- **Combat/UI:** movement legality, artillery/air interactions, native psi combat, fog-of-war and visual clarity; whether existing art can distinguish maturity/density without breaking native draw ordering.
+- **Validation if adopted later:** same-build save/reload, deterministic seed and budget tests, long-run ecological stability, speed on huge maps, balance across native-life settings, Perihelion and different faction playstyles. Preserve a way to disable experimental ecology for A/B comparison.
+
+**Scope boundary:** Keep this as exploratory design until explicitly selected for a later project phase. Do not blend it into the ongoing PR #4 terrain-rendering acceptance work or put speculative subtasks in `WORK-QUEUE.md`.
