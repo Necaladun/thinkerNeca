@@ -8,7 +8,7 @@
 
 | ID | Priority | State | Task and completion criterion |
 | --- | --- | --- | --- |
-| TERR-001 | P1 | WIP | **Runtime regression for independent terrain.** New-game Jungle/Uranium/Titanium survive actual save→reload, Inspector and fog/zoom/focus tests; document version and results in [TESTING](TESTING.md). |
+| TERR-001 | P1 | WIP (persistence partially user-tested) | **Runtime regression for independent terrain.** User reports a visible feature persisted through repeated loads/turn advances (5 Nov); exact tile/INI, post-load bonus, all three types, Inspector and fog/zoom/focus still require specific checks. Record version/results in [TESTING](TESTING.md). |
 | TERR-002 | P2 | TODO | **Generation coverage.** Evaluate several seeds, map sizes, climate values, patch distributions and landmark overlaps; record reproducible anomalies or mark checked. Mirrored modes are currently deliberately unsupported. |
 | TERR-003 | P2 | TODO | **Projected vs actual yield audit.** Catalogue divergence in `item_yield()` vs live calculations for future improvements (especially boreholes); correct after resource-extraction policy is decided. |
 | REND-001 | P1 | WIP (source fix) | **Native Jungle hook safety.** All three sites are now preflighted before the first write (`b76feed`); a mismatch leaves all three untouched. Confirm on the supported Windows executable and an intentionally mismatched site before closing. |

@@ -9,9 +9,9 @@
 | Area | Evidence | Remaining checks |
 | --- | --- | --- |
 | Windows Develop | CI success on `4809cb7` (5 November 2026): x86 DLL/launcher cross-compilation plus synthetic sprite, save, config and source contracts | Clean installation and actual Windows runtime tests; compiler/CI does not execute the game |
-| Minor storage/yields | Synthetic THMIN001 v2 saves; user confirms Jungle +1N, Uranium +1E, Titanium +1M | Actual same-build save→reload→continue; resource/improvement and crawler interactions |
+| Minor storage/yields | Synthetic THMIN001 v2 saves; user confirms Jungle +1N, Uranium +1E, Titanium +1M. **5 Nov user report:** the visible feature stayed present after loading, turn advances and further loading (apparently Titanium in this test sequence). | Record exact DLL/INI/tiles; recheck +1M after reload and repeat for Jungle/Uranium; resource/improvement and crawler interactions |
 | Jungle/Uranium graphics | User reports native sprites and resource effects working; `b76feed` preflights all three Jungle patch sites before modifying any | Check Jungle hook on the supported executable and forced unsupported preimage; fog/units, composite tiles and Release |
-| Titanium custom sprite | **User-verified:** mode-3 blue-grey art, transparency, positioning, zoom-in/out and +1M work on tested variant 0 | Native variant 1, fog, unit/base layering, partial redraw, clean-install fallback |
+| Titanium custom sprite | **User-verified:** mode-3 blue-grey art, transparency, positioning, zoom-in/out and +1M work on tested variant 0; user reports visual persistence through repeated loads/turn advances | Native variant 1, fog, unit/base layering, partial redraw, clean-install fallback; +1M after reload not expressly confirmed |
 | Inspector | Jungle/Uranium labels and some Titanium labels observed; `INSPECTOR APPEND` now logs successful native-hook writes (`b76feed`) | Compare actual append vs hover at the same coordinate, then check feature combinations, focus/fog (BUG-002) |
 | World generation | Independent Jungle/Uranium/Titanium appeared in new games | Several map seeds/sizes/climates and real save/reload; mirrored modes unsupported |
 | Major landmarks | Great Dunes accepted; Mesa central +1E confirmed; raised Mesa visually rejected and reverted | Other majors/improvement interactions and restored low Mesa confirmation |
@@ -27,12 +27,18 @@
 
 ## Remaining runtime regression procedure
 
-1. Install matching Develop `thinker.dll` and user-prepared `neca_sprites.pcx`; set mode 3 in the effective INI, restart the game.
-2. Confirm Titanium graphics, Inspector name and +1M at several zooms; correlate `INSPECTOR HOVER` and `INSPECTOR APPEND` log lines for the same tile. The `TITANIUM SPRITE TEST` log captures up to four independent samples for each native sprite variant; record a variant-1 line and its geometry (variant 1 still appears as Uranium).
-3. Check ordinary resources, fungus, forests, bases, units, fog and partial redraw; record coordinates/screenshot and log on discrepancies.
-4. Start a **new game**, save, quit, reload using the **same DLL**, compare tiles and yields, advance turns and save again.
-5. Remove the PCX in a disposable install to verify native Uranium fallback; mode 0 is native reference, mode 1 is external Uranium reference, mode 2 is legacy-only.
-6. Vary seeds and map sizes and inspect landmark overlaps separately.
+Prioritise one normal Windows Develop test game before changing INI options or art.
+
+1. **Same-build persistence (TERR-001):** on a newly generated map, record an exact Jungle, Uranium and Titanium tile coordinate; inspect each name, art and +1N/+1E/+1M contribution subject to resource limits. Save, close the game, reload with the identical DLL and INI, compare each tile, advance turns, save and reload again. The user has already reported visible persistence through repeated loads/turns; explicit post-load yield and cross-type checks remain.
+2. **Native Jungle drawing (REND-001 positive path):** inspect irregular Jungle edges, seams and adjacent ordinary/fungus/forest tiles while zooming, panning and reopening map/base windows; retry after reload. The incompatible-instruction *negative* patch-preflight case is an **engineering harness/isolated executable test**, not something the user should attempt by editing `terranx.exe`.
+3. **Titanium layering/redraw (TERR-001):** move a unit onto/off Titanium; settle a base if practical; compare revealed, fogged and re-revealed tiles, partial redraw, multiple zoom levels, and adjacent normal resource icons. Neither the sprite nor fog should paint incorrectly over units, bases or normal resource art.
+4. **Inspector (BUG-002):** select/hover an otherwise plain minor tile, then one with Forest, road, fungus or other native feature text as available. Compare the actual displayed label with `INSPECTOR HOVER` and `INSPECTOR APPEND` records at the same coordinate; include zoom/focus changes. A log showing `INSPECTOR APPEND` is evidence of text insertion, not necessarily evidence that the UI displayed it.
+5. **Sprite variant 1 (REND-004):** inspect several deposits while moving/zooming, then search `minor_terrain_render.log` for `TITANIUM SPRITE TEST mode=3 variant=1`. The logger captures four samples per variant, with native sprite dimensions/offset/pitch/key. If absent, report "not encountered"; do not invent dimensions or expect blue-grey art on variant 1 yet.
+6. **Atlas fallback (REND-002):** in a disposable installation (preserving the working PCX), temporarily remove or rename `neca_sprites.pcx`, restart and confirm Titanium reverts to native Uranium without crashing; restore the PCX and restart for mode 3. Mode 0 is the PCX-free reference. The actual Release DLL currently compiles but intentionally excludes custom Titanium and native Inspector hooks, so Release graphics parity is **not** an ordinary user-pass condition until implemented.
+7. **Generation/landmarks (TERR-002, MAP-001/002):** inspect at least three distinct fresh seeds (ideally varying map size/climate). Geological patches should be separate 3–9-tile land deposits, no independent feature should overlap a major landmark, and no new-map Nessus Canyon/slot-10 effects should appear. Check Dunes, Fossil Field, Borehole Cluster and Sunny Mesa where generated. Mirrored worlds currently skip independent features by design.
+8. **Probe capture (BUG-001, separate):** only on a disposable save, check mind-control captures with the current `base_capture_fix=0`; do not turn the workaround back on in an ongoing campaign merely to test stack cleanup.
+
+**Evidence handling:** `minor_terrain_render.log` is written beside the game executable and **truncated on DLL startup**; copy it before restarting when a repro occurs. Hover and append diagnostics are capped per process. For failures, supply DLL commit, effective INI (including `thinker_user.ini`), map size/seed/year, tile coordinates, what happened versus expected, and a screenshot or a copied log. Do not alter your original `terranx.exe` for negative hook tests.
 
 ## CI and deployment
 
