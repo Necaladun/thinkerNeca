@@ -37,7 +37,7 @@
 | MAP-004 | P3 | Deferred | **Repurpose original major slots 3/4.** Defer removal of legacy Jungle/Uranium native semantics until independent render path and future major designs are stable. |
 | MAINT-001 | P2 | WIP | **Rendering prototype cleanup.** Removed old startup hex scans and skipped the O(map tiles) fallback scan when all native types are configured (`b76feed`). Mode-2 `minor_terrain.pcx`, late overlay and its CI dependencies remain for intentional fallback coverage; retire only after REND-002. Preserve native sprite hooks. |
 | MAINT-002 | P3 | Done (pending runtime) | **Shared geology generator:** Uranium/Titanium now alternate using a common placement routine and distinct RNG seeds. New-map distribution may differ from prior builds; test several seeds under TERR-002. |
-| MAINT-003 | P2 | Done (parser/source) | **Safe skip-mask shifts.** `skip_facility` now uses an unsigned 64-bit literal for IDs 1–64, and `skip_event`/`skip_faction` use unsigned 32-bit literals for IDs 1–32; a static parser-width contract guards against regression. This does not establish downstream gameplay semantics for all high IDs. |
+| MAINT-003 | P2 | Done (source/CI contract; runtime pending) | **Safe skip-mask shifts.** Both parser and `src/build.cpp` facility-selection consumer now use unsigned 64-bit shifts for IDs 1–64; `skip_event`/`skip_faction` parser masks use unsigned 32-bit shifts for IDs 1–32. Source test covers both ends. Live exclusion behaviour for high IDs is not yet verified. |
 | MAINT-004 | P3 | Deferred | **Remove superseded merged PR branches** after confirming no needed independent work is stranded there. |
 
 ## Updating this file

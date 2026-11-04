@@ -30,7 +30,7 @@ The older major-landmark options `jungle=0` and `uranium=0` **are distinct** fro
 - Comments in `docs/thinker.ini` explain each supported setting; **avoid maintaining a second 170-option catalogue here**.
 - Leave untouched values as they are while testing. Distinguish source-level mechanics from settings that merely activate existing code.
 - `tools/test_thinker_ini_contract.py` checks names against the parser, expected array lengths, duplicates, unsigned shift widths and the retired Canyon key. It does **not** prove every value is sensible in play.
-- `skip_facility` uses a 64-bit unsigned bit mask for parser IDs 1–64 (and value 0 clears the mask); `skip_event` and `skip_faction` use 32-bit unsigned masks for IDs 1–32. This fixes shift-width undefined behaviour; individual high-ID gameplay effects have not been separately verified.
+- `skip_facility` uses a 64-bit unsigned mask for parser IDs 1–64 and for its `src/build.cpp` facility-filter consumer (value 0 clears the mask). `skip_event`/`skip_faction` use 32-bit unsigned parser masks for IDs 1–32. This removes shift-width undefined behaviour; actual high-ID exclusions have not been tested in-game.
 - The compiled `Config` defaults may differ from the distributed INI. An option missing from a local file normally inherits a compiled default, not necessarily `0`.
 - A clean game installation and a local `thinker_user.ini` can produce different behaviour despite identical repository contents; always record overrides when reporting bugs.
 

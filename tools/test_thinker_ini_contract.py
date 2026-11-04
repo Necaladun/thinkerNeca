@@ -44,9 +44,14 @@ def main() -> None:
 
     # Static parser-width contract; this is not a game runtime test.
     config = Path("src/main.h").read_text(encoding="utf-8")
+    build = Path("src/build.cpp").read_text(encoding="utf-8")
     assert "uint64_t skip_gov_facility = 0;" in config
     assert "1ull << (val - 1)" in parser, (
         "skip_facility IDs 33-64 require a 64-bit shift"
+    )
+    assert "item_id >= 1 && item_id <= 64" in build
+    assert "conf.skip_gov_facility & (1ull << (item_id - 1))" in build, (
+        "High-ID facility exclusions also require a 64-bit consumer mask"
     )
     assert parser.count("1u << (val - 1)") == 2, (
         "skip_event and skip_faction IDs 32 require unsigned 32-bit shifts"
