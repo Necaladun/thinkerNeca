@@ -12,7 +12,8 @@ Record choices that materially constrain implementation. **Established** means i
 | DEC-006 | Trial | **3/3/3 resource limits** in the distributed test INI; original cap 2/2/2 remains available. This is a test configuration, not a hardcoded mechanics change. | Gameplay evidence from BAL-001 |
 | DEC-007 | Trial / workaround | **`base_capture_fix=0`** because of reported probe-team issues; other capture fixes are lost with it. `probe_action_fix=1` remains enabled. | BUG-001 isolated/fixed |
 | DEC-008 | Current play preference | **No polar caps; exclude Sunspots and Base Asteroid Strike; extra starting units.** Test-profile values are in [configuration](technical/configuration.md). Not a universal balance standard. | Player preference changes |
-| DEC-009 | Established, pending runtime test | **Sunny Mesa adds +1 energy only in its central 3×3**, not the wider 7×7, while preserving surrounding geography/climate. Both actual and projected energy use tile codes 0–8. | In-game regression or future landmark balance decision |
+| DEC-009 | Established, user-verified | **Sunny Mesa adds +1 energy only in its central 3×3**, not the wider 7×7. Both actual and projected energy use tile codes 0–8; user confirmed this effect in-game. | Future landmark balance decision |
+| DEC-010 | Trial | **Sunny Mesa's three-tier elevation:** central 3×3 around 2,000 m, surrounding 5×5 ring around 1,000 m, outer 7×7 ring below 1,000 m, using existing native smoothing and visuals. Test appearance before confirming. No extra Solar bonus or guaranteed energy resource. | MAP-006 visual/terrain review |
 
 **Not decided:** reducing Forest to 1/1/1; making geological bonuses Mine-only; a replacement for major slot 10; reworking Former scoring. Those are tracked as TBD in [WORK-QUEUE](WORK-QUEUE.md) or exploratory [IDEAS](IDEAS.md).
 

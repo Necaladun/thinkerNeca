@@ -20,7 +20,7 @@
 | Ironstone rendering | +1 mineral confirmed; **sprite sometimes appears on a tile with no recorded Ironstone** (BUG-002) | Reproduce tile-to-sprite discrepancy, zoom/overlay effects; WIP art changes elsewhere |
 | Native tile Inspector | Jungle/Uranium labels confirmed; **Ironstone label intermittent** in latest user test (BUG-002) | Inspect same tile sprite vs registry data, click/focus/fog and composite feature cases |
 | New world generation | User observed generated independent terrain, current INI launches/works | Multiple deterministic seeds, map sizes, rainfall, count and major/minor overlap |
-| Major landmarks | Great Dunes look good. Sunny Mesa's centre-only +1E passed user in-game verification and source-contract CI. | Check other landmarks and improvement interactions; visual Mesa footprint not separately regressed. |
+| Major landmarks | Great Dunes look good; Mesa's +1E on 3×3 confirmed in prior build. **New Mesa 3/5/7 elevation tiers implemented; static CI check added.** | Fresh game: verify summit/terrace/rim elevations, cliff sprite alignment, edge smoothing, coastline, rainfall/rockiness and Solar yields. This elevation layout is **not yet visually verified**. |
 | Retired Canyon | Static source/INI/landmark-table guard passes | Observe random maps built with both generators |
 | Configuration | Parser/INI structural CI passed; user reports current settings seem to work | Confirm local overrides, starting allocation/event exclusions and cap effects in play |
 | Release build and PRACX | Not verified | Ironstone/Inspector not wired in Release; PRACX/reduced mode not established |
@@ -33,7 +33,7 @@
 2. Inspect Jungle, Uranium and Ironstone with and without improvements, normal resource bonuses, fungus, rivers and overlapping unit/base artwork. Compare displayed N/M/E to base worker and crawler outputs.
 3. Zoom from maximum out to close in; switch selection and map focus repeatedly; verify tile Inspector text and fog-of-war rules.
 4. Save, close the game, relaunch the **same build**, load and inspect the same minor tiles; save again. Old-version save interoperability is **not** a requirement.
-5. Check at least a few seeds/map sizes and the major landmarks that were modified; record RNG seed, map settings and any reproducible anomaly.
+5. Check at least a few seeds/map sizes and major landmarks. For Mesa specifically, inspect a new world's 3×3 2000–2999 m summit, 16-tile 1000–1999 m terrace, and 24-tile 0–999 m rim; verify the native cliff sprite, neighbours/coasts and Solar yields. Record seed, map settings and any reproducible anomaly.
 6. Test the actual deployed ZIP pair of DLL/PCX, not just source compilation. Separately assess Release when engineering catches up.
 
 ## CI coverage
@@ -42,7 +42,7 @@ Workflow: [`.github/workflows/build-windows.yml`](../.github/workflows/build-win
 
 - Compile Develop DLL/launcher for 32-bit Windows.
 - Generate/test indexed minor-terrain PCX atlas.
-- Check minor-terrain source invariants and reserved major slot 10.
+- Check minor-terrain source invariants, reserved major slot 10 and Sunny Mesa's centre-only energy/3-tier elevation source contract.
 - Check distributed INI against supported parser settings.
 - Decode a synthetic independent-minor SAV extension.
 - Upload the DLL/EXE/atlas artifact.

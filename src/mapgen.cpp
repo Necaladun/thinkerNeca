@@ -1832,7 +1832,15 @@ void __cdecl mod_world_mesa(int x, int y) {
         int x2 = wrap(x + TableOffsetX[i]);
         int y2 = y + TableOffsetY[i];
         if (mapsq(x2, y2)) {
-            world_alt_set(x2, y2, (i < TableRange[2]) + ALT_SHORE_LINE, true);
+            // Stepped Mesa: a 3x3 high plateau, 5x5 middle terrace,
+            // and lowland rim across the original 7x7 landmark.
+            int altitude = ALT_SHORE_LINE;
+            if (i < 9) {
+                altitude = ALT_TWO_ABOVE_SEA;
+            } else if (i < TableRange[2]) {
+                altitude = ALT_ONE_ABOVE_SEA;
+            }
+            world_alt_set(x2, y2, altitude, true);
             bit2_set(x2, y2, LM_MESA, true);
             code_set(x2, y2, i);
         }
