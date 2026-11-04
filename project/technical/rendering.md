@@ -11,7 +11,7 @@
 | Titanium | Same native resource draw, with guarded `Sprite*` substitution | **Blue-grey custom art verified in-game for native variant 0**, with +1 mineral separate |
 | Tile Inspector | Narrow native feature-line append (`strlen` callsite hook) | Develop tested, intermittent Titanium label still to investigate (BUG-002) |
 
-The normal resource-bonus icon takes precedence over a minor mineral feature. No native major-landmark flag is spoofed for minor terrain.
+The normal resource-bonus icon is intended to take precedence over a minor mineral feature; it occupies the same native resource sprite slot, so the geological icon is not simultaneously visible. A 5 November user regression found that the previous renderer sentinel obscured *procedural* resource bonuses (no `BIT_BONUS_RES`), while explicitly editor-placed resources already took precedence. `src/map.cpp` now evaluates the complete ordinary bonus function before considering geological renderer-only type 4 (BUG-003); this correction requires Windows in-game verification. Both underlying resource and minor-terrain bonuses remain available to yield calculations. No native major-landmark flag is spoofed for minor terrain.
 
 **Native hook contract (supported x86 `terranx.exe` only):** Uranium bonus call `0x465DFC`, type-4 branch `0x465E0E`, verified original sprite draw at `0x465E37` targeting `0x5E4B9A`. `src/patch.cpp` checks expected instruction bytes before installing. The wrapper swaps the Sprite pointer in saved ECX at +24 and forwards its transparency colour index at the original draw argument, retaining original zoom, clipping, position and layering.
 

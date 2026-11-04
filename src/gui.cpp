@@ -2086,7 +2086,9 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
     MAP* tile = mapsq(x, y);
     if (!tile || minor_landmark_at(x, y) != MINOR_TITANIUM
         || (tile->items & BIT_BONUS_RES)) {
-        // Normal resource icons take precedence over minor geology.
+        // Normal icons (including procedural ones) are prioritised by
+        // mod_bonus_at before the renderer reaches this type-4 draw branch.
+        // The explicit-bit guard remains a safety check for this callback.
         return original;
     }
     const int mode = conf.minor_titanium_sprite_mode;

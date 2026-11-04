@@ -129,11 +129,24 @@ def main() -> None:
     require(renderer.count('&& (!conf.minor_native_jungle || !conf.minor_native_uranium') == 2
             and '|| !conf.minor_native_titanium))' in renderer,
             'Do not scan every tile when all native types are enabled')
-    require('const bool native_geology' in yields
-            and '(minor_type == MINOR_URANIUM && conf.minor_native_uranium)' in yields
-            and '(minor_type == MINOR_TITANIUM && conf.minor_native_titanium)' in yields
-            and 'return 4;' in yields,
+    bonus_wrapper = body_between(yields, 'int __cdecl mod_bonus_at(int x, int y) {',
+                                 'Determine if the tile has a supply pod')
+    native_resources = body_between(yields,
+                                    'static int underlying_resource_bonus_at(',
+                                    'int __cdecl mod_bonus_at(int x, int y) {')
+    require('const bool native_geology' in bonus_wrapper
+            and '(minor_type == MINOR_URANIUM && conf.minor_native_uranium)' in bonus_wrapper
+            and '(minor_type == MINOR_TITANIUM && conf.minor_native_titanium)' in bonus_wrapper
+            and 'return 4;' in bonus_wrapper,
             'Both metals must share the native renderer-only Uranium sprite')
+    require('BIT_BONUS_RES' in native_resources
+            and 'bool has_rsc_bonus = bit & BIT_BONUS_RES;' in native_resources
+            and 'chk != ((*MapRandomSeed' in native_resources
+            and 'const int normal_bonus = underlying_resource_bonus_at(x, y, sq);' in bonus_wrapper
+            and bonus_wrapper.index('if (normal_bonus != RES_NONE)')
+                < bonus_wrapper.index('return 4;')
+            and '!(sq->items & BIT_BONUS_RES)' not in bonus_wrapper,
+            'Natural and editor-placed resources must precede the geological renderer sentinel')
     require('minor_native_titanium_bonus_hook' not in renderer
             and 'minor_titanium_bonus_inner' not in renderer
             and 'type == MINOR_TITANIUM && conf.minor_native_titanium' in renderer,

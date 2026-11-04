@@ -1347,38 +1347,11 @@ int __cdecl mod_minerals_at(int x, int y) {
 Determine if the tile has a resource bonus.
 Return Value: 0 (no bonus), 1 (nutrient), 2 (mineral), 3 (energy)
 */
-int __cdecl mod_bonus_at(int x, int y) {
-    MAP* sq = mapsq(x, y);
-    if (!sq) {
-        return RES_NONE;
-    }
-
-    // The native map renderer uses bonus_at(x,y)==4 to draw its already
-    // loaded terrestrial special-resource sprite for both Uranium and Titanium.
-    // Present 4 ONLY at that renderer's direct callsite. All real resource
-    // calculations and AI calls still receive ordinary 0..3 bonuses, so
-    // the independent +1 energy/mineral yields are not counted twice.
-    //
-    // OpenSMAC reconstructs this path in MapWin_gen_terrain_poly
-    // (0x4632D0, before the next MapWin functions). The bounded return
-    // address check is intentionally specific to the supported terranx.exe
-    // image; never globally turn independent Uranium into resource type 4.
-    // If a native resource bonus exists, preserve its normal icon and yield.
-#if defined(__GNUC__)
-    const uintptr_t caller = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
-#else
-    const uintptr_t caller = 0; // Unsupported compiler: skip native visual shortcut.
-#endif
-    const MinorLandmark minor_type = minor_landmark_at(x, y);
-    const bool native_geology =
-        (minor_type == MINOR_URANIUM && conf.minor_native_uranium)
-        || (minor_type == MINOR_TITANIUM && conf.minor_native_titanium);
-    if (native_geology
-        && caller >= 0x4632D0u && caller < 0x467000u
-        && !(sq->items & BIT_BONUS_RES)) {
-        // Renderer-only sentinel. Normal yields and AI still get 0..3.
-        return 4;
-    }
+// Evaluate the actual natural resource first. Some resource bonuses have
+// BIT_BONUS_RES explicitly set (e.g. editor placement); others are inferred
+// from the map seed and coordinates. Neither kind may be hidden by our
+// renderer-only geological sentinel.
+static int underlying_resource_bonus_at(int x, int y, MAP* sq) {
     uint32_t bit = sq->items;
     uint32_t alt = sq->alt_level();
 
@@ -1418,7 +1391,41 @@ int __cdecl mod_bonus_at(int x, int y) {
         }
         return ((bit & BIT_MINERAL_RES) != 0) + 1; // nutrient or mineral
     }
-    return ret;
+    return ret;}
+
+int __cdecl mod_bonus_at(int x, int y) {
+    MAP* sq = mapsq(x, y);
+    if (!sq) {
+        return RES_NONE;
+    }
+
+    // Resource art is a single native sprite slot. Give both flagged and
+    // procedural resource bonuses priority; independent minor-terrain
+    // nutrient/mineral/energy bonuses still stack in the yield functions.
+    const int normal_bonus = underlying_resource_bonus_at(x, y, sq);
+    if (normal_bonus != RES_NONE) {
+        return normal_bonus;
+    }
+
+    // The native map renderer uses bonus_at(x,y)==4 to draw its already
+    // loaded terrestrial special-resource sprite for Uranium/Titanium.
+    // Present 4 ONLY at that renderer's direct callsite. All genuine
+    // resource calculations and AI calls receive ordinary 0..3 bonuses.
+    // OpenSMAC identifies this native terrain draw range for the supported
+    // terranx.exe; never turn independent geology into a global resource.
+#if defined(__GNUC__)
+    const uintptr_t caller = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
+#else
+    const uintptr_t caller = 0; // Unsupported compiler: no visual shortcut.
+#endif
+    const MinorLandmark minor_type = minor_landmark_at(x, y);
+    const bool native_geology =
+        (minor_type == MINOR_URANIUM && conf.minor_native_uranium)
+        || (minor_type == MINOR_TITANIUM && conf.minor_native_titanium);
+    if (native_geology && caller >= 0x4632D0u && caller < 0x467000u) {
+        return 4; // Rendering-only sentinel; no natural resource on this tile.
+    }
+    return RES_NONE;
 }
 
 /*

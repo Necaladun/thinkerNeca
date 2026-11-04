@@ -20,7 +20,7 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 
 - [TERR-001](WORK-QUEUE.md): new-game **same-build save→reload→continue**, unusual improvements, fog, unit/base drawing and Inspector checks.
 - [REND-001/002/004](WORK-QUEUE.md): Jungle all-site preflight is implemented but needs Windows verification; Release/packaging parity and the second Uranium/Titanium sprite variant remain open (variant 1 still uses native Uranium).
-- [BUG-002](WORK-QUEUE.md): earlier intermittent Inspector name; distinct sprite is no longer the blocker. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
+- [BUG-002](WORK-QUEUE.md): intermittent Inspector label. [BUG-003](WORK-QUEUE.md): naturally seeded resource icons were hidden by geology though yields stacked; resource-priority source fix now needs Windows retest. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
 - More map seeds/climates and landmark regressions remain open. PR #4 stays **draft**.
 
 **Next:** same-build save/reload, fog/unit/Inspector checks with the working mode-3 atlas; verify the new all-site Jungle preflight, then variant 1 and Release parity. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).
