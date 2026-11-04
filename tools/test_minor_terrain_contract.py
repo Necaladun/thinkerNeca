@@ -24,6 +24,7 @@ def main() -> None:
     defs = source('src/savegame.h')
     store = source('src/savegame.cpp')
     cfg = source('src/main.cpp')
+    config = source('src/main.h')
     mapgen = source('src/mapgen.cpp')
     yields = source('src/map.cpp')
     renderer = source('src/gui.cpp')
@@ -148,6 +149,11 @@ def main() -> None:
     require('minor_native_titanium=1' in ini
             and 'MATCH("minor_native_titanium")' in cfg,
             'Titanium native rendering switch must be supported')
+    require('minor_titanium_sprite_mode=0' in ini
+            and 'int minor_titanium_sprite_mode = 0;' in config
+            and 'MATCH("minor_titanium_sprite_mode")' in cfg
+            and 'cf->minor_titanium_sprite_mode = clamp(atoi(value), 0, 2);' in cfg,
+            'Titanium external sprite test must parse modes 0-2, default to native')
     require('static bool install_minor_native_titanium_sprite()' in patches
             and 'constexpr int bonus_site = 0x465DFC;' in patches
             and 'constexpr int type_four_site = 0x465E0E;' in patches
@@ -162,6 +168,14 @@ def main() -> None:
             and 'if (!valid)' in patches
             and 'write_call(draw_site, (int)minor_native_titanium_sprite_hook);' in patches,
             'Titanium hook must target only the verified native resource-type-4 call')
+    require('static void load_neca_test_sprites(Buffer* canvas)' in renderer
+            and 'minor_graphics_file("neca_sprites.pcx")' in renderer
+            and '{"uranium_test", 16, 16, 100, 62, 253}' in renderer
+            and 'def.x + def.width > atlas_width' in renderer
+            and 'corner != def.transparent_index' in renderer
+            and 'source252=%d source253=%d other=%d' in renderer
+            and '&neca_sprites[id], &image, def.transparent_index,' in renderer,
+            'New atlas must validate source rectangle/key and log decoded indices')
     require('Buffer_load_pcx(&image, path.c_str(), nullptr, 0, 0)' in renderer
             and 'Buffer_load_pcx(&image, path.c_str(), canvas->palette, 0, 0)' not in renderer,
             'PCX ore indices must not be remapped into the canvas palette before sprite extraction')
@@ -175,7 +189,13 @@ def main() -> None:
     require('minor_titanium_select_native_sprite(' in renderer
             and 'frame[8], y = frame[9]' in renderer
             and 'minor_landmark_at(x, y) != MINOR_TITANIUM' in renderer
-            and 'return &minor_sprites[MINOR_TITANIUM];' in renderer
+            and 'mode == 1' in renderer
+            and 'load_neca_test_sprites(canvas);' in renderer
+            and 'selected = &neca_sprites[NECA_SPRITE_URANIUM_TEST];' in renderer
+            and 'mode == 2' in renderer
+            and 'selected = &minor_sprites[MINOR_TITANIUM];' in renderer
+            and 'return selected;' in renderer
+            and 'TITANIUM SPRITE TEST mode=%d' in renderer
             and 'jmp *_minor_titanium_native_draw_target' in renderer
             and '"1: movl %eax, 24(%esp)' in renderer
             and '"movl %eax, 28(%esp)' not in renderer

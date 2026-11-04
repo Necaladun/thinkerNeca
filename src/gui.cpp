@@ -1913,6 +1913,25 @@ static Sprite minor_sprites[MINOR_TYPE_COUNT] = {};
 static bool minor_sprite_ready[MINOR_TYPE_COUNT] = {};
 static bool minor_sprites_attempted = false;
 
+// The first external-atlas diagnostic uses *unrecoloured* Uranium art.
+// This is a source-rectangle registry, not a new native rendering hook.
+// Original-game art is provided locally by the user, not redistributed.
+enum NecaSpriteId { NECA_SPRITE_URANIUM_TEST, NECA_SPRITE_COUNT };
+struct NecaSpriteDef {
+    const char* name;
+    int x;
+    int y;
+    int width;
+    int height;
+    int transparent_index;
+};
+static const NecaSpriteDef neca_sprite_defs[NECA_SPRITE_COUNT] = {
+    {"uranium_test", 16, 16, 100, 62, 253},
+};
+static Sprite neca_sprites[NECA_SPRITE_COUNT] = {};
+static bool neca_sprite_ready[NECA_SPRITE_COUNT] = {};
+static bool neca_sprites_attempted = false;
+
 // Native sprite substitution is strictly scoped to one verified resource
 // drawing call in the supported terranx.exe, if that call can be found.
 // The actual resource sprite rendering position remains the game's own.
@@ -1967,11 +1986,10 @@ static void load_minor_terrain_sprites(Buffer* canvas)
         if (slot >= 0 && image.clipRect.right >= sprite_x + 104
             && image.clipRect.bottom >= 60) {
             Sprite_ctor(&minor_sprites[id]);
-            // Sprite_extract_2 compares the FULL argument to 8-bit
-            // pixel values while stripping transparency (confirmed from
-            // terranx.exe 0x5E39A0). The previous 0x1FD (509) could
-            // never equal index 253, leaving bright-magenta rectangles.
-            // Pass the actual 8-bit transparent palette index instead.
+            // Sprite_extract_2 masks its colour key to 8 bits on entry
+            // (confirmed at terranx.exe 0x5E39A0). Thus 0x1FD and 253
+            // are equivalent keys here; earlier diagnoses blaming the
+            // upper byte were incorrect. Use explicit 253 for clarity.
             // Buffer_load_pcx(..., canvas->palette, ...) may remap the
             // source PCX's transparent index 253 to an active-palette
             // index. The prepared Titanium PCX has a transparent
@@ -2009,12 +2027,106 @@ static void load_minor_terrain_sprites(Buffer* canvas)
 }
 
 /*
-Select the custom Titanium sprite AT the native resource sprite call.
-The original renderer continues with its original parameters (canvas,
-position, scaling, clipping, and draw order); only the Sprite* in ECX
-is substituted. This deliberately does not call MapWin_tile_to_pixel.
-If the verified callsite or custom atlas is unavailable, the native
-Uranium sprite remains the fallback.
+External Uranium reference, loaded only by mode 1. A missing, corrupt or
+incompatible sheet falls back to native Uranium; do not try another atlas.
+Retain the source's palette indices unchanged for this diagnostic test.
+*/
+static void load_neca_test_sprites(Buffer* canvas)
+{
+    if (neca_sprites_attempted || !canvas || !canvas->palette) {
+        return;
+    }
+    neca_sprites_attempted = true;
+    const std::string path = minor_graphics_file("neca_sprites.pcx");
+    FILE* fp = fopen(path.c_str(), "rb");
+    if (!fp) {
+        minor_graphics_trace("NECA SPRITE PCX missing / fallback",
+            0, 0, GetLastError());
+        return;
+    }
+    fclose(fp);
+
+    Buffer image;
+    Buffer_ctor(&image);
+    const int loaded = Buffer_load_pcx(&image, path.c_str(), nullptr, 0, 0);
+    const int atlas_width = image.clipRect.right;
+    const int atlas_height = image.clipRect.bottom;
+    minor_graphics_trace("NECA SPRITE atlas result / width / height",
+        loaded, atlas_width, atlas_height);
+
+    if (loaded == 0) {
+        for (int id = 0; id < NECA_SPRITE_COUNT; ++id) {
+            const NecaSpriteDef& def = neca_sprite_defs[id];
+            if (def.x < 0 || def.y < 0 || def.width <= 0 || def.height <= 0
+                || def.x + def.width > atlas_width
+                || def.y + def.height > atlas_height) {
+                minor_graphics_trace("NECA SPRITE invalid source rectangle",
+                    id, atlas_width, atlas_height);
+                continue;
+            }
+
+            const int corner = Buffer_get_pixel(&image, def.x, def.y);
+            if (corner != def.transparent_index) {
+                // The user's atlas has an index-253 background at (16,16).
+                // An unexpected index must be diagnosed, not guessed.
+                minor_graphics_trace("NECA SPRITE unexpected corner key",
+                    id, corner, def.transparent_index);
+                continue;
+            }
+
+            // Count and hash decoded 8-bit *Buffer* pixels. Sprite::data may
+            // be RLE encoded, so do not assume pitch*height readable bytes.
+            int mask_252 = 0, background_253 = 0, other_pixels = 0;
+            uint32_t source_hash = 2166136261u;
+            for (int y = def.y; y < def.y + def.height; ++y) {
+                for (int x = def.x; x < def.x + def.width; ++x) {
+                    const int pixel = Buffer_get_pixel(&image, x, y);
+                    if (pixel == 252) {
+                        ++mask_252;
+                    } else if (pixel == 253) {
+                        ++background_253;
+                    } else {
+                        ++other_pixels;
+                    }
+                    source_hash = (source_hash
+                        ^ static_cast<uint8_t>(pixel)) * 16777619u;
+                }
+            }
+
+            Sprite_ctor(&neca_sprites[id]);
+            const int result = Sprite_extract_2(
+                &neca_sprites[id], &image, def.transparent_index,
+                def.x, def.y, def.width, def.height, nullptr);
+            const Sprite& sprite = neca_sprites[id];
+            neca_sprite_ready[id] = result == 0 && sprite.data != nullptr
+                && sprite.width > 0 && sprite.width <= def.width
+                && sprite.height > 0 && sprite.height <= def.height;
+
+            fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+            if (fp) {
+                fprintf(fp, "NECA SPRITE name=%s source=%d,%d,%d,%d "
+                    "corner=%d source252=%d source253=%d other=%d "
+                    "hash=%08X extract=%d ready=%d "
+                    "sprite=%dx%d offset=%d,%d pitch=%d key=%u\n",
+                    def.name, def.x, def.y, def.width, def.height,
+                    corner, mask_252, background_253, other_pixels,
+                    (unsigned)source_hash, result, neca_sprite_ready[id] ? 1 : 0,
+                    sprite.width, sprite.height, sprite.offset_x, sprite.offset_y,
+                    sprite.pitch, (unsigned)sprite.color_index[0]);
+                fclose(fp);
+            }
+        }
+    }
+    Buffer_dtor(&image);
+}
+
+/*
+Select the Develop-only Titanium sprite test at the original native
+resource drawing call. Mode 0=original sprite, mode 1=external Uranium
+control from neca_sprites.pcx, mode 2=legacy minor_terrain.pcx Titanium.
+The original renderer still owns position, scale, clipping and layer.
+When substituting, the x86 shim forwards the selected sprite's colour
+key; missing assets retain the working native Uranium fallback.
 */
 #if defined(__GNUC__) && defined(__i386__)
 extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
@@ -2035,25 +2147,51 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
         // Normal resource icons take precedence over minor geology.
         return original;
     }
-    load_minor_terrain_sprites(canvas);
-    if (!minor_sprite_ready[MINOR_TITANIUM]) {
-        return original;
+    const int mode = conf.minor_titanium_sprite_mode;
+    Sprite* selected = original;
+    if (mode == 1) {
+        load_neca_test_sprites(canvas);
+        if (neca_sprite_ready[NECA_SPRITE_URANIUM_TEST]) {
+            selected = &neca_sprites[NECA_SPRITE_URANIUM_TEST];
+        }
+    } else if (mode == 2) {
+        load_minor_terrain_sprites(canvas);
+        if (minor_sprite_ready[MINOR_TITANIUM]) {
+            selected = &minor_sprites[MINOR_TITANIUM];
+        }
     }
-    static int swaps_logged = 0;
-    if (swaps_logged < 12) {
-        minor_graphics_trace("native Titanium sprite substitute", x, y, ++swaps_logged);
+    // The wrapper compares the returned pointer against original. A
+    // non-replacement leaves ECX and the original draw key unchanged.
+    static int diagnostics_logged = 0;
+    if (diagnostics_logged < 12) {
+        ++diagnostics_logged;
+        minor_graphics_trace(selected != original
+                ? "native Titanium sprite substitute"
+                : "native Titanium sprite fallback",
+            x, y, diagnostics_logged);
         const std::string path = minor_graphics_file("minor_terrain_render.log");
         FILE* fp = fopen(path.c_str(), "a");
         if (fp) {
-            fprintf(fp, "TITANIUM COLOR KEY x=%d y=%d native=%u loaded=%u sprite=%dx%d\n",
-                x, y, static_cast<unsigned>(original->color_index[0]),
-                static_cast<unsigned>(minor_sprites[MINOR_TITANIUM].color_index[0]),
-                minor_sprites[MINOR_TITANIUM].width,
-                minor_sprites[MINOR_TITANIUM].height);
+            fprintf(fp, "TITANIUM SPRITE TEST mode=%d x=%d y=%d swapped=%d "
+                "native=%p key=%u sprite=%dx%d offset=%d,%d pitch=%d "
+                "selected=%p key=%u sprite=%dx%d offset=%d,%d pitch=%d\n",
+                mode, x, y, selected != original ? 1 : 0,
+                (void*)original, (unsigned)original->color_index[0],
+                original->width, original->height, original->offset_x,
+                original->offset_y, original->pitch,
+                (void*)selected, (unsigned)selected->color_index[0],
+                selected->width, selected->height, selected->offset_x,
+                selected->offset_y, selected->pitch);
+            if (selected != original) {
+                fprintf(fp, "TITANIUM COLOR KEY x=%d y=%d native=%u loaded=%u sprite=%dx%d\n",
+                    x, y, (unsigned)original->color_index[0],
+                    (unsigned)selected->color_index[0],
+                    selected->width, selected->height);
+            }
             fclose(fp);
         }
     }
-    return &minor_sprites[MINOR_TITANIUM];
+    return selected;
 }
 
 // Thiscall native resource sprite: ECX holds Sprite*, [ESP+4] holds

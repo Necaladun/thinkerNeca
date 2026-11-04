@@ -43,3 +43,8 @@ The setting gates multiple corrections in `src/base.cpp`, not just probe-team be
 - **Post-capture diplomacy:** disables a check that prevents repeated AI requests to talk after losing a base.
 
 **Not disabled:** the captured base's old owner's units **supported by that base** are still reassigned to another eligible surviving base, or destroyed if none is suitable, in an unconditional section of `mod_capture_base()`. Also `facility_capture_fix=1` and `probe_action_fix=1` are separate switches that remain enabled. See [BUG-001](../WORK-QUEUE.md).
+
+
+### Develop Titanium sprite test (REND-003)
+
+`minor_titanium_sprite_mode=0` (default) retains native Uranium art on independent Titanium tiles; `1` loads the user-supplied `neca_sprites.pcx` atlas's Uranium reference at (16,16,100,62); `2` uses the previous experimental `minor_terrain.pcx` loader. Mode only affects graphics and needs `minor_native_titanium=1`, supported native executable and Develop DLL. An installed `thinker_user.ini` can override the distributed default. Mode 1 does not require the legacy PCX and falls back to native Uranium if its asset is absent or invalid.

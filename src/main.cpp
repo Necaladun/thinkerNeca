@@ -308,6 +308,8 @@ int option_handler(void* user, const char* section, const char* name, const char
         cf->minor_native_uranium = !!atoi(value);
     } else if (MATCH("minor_native_titanium")) {
         cf->minor_native_titanium = !!atoi(value);
+    } else if (MATCH("minor_titanium_sprite_mode")) {
+        cf->minor_titanium_sprite_mode = clamp(atoi(value), 0, 2);
     } else if (MATCH("minor_native_inspector")) {
         cf->minor_native_inspector = !!atoi(value);
     } else if (MATCH("minor_native_jungle_preview")) {

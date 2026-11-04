@@ -190,6 +190,9 @@ struct Config {
     // Draw custom Titanium during the native special-resource stage;
     // uses a runtime-verified renderer bonus_at callsite in Develop.
     int minor_native_titanium = 1;
+    // Develop-only Titanium sprite test: 0=native Uranium,
+    // 1=neca_sprites.pcx external Uranium control, 2=legacy minor_terrain.pcx.
+    int minor_titanium_sprite_mode = 0;
     // Develop-only, expected-byte-validated native tile-inspector feature-line append.
     int minor_native_inspector = 1;
     // Develop-only: original loaded Jungle textures, drawn at an overlay
