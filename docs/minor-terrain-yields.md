@@ -1,92 +1,48 @@
-# Independent minor terrain — generator and yield framework
+# Independent minor terrain — current implementation
+
+**Status:** Implemented on draft PR #4; initial Windows Develop gameplay checks have passed, but full regression coverage and Release parity are outstanding. This document describes the implemented rules, **not** proposed forest/cap/deposit balance changes.
 
 ## Data model
 
-Minor terrain uses a separate per-tile `MinorTerrainTile { type, code }`
-record and **never requires** one of the original sixteen `LM_*` flags.
-The optional `code` field allows a minor feature to carry per-tile shape,
-strength, climate or other type-specific state.
+Independent minor terrain is stored per map tile as `MinorTerrainTile { uint8_t type, uint8_t code }` in `src/savegame.cpp` / `src/savegame.h`. It does **not** consume an original `LM_*` landmark bit or create a named major landmark. The definitions registry supplies name, nutrient/mineral/energy bonus, fallback sprite slot and generation phase.
 
-`THMIN001` saves now use **version 2**, storing two bytes per tile. Version 1
-extension saves are deliberately incompatible. Fresh maps and saves are the
-supported development target.
+`THMIN001` version 2 writes two bytes per tile after the native map data. The current reader accepts native saves with no extension; version 1 extensions are incompatible. **Forward development assumes new games**; compatibility with older mod saves or custom scenarios is not a design requirement, although some legacy support code remains.
 
-The type registry in `src/savegame.cpp` defines the common resource effects.
-Each type also declares its generation phase (early, before final climate,
-or late, after rockiness), and sprite slot. The map generator dispatches
-to a specialised algorithm for each type. Additional mechanics are handled
-in their relevant engine components, rather than assigning arbitrary meanings
-to the minor `code` byte globally.
+| Type | Current bonus | Phase | Distribution |
+| --- | --- | --- | --- |
+| Jungle | +1 nutrient | Early | Climate-/moisture-sensitive patches, generally 8–16 tiles, occasionally larger |
+| Uranium | +1 energy | Late | Dispersed 3–9 tile deposits, lowland preference |
+| Ironstone | +1 mineral | Late | Dispersed 3–9 tile deposits, rolling/rocky preference |
 
-| Minor type | Common effect | Special generation |
-| --- | --- | --- |
-| Jungle | +1 nutrient | Early, climate-aware, moisture/rainfall-sensitive patches |
-| Uranium | +1 energy | Late, small dispersed patches favouring lower elevations |
-| Ironstone | +1 mineral | Late, dispersed patches favouring rocky/rolling terrain |
+Only one independent minor type is stored per tile. The `code` field is type-specific: Jungle uses a climate/rainfall pattern; Uranium and Ironstone currently use patch-local indices (0–8).
 
-Jungle's previous Thinker patch algorithm is retained, including its size
-distribution, independent RNG seed, latitude/moisture preferences, and
-`minor_code % 121` pattern used by the rainfall algorithm. It also retains
-its special random-resource-placement behaviour in `world_rocky()`.
+## Generation
 
-Uranium retains its existing weighted 3–9 tile deposit sizes and independent
-seed. Uranium and Ironstone currently use patch-local codes (0–8). Future
-specialised geology generators can replace their placement strategies without
-altering the shared terrain representation.
+For the intended independent-feature maps, use `new_world_builder=1`, `modified_landmarks=1`, `minor_jungle=1`, `minor_uranium=1` and `minor_ironstone=1`. The older `jungle=0` and `uranium=0` controls disable their **native major** placement, not these minor types.
 
-## Generation ordering and options
+1. The early phase generates Jungle before the native-major landmark placement loop and final climate/rainfall pass. Major landmarks can overwrite parts of those patches; the post-placement cleanup removes overlapping independent minor tiles.
+2. The modified world generator then finalises climate and rockiness.
+3. The late phase generates Uranium and Ironstone, avoiding existing major-landmark flags and other independent minor patches. Each geological generator targets 2–6 geographically dispersed patches, depending on map area, but placement can reject or fail targets.
+4. Mirrored map modes skip independent minor generation (symmetry is not implemented).
 
-Set `modified_landmarks=1`, `jungle=0`, `uranium=0`. These old options
-are no longer used to generate Jungle/Uranium in the modified world builder.
+**Configuration caveat:** `minor_generator_enabled()` currently requires `modified_landmarks=1` for Jungle and Uranium but not Ironstone. The independent features are only generated through Thinker's `new_world_builder=1` path. This coupling is pending a separate configuration review; do not silently treat all three toggles as fully independent.
 
-`minor_jungle=1` (default) invokes Jungle before the original major-landmark
-loop, allowing the later `world_climate()` / `world_rainfall()` pass to read
-the independent type/code. Major landmarks may replace occupied Jungle tiles;
-the post-landmark cleanup explicitly removes the replaced minor type.
-`minor_uranium=1` and `minor_ironstone=1` (defaults) invoke late generators
-after final climate and rockiness computation.
+The legacy `LM_JUNGLE` / `LM_URANIUM` generator paths remain available in some unmodified/editor modes. These are not the independent registry types. Original major-landmark slot 10 (former Nessus Canyon) has been retired and reserved as `LM_RESERVED_10 = 0x200`; it is not used for the new minor features.
 
-One minor type per tile. The generators avoid major-landmark footprints and
-other minor terrain; patches keep separation buffers. No minor generator
-calls `new_landmark()`. Mirrored maps currently skip all independent minor
-generators until symmetric placement is implemented.
+## Resource yields and AI
 
-Without `modified_landmarks=1`, the original native Jungle/Uranium
-generators remain available for vanilla-style world creation.
+The registry currently defines **unconditional +1 basic-resource bonuses** (subject to the actual resource-calculation branch and restrictions). Normal land, base squares and Forests generally preserve their minor bonuses. Some special improvement branches overwrite calculated values: notably, a Thermal Borehole suppresses Jungle's nutrient and Ironstone's mineral bonus, whereas Uranium's energy bonus can survive. Fungus and other special cases require individual checks. Ordinary resource restrictions can cap the realised bonus.
 
-## Resource effects
+Thinker's worker selection, crawler logic and former scoring consume modified actual tile yields in several paths. Settlement scoring also explicitly recognises independent terrain, but uses coarse fixed bonuses. The projected `item_yield()` calculation is not fully identical to actual `mod_crop_yield()`, `mod_mine_yield()` and `mod_energy_yield()` for certain future improvements (especially Ironstone/Jungle plus a Thermal Borehole). These discrepancies should be fixed in the later AI/terraform pass, once extraction rules are finalised.
 
-Basic nutrient/mineral/energy bonuses feed `mod_crop_yield`,
-`mod_mine_yield`, `mod_energy_yield`, and the independent AI `item_yield`
-estimator. Native legacy `LM_*` effects remain available for existing
-scenarios and unmodified world generation. Minor features are independent
-from bonus resource icons. Standard output caps and improvement effects apply.
+**Not implemented:** 1/1/1 Forests, 3/3/3 pre-tech caps, improvement-dependent extraction of geological deposits, or a general terraform-AI rewrite. Those are design discussions, not existing code.
 
-## Incomplete integration — do not consider this a game-ready release
+## Testing and limitations
 
-- The separate Ironstone sprite is currently **Develop-only** and drawn after
-  the native map pass; layering/zoom require in-game verification.
-- Native Jungle and Uranium sprites **will not automatically render** for
-  tiles using independent minor IDs. The shared minor-terrain sprite atlas
-  and proper draw-layer integration must be completed.
-- The native tile inspector does **not** yet display independent minor names.
-  A prior speculative status-window hook caused crashes and was removed.
-- The map editor still has native Jungle/Uranium tools and `#NATURAL` entries.
-  Do not reuse original landmark flags or graphics yet.
-- Windows DLL compilation, in-game generation, yield, fog, and save/reload
-  tests have **not** been performed in this environment.
+**Observed in game by the user:** all three minor types generate and are visible; Jungle +1 nutrient and Ironstone +1 mineral were observed; native Jungle and Uranium graphics render; corrected Ironstone graphics work at ordinary and far zoom; all three feature names appear in the native tile Inspector in the tested Develop build.
 
-The source migration is suitable for continued implementation on a feature
-branch, not yet for replacing a working Jungle/Uranium game build.
+**Automated:** the Windows Develop CI builds the DLL/launcher, checks static source invariants, generates/tests the indexed PCX fallback and parses synthetic `THMIN001` v2 saves. These are **not** executable world-generation or full save/reload tests.
 
-## Verification checklist
+**Still to verify:** multiple seeds and map sizes; fragment/spacing statistics; complete fog, focus and partial redraw behaviour; resource and improvement combinations; native Inspector on standalone/composite features; real in-game save/reload; mirrored maps (currently excluded); Release and PRACX/reduced-mode behaviour.
 
-1. Build Develop and confirm type/code save and reload with fresh maps.
-2. Count Jungle, Uranium and Ironstone minor tiles; check that no generated
-   minor feature has a native Jungle/Uranium landmark flag or name.
-3. Compare Jungle rainfall and bonus-resource distribution against the
-   previous Thinker generator; verify per-tile code influences moisture.
-4. Verify +1 N/E/M from engine status yields and `item_yield`, respecting caps.
-5. Check patch counts, lengths, distance buffers and major-landmark overlap.
-6. Complete graphics, tile inspector and map editor before merging the entire
-   migration into a playable default.
+See [minor-terrain-graphics.md](minor-terrain-graphics.md) for the rendering architecture, deployment and diagnostics.
