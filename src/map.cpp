@@ -1391,7 +1391,8 @@ static int underlying_resource_bonus_at(int x, int y, MAP* sq) {
         }
         return ((bit & BIT_MINERAL_RES) != 0) + 1; // nutrient or mineral
     }
-    return ret;}
+    return ret;
+}
 
 int __cdecl mod_bonus_at(int x, int y) {
     MAP* sq = mapsq(x, y);
