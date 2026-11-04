@@ -120,7 +120,7 @@ This feature supports all the world settings chosen from the game menus such as 
 
 From the menu options it is also possible to choose the random map style from larger or smaller continents, same as `world_continents` option. Note that this has only significant impact if the ocean coverage is at least average, since at low levels all generated maps will tend towards pangaea layouts.
 
-All landmarks that are placed on random maps can also be configured from `thinker.ini`. Nessus Canyon is available but disabled by default. When new map generator is enabled, `modified_landmarks` option replaces the default Monsoon Jungle landmark with multiple smaller jungles dispersed across the equator area. Planet rainfall level will determine how many jungle tiles are placed. Borehole Cluster is also expanded to four tiles and Fossil Field Ridge is placed on ocean shelf tiles.
+All landmarks that are placed on random maps can also be configured from `thinker.ini`. The former Nessus Canyon generator has been retired; landmark slot 10 is reserved and disabled in both world builders. When new map generator is enabled, `modified_landmarks` option replaces the default Monsoon Jungle landmark with multiple smaller jungles dispersed across the equator area. Planet rainfall level will determine how many jungle tiles are placed. Borehole Cluster is also expanded to four tiles and Fossil Field Ridge is placed on ocean shelf tiles.
 
 It is also possible to place multiple similar landmarks if the corresponding landmark option is set to some value greater than one. When playing on smaller maps, it might make more sense to disable some additional landmarks, as otherwise the map generator may skip placing some landmarks due to not having enough space.
 

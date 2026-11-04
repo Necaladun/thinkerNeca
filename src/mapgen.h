@@ -32,7 +32,6 @@ void __cdecl mod_world_borehole(int x, int y);
 void __cdecl mod_world_temple(int x, int y);
 void __cdecl mod_world_unity(int x, int y);
 void __cdecl mod_world_fossil(int x, int y);
-void __cdecl mod_world_canyon(int x, int y);
 void __cdecl mod_world_mesa(int x, int y);
 void __cdecl mod_world_ridge(int x, int y);
 void __cdecl mod_world_geothermal(int x, int y);

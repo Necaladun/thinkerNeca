@@ -332,8 +332,6 @@ int option_handler(void* user, const char* section, const char* name, const char
         cf->landmarks.fresh = max(0, atoi(value));
     } else if (MATCH("mesa")) {
         cf->landmarks.mesa = max(0, atoi(value));
-    } else if (MATCH("canyon")) {
-        cf->landmarks.canyon = max(0, atoi(value));
     } else if (MATCH("geothermal")) {
         cf->landmarks.geothermal = max(0, atoi(value));
     } else if (MATCH("ridge")) {

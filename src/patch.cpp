@@ -1819,7 +1819,8 @@ bool patch_setup(Config* cf) {
     if (!cf->landmarks.ruins     ) remove_call(0x5C88D9);
     if (!cf->landmarks.unity     ) remove_call(0x5C88EE);
     if (!cf->landmarks.fossil    ) remove_call(0x5C88F7);
-    if (!cf->landmarks.canyon    ) remove_call(0x5C8903);
+    // Retired native Canyon slot (0x200): disable its original WorldBuilder call.
+    remove_call(0x5C8903);
     if (!cf->landmarks.nexus     ) remove_call(0x5C890F);
     if (!cf->landmarks.borehole  ) remove_call(0x5C8918);
     if (!cf->landmarks.sargasso  ) remove_call(0x5C8921);

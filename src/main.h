@@ -117,7 +117,7 @@ struct LMConfig {
     int dunes = 1;
     int fresh = 1;
     int mesa = 1;
-    int canyon = 0;
+    int reserved_10 = 0; // Unused major-landmark slot; preserve 16-slot layout
     int geothermal = 1;
     int ridge = 1;
     int borehole = 1;

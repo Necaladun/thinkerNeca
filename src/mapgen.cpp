@@ -1824,24 +1824,6 @@ void __cdecl mod_world_fossil(int x, int y) {
     name_landmark(x, y, LM_FOSSIL);
 }
 
-void __cdecl mod_world_canyon(int x, int y) {
-    if (!locate_landmark(&x, &y, false)) {
-        return;
-    }
-    const int WorldCanyonOffset[12] = {26, 27, 9, 1, 2, 0, 3, 4, 17, 23, 36, 35};
-    for (int i = 0; i < 12; i++) {
-        int x2 = wrap(x + TableOffsetX[WorldCanyonOffset[i]]);
-        int y2 = y + TableOffsetY[WorldCanyonOffset[i]];
-        if (mapsq(x2, y2)) {
-            world_alt_set(x2, y2, ALT_ONE_ABOVE_SEA, true);
-            world_alt_set(x2, y2, ALT_SHORE_LINE, true);
-            bit2_set(x2, y2, LM_CANYON, true); // rolled these two into single loop with
-            code_set(x2, y2, WorldCanyonOffset[i]); // the above world_alt_set()
-        }
-    }
-    name_landmark(x, y + 2, LM_CANYON);
-}
-
 void __cdecl mod_world_mesa(int x, int y) {
     if (!locate_landmark(&x, &y, false)) {
         return;
@@ -2175,10 +2157,6 @@ void world_generate(uint32_t seed) {
                 mod_world_fossil(-1, -1);
                 lm.fossil--;
             }
-        }
-        if (lm.canyon > 0) {
-            mod_world_canyon(-1, -1);
-            lm.canyon--;
         }
         if (lm.nexus > 0) {
             mod_world_temple(-1, -1);

@@ -958,8 +958,7 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
 
     if ((sq->landmarks & LM_CRATER && sq->code_at() < 9)
     || (sq->landmarks & LM_VOLCANO && sq->code_at() < 9)
-    || (sq->landmarks & LM_FOSSIL && sq->code_at() < 6)
-    || (sq->landmarks & LM_CANYON)) {
+    || (sq->landmarks & LM_FOSSIL && sq->code_at() < 6)) {
         bonus_landmark |= !(sq->landmarks & LM_DISABLE);
     }
     int value = bonus_landmark + minor_minerals
@@ -1607,7 +1606,6 @@ int item_yield(int x, int y, int faction_id, int bonus, MapItem item) {
         if (sq->landmarks & LM_GEOTHERMAL) { E++; }
         if (sq->landmarks & LM_RIDGE) { E++; }
         if (sq->landmarks & LM_MESA) { E++; }
-        if (sq->landmarks & LM_CANYON) { M++; }
         if (sq->landmarks & LM_FOSSIL && sq->code_at() < 6) { M++; }
         if (Factions[faction_id].SE_economy_pending >= 2) {
             E++;
