@@ -1,5 +1,7 @@
 # Independent minor terrain — current implementation
 
+**Reference document.** Work items: [queue](../WORK-QUEUE.md); runtime evidence: [testing](../TESTING.md).
+
 **Status:** Implemented on draft PR #4; initial Windows Develop gameplay checks have passed, but full regression coverage and Release parity are outstanding. This document describes the implemented rules, **not** proposed forest/cap/deposit balance changes.
 
 ## Data model
@@ -45,4 +47,4 @@ Thinker's worker selection, crawler logic and former scoring consume modified ac
 
 **Still to verify:** multiple seeds and map sizes; fragment/spacing statistics; complete fog, focus and partial redraw behaviour; resource and improvement combinations; native Inspector on standalone/composite features; real in-game save/reload; mirrored maps (currently excluded); Release and PRACX/reduced-mode behaviour.
 
-See [minor-terrain-graphics.md](minor-terrain-graphics.md) for the rendering architecture, deployment and diagnostics.
+See [rendering.md](rendering.md) for the rendering architecture, deployment and diagnostics.

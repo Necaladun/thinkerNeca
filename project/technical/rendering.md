@@ -1,5 +1,7 @@
 # Independent minor-terrain rendering — current implementation
 
+**Reference document.** Actionable follow-ups: [work queue](../WORK-QUEUE.md); test matrix: [testing](../TESTING.md).
+
 **Status:** Initial Windows Develop in-game verification succeeded for Jungle, Uranium, Ironstone and their native tile-Inspector names. This remains draft work: regression coverage, Release parity and PRACX/reduced-mode support are incomplete. This document records the *current* implementation, not each historical rendering experiment.
 
 ## Rendering paths
@@ -11,7 +13,7 @@
 | Ironstone | Custom indexed-PCX sprite at native resource stage | Develop-only wrapper at the uniquely located `bonus_at` callsite; uses native tile position, elevation/zoom adjustment and a smaller glyph at far zoom |
 | Tile Inspector | Native feature-line append | Develop-only verified `strlen` callsite hook adds Jungle/Uranium/Ironstone to the River/Forest/Fungus line, including standalone minor terrain |
 
-The features remain independent map-tile type/code records. Rendering does not allocate or overwrite native landmark flags, `#NATURAL` entries or major-landmark names. Resource calculations are documented in [minor-terrain-yields.md](minor-terrain-yields.md).
+The features remain independent map-tile type/code records. Rendering does not allocate or overwrite native landmark flags, `#NATURAL` entries or major-landmark names. Resource calculations are documented in [minor-terrain.md](minor-terrain.md).
 
 ## Native hooks and controls
 

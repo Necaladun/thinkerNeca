@@ -48,6 +48,8 @@ jobs:
         run: python tools/test_reserved_landmark_slot.py
       - name: Validate distributed thinker.ini options
         run: python tools/test_thinker_ini_contract.py
+      - name: Validate fork docs and local links
+        run: python tools/test_project_docs.py
       - name: Check independent minor-terrain SAV decoder
         run: python tools/test_minor_save.py
       - name: Upload Windows Develop binaries

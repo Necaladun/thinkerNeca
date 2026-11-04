@@ -1,3 +1,7 @@
+# Technical reference — upstream Thinker plus fork notes
+
+The material below is inherited from upstream Thinker. The current thinkerNeca additions, test limits and native rendering hooks are documented in [PROJECT.md](PROJECT.md), [native rendering](project/technical/rendering.md), [independent terrain](project/technical/minor-terrain.md), [map generation](project/technical/map-generation.md) and [TESTING](project/TESTING.md). Follow the fork's [README](Readme.md) for the current Windows Develop artifact and matching PCX deployment; upstream binary compatibility statements do not automatically validate every new hook.
+
 
 Thinker command line options
 ============================

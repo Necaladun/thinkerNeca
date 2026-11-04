@@ -1,4 +1,10 @@
 
+# Upstream Thinker reference — fork notes
+
+This large reference documents **upstream Thinker Mod mechanics**. For current thinkerNeca changes, start at [PROJECT.md](PROJECT.md), [status](project/STATUS.md), [fork changelog](Fork-Changelog.md), [minor terrain](project/technical/minor-terrain.md) and [configuration](project/technical/configuration.md). The distributed `docs/thinker.ini` is the fork's selected **test profile**, which differs from some values discussed below. Native minor-terrain rendering and major-landmark changes remain on draft PR #4.
+
+**Save-format exception:** the statement below about original-game-compatible saves applies to upstream Thinker, **not** to this fork's `THMIN001` independent type/code extension. We target new games, but same-build save/reload must be verified.
+
 Main features
 =============
 Thinker has several advanced planning routines that enhance the base game AI to manage the complexities of colony building in Alpha Centauri. In the original game, many of the AI aspects were left underdeveloped while the computer factions struggled to deal with various punitive penalties. This left the single player experience severely lacking, since the AI would have no counter to many simple strategies.
@@ -120,7 +126,7 @@ This feature supports all the world settings chosen from the game menus such as 
 
 From the menu options it is also possible to choose the random map style from larger or smaller continents, same as `world_continents` option. Note that this has only significant impact if the ocean coverage is at least average, since at low levels all generated maps will tend towards pangaea layouts.
 
-Major landmarks on random maps can be configured from `thinker.ini`. The former Nessus Canyon generator is retired and native slot 10 (`0x200`) is reserved. In the modified Thinker world builder (`new_world_builder=1`, `modified_landmarks=1`), independent Jungle patches replace native Monsoon Jungle, while independent Uranium and Ironstone form dispersed deposits. These minor features do not consume original landmark IDs. Jungle placement remains climate-sensitive; Borehole Cluster uses four boreholes and Fossil Field Ridge is placed on ocean-shelf tiles. Current implementation, required switches and testing limits are documented in [the minor-terrain overview](docs/minor-terrain-yields.md) and [graphics guide](docs/minor-terrain-graphics.md).
+Major landmarks on random maps can be configured from `thinker.ini`. The former Nessus Canyon generator is retired and native slot 10 (`0x200`) is reserved. In the modified Thinker world builder (`new_world_builder=1`, `modified_landmarks=1`), independent Jungle patches replace native Monsoon Jungle, while independent Uranium and Ironstone form dispersed deposits. These minor features do not consume original landmark IDs. Jungle placement remains climate-sensitive; Borehole Cluster uses four boreholes and Fossil Field Ridge is placed on ocean-shelf tiles. Current implementation, required switches and testing limits are documented in [the minor-terrain overview](project/technical/minor-terrain.md) and [graphics guide](project/technical/rendering.md).
 
 It is also possible to place multiple similar landmarks if the corresponding landmark option is set to some value greater than one. When playing on smaller maps, it might make more sense to disable some additional landmarks, as otherwise the map generator may skip placing some landmarks due to not having enough space.
 

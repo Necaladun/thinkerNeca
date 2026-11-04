@@ -1,3 +1,5 @@
+> **Upstream Thinker release changelog.** This inherited version history is retained as a historical reference. For Necaladun's fork, see [Fork-Changelog.md](Fork-Changelog.md) and [current status](project/STATUS.md). Do not append fork-only draft work to the upstream version entries.
+
 
 # Thinker mod release changelog
 
