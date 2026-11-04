@@ -170,12 +170,19 @@ def main() -> None:
             'Titanium hook must target only the verified native resource-type-4 call')
     require('static void load_neca_test_sprites(Buffer* canvas)' in renderer
             and 'minor_graphics_file("neca_sprites.pcx")' in renderer
-            and '{"uranium_test", 16, 16, 100, 62, 253}' in renderer
+            and '{"uranium_test", 16, 16, 100, 62, 9}' in renderer
             and 'def.x + def.width > atlas_width' in renderer
-            and 'corner != def.transparent_index' in renderer
-            and 'source252=%d source253=%d other=%d' in renderer
+            and 'decoded_corner != 7' in renderer
+            and 'Buffer_load_pcx(&image, path.c_str(), nullptr, 10, 236)' in renderer
+            and 'Buffer_change_color(&image, 0x107, 0x109)' in renderer
+            and 'Buffer_change_color(&image, 0x106, 0x109)' in renderer
+            and 'processed_hash == 0x24A1B67Au' in renderer
+            and 'transparent_pixels == 5635' in renderer
+            and 'visible_pixels == 565' in renderer
+            and 'if (!pixels_match)' in renderer
+            and 'sprite.color_index[0] == def.transparent_index' in renderer
             and '&neca_sprites[id], &image, def.transparent_index,' in renderer,
-            'New atlas must validate source rectangle/key and log decoded indices')
+            'Uranium control must use native index offset/masks and fail closed on hash mismatch')
     require('Buffer_load_pcx(&image, path.c_str(), nullptr, 0, 0)' in renderer
             and 'Buffer_load_pcx(&image, path.c_str(), canvas->palette, 0, 0)' not in renderer,
             'PCX ore indices must not be remapped into the canvas palette before sprite extraction')
@@ -190,6 +197,9 @@ def main() -> None:
             and 'frame[8], y = frame[9]' in renderer
             and 'minor_landmark_at(x, y) != MINOR_TITANIUM' in renderer
             and 'mode == 1' in renderer
+            and 'native_variant == 0 && original->color_index[0] == 9' in renderer
+            and 'original_address == 0x78A700u ? 0' in renderer
+            and 'original_address == 0x78A72Cu ? 1 : -1' in renderer
             and 'load_neca_test_sprites(canvas);' in renderer
             and 'selected = &neca_sprites[NECA_SPRITE_URANIUM_TEST];' in renderer
             and 'mode == 2' in renderer

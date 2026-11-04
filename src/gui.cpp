@@ -1926,7 +1926,7 @@ struct NecaSpriteDef {
     int transparent_index;
 };
 static const NecaSpriteDef neca_sprite_defs[NECA_SPRITE_COUNT] = {
-    {"uranium_test", 16, 16, 100, 62, 253},
+    {"uranium_test", 16, 16, 100, 62, 9},
 };
 static Sprite neca_sprites[NECA_SPRITE_COUNT] = {};
 static bool neca_sprite_ready[NECA_SPRITE_COUNT] = {};
@@ -2029,7 +2029,8 @@ static void load_minor_terrain_sprites(Buffer* canvas)
 /*
 External Uranium reference, loaded only by mode 1. A missing, corrupt or
 incompatible sheet falls back to native Uranium; do not try another atlas.
-Retain the source's palette indices unchanged for this diagnostic test.
+Apply the native TER1.PCX decode and mask substitutions to this raw
+external copy. Any pixel/hash mismatch must fall back to native Uranium.
 */
 static void load_neca_test_sprites(Buffer* canvas)
 {
@@ -2048,13 +2049,22 @@ static void load_neca_test_sprites(Buffer* canvas)
 
     Buffer image;
     Buffer_ctor(&image);
-    const int loaded = Buffer_load_pcx(&image, path.c_str(), nullptr, 0, 0);
+
+    // Exact native TER1.PCX path, verified in the supported terranx.exe:
+    // Buffer_load_pcx(..., nullptr, 10, 236), then Buffer_change_color
+    // 0x107->0x109 and 0x106->0x109, then Sprite_extract_2 with key 9.
+    // PCX loader adds 10 modulo 256 to each decoded 8-bit pixel:
+    // raw 253 -> 7, raw 252 -> 6; both are remapped to 9.
+    const int loaded = Buffer_load_pcx(&image, path.c_str(), nullptr, 10, 236);
     const int atlas_width = image.clipRect.right;
     const int atlas_height = image.clipRect.bottom;
     minor_graphics_trace("NECA SPRITE atlas result / width / height",
         loaded, atlas_width, atlas_height);
 
+    // Buffer_load_pcx uses 0 for success. Avoid touching an invalid
+    // image, and do not try to guess an alternate graphics source.
     if (loaded == 0) {
+        bool rectangle_valid = true;
         for (int id = 0; id < NECA_SPRITE_COUNT; ++id) {
             const NecaSpriteDef& def = neca_sprite_defs[id];
             if (def.x < 0 || def.y < 0 || def.width <= 0 || def.height <= 0
@@ -2062,58 +2072,90 @@ static void load_neca_test_sprites(Buffer* canvas)
                 || def.y + def.height > atlas_height) {
                 minor_graphics_trace("NECA SPRITE invalid source rectangle",
                     id, atlas_width, atlas_height);
-                continue;
+                rectangle_valid = false;
             }
+        }
 
-            const int corner = Buffer_get_pixel(&image, def.x, def.y);
-            if (corner != def.transparent_index) {
-                // The user's atlas has an index-253 background at (16,16).
-                // An unexpected index must be diagnosed, not guessed.
-                minor_graphics_trace("NECA SPRITE unexpected corner key",
-                    id, corner, def.transparent_index);
-                continue;
+        if (rectangle_valid) {
+            const NecaSpriteDef& ref = neca_sprite_defs[NECA_SPRITE_URANIUM_TEST];
+            // Verify the raw PCX background was offset as expected before
+            // changing any source indices. (253 + 10) mod 256 = 7.
+            const int decoded_corner = Buffer_get_pixel(&image, ref.x, ref.y);
+            if (decoded_corner != 7) {
+                minor_graphics_trace("NECA SPRITE unexpected offset corner",
+                    NECA_SPRITE_URANIUM_TEST, decoded_corner, 7);
+                rectangle_valid = false;
             }
+        }
 
-            // Count and hash decoded 8-bit *Buffer* pixels. Sprite::data may
-            // be RLE encoded, so do not assume pitch*height readable bytes.
-            int mask_252 = 0, background_253 = 0, other_pixels = 0;
-            uint32_t source_hash = 2166136261u;
-            for (int y = def.y; y < def.y + def.height; ++y) {
-                for (int x = def.x; x < def.x + def.width; ++x) {
-                    const int pixel = Buffer_get_pixel(&image, x, y);
-                    if (pixel == 252) {
-                        ++mask_252;
-                    } else if (pixel == 253) {
-                        ++background_253;
-                    } else {
-                        ++other_pixels;
+        if (rectangle_valid) {
+            const int change_7 = Buffer_change_color(&image, 0x107, 0x109);
+            const int change_6 = change_7 == 0
+                ? Buffer_change_color(&image, 0x106, 0x109) : -1;
+            minor_graphics_trace("NECA SPRITE remap 7to9 / 6to9",
+                change_7, change_6, 0);
+            if (change_7 == 0 && change_6 == 0) {
+                for (int id = 0; id < NECA_SPRITE_COUNT; ++id) {
+                    const NecaSpriteDef& def = neca_sprite_defs[id];
+                    const int corner = Buffer_get_pixel(&image, def.x, def.y);
+                    int transparent_pixels = 0;
+                    int visible_pixels = 0;
+                    uint32_t processed_hash = 2166136261u;
+                    for (int y = def.y; y < def.y + def.height; ++y) {
+                        for (int x = def.x; x < def.x + def.width; ++x) {
+                            const int pixel = Buffer_get_pixel(&image, x, y);
+                            if (pixel == def.transparent_index) {
+                                ++transparent_pixels;
+                            } else {
+                                ++visible_pixels;
+                            }
+                            processed_hash = (processed_hash
+                                ^ static_cast<uint8_t>(pixel)) * 16777619u;
+                        }
                     }
-                    source_hash = (source_hash
-                        ^ static_cast<uint8_t>(pixel)) * 16777619u;
+
+                    // Reference values calculated independently from the
+                    // user's exact Uranium pixel copy. This verifies native
+                    // preprocessing, NOT final visual equivalence.
+                    const bool pixels_match = corner == def.transparent_index
+                        && transparent_pixels == 5635
+                        && visible_pixels == 565
+                        && processed_hash == 0x24A1B67Au;
+                    fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+                    if (fp) {
+                        fprintf(fp, "NECA SPRITE processed name=%s "
+                            "corner=%d transparent=%d visible=%d "
+                            "hash=%08X expected=24A1B67A verified=%d\n",
+                            def.name, corner, transparent_pixels, visible_pixels,
+                            (unsigned)processed_hash, pixels_match ? 1 : 0);
+                        fclose(fp);
+                    }
+                    if (!pixels_match) {
+                        minor_graphics_trace("NECA SPRITE processed mismatch / fallback",
+                            id, transparent_pixels, visible_pixels);
+                        continue;
+                    }
+
+                    Sprite_ctor(&neca_sprites[id]);
+                    const int result = Sprite_extract_2(
+                        &neca_sprites[id], &image, def.transparent_index,
+                        def.x, def.y, def.width, def.height, nullptr);
+                    const Sprite& sprite = neca_sprites[id];
+                    neca_sprite_ready[id] = result == 0 && sprite.data != nullptr
+                        && sprite.width > 0 && sprite.width <= def.width
+                        && sprite.height > 0 && sprite.height <= def.height
+                        && sprite.color_index[0] == def.transparent_index;
+                    fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+                    if (fp) {
+                        fprintf(fp, "NECA SPRITE extract name=%s result=%d ready=%d "
+                            "sprite=%dx%d offset=%d,%d pitch=%d key=%u\n",
+                            def.name, result, neca_sprite_ready[id] ? 1 : 0,
+                            sprite.width, sprite.height, sprite.offset_x,
+                            sprite.offset_y, sprite.pitch,
+                            (unsigned)sprite.color_index[0]);
+                        fclose(fp);
+                    }
                 }
-            }
-
-            Sprite_ctor(&neca_sprites[id]);
-            const int result = Sprite_extract_2(
-                &neca_sprites[id], &image, def.transparent_index,
-                def.x, def.y, def.width, def.height, nullptr);
-            const Sprite& sprite = neca_sprites[id];
-            neca_sprite_ready[id] = result == 0 && sprite.data != nullptr
-                && sprite.width > 0 && sprite.width <= def.width
-                && sprite.height > 0 && sprite.height <= def.height;
-
-            fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
-            if (fp) {
-                fprintf(fp, "NECA SPRITE name=%s source=%d,%d,%d,%d "
-                    "corner=%d source252=%d source253=%d other=%d "
-                    "hash=%08X extract=%d ready=%d "
-                    "sprite=%dx%d offset=%d,%d pitch=%d key=%u\n",
-                    def.name, def.x, def.y, def.width, def.height,
-                    corner, mask_252, background_253, other_pixels,
-                    (unsigned)source_hash, result, neca_sprite_ready[id] ? 1 : 0,
-                    sprite.width, sprite.height, sprite.offset_x, sprite.offset_y,
-                    sprite.pitch, (unsigned)sprite.color_index[0]);
-                fclose(fp);
             }
         }
     }
@@ -2149,10 +2191,18 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
     }
     const int mode = conf.minor_titanium_sprite_mode;
     Sprite* selected = original;
+    // 0x465E2E selects 0x78A700 (variant 0) or 0x78A72C (variant 1).
+    // Only the first raw source rectangle is present in neca_sprites.pcx.
+    // A different/unknown native variant must remain untouched.
+    const uintptr_t original_address = reinterpret_cast<uintptr_t>(original);
+    const int native_variant = original_address == 0x78A700u ? 0
+        : original_address == 0x78A72Cu ? 1 : -1;
     if (mode == 1) {
-        load_neca_test_sprites(canvas);
-        if (neca_sprite_ready[NECA_SPRITE_URANIUM_TEST]) {
-            selected = &neca_sprites[NECA_SPRITE_URANIUM_TEST];
+        if (native_variant == 0 && original->color_index[0] == 9) {
+            load_neca_test_sprites(canvas);
+            if (neca_sprite_ready[NECA_SPRITE_URANIUM_TEST]) {
+                selected = &neca_sprites[NECA_SPRITE_URANIUM_TEST];
+            }
         }
     } else if (mode == 2) {
         load_minor_terrain_sprites(canvas);
@@ -2172,10 +2222,10 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
         const std::string path = minor_graphics_file("minor_terrain_render.log");
         FILE* fp = fopen(path.c_str(), "a");
         if (fp) {
-            fprintf(fp, "TITANIUM SPRITE TEST mode=%d x=%d y=%d swapped=%d "
+            fprintf(fp, "TITANIUM SPRITE TEST mode=%d variant=%d x=%d y=%d swapped=%d "
                 "native=%p key=%u sprite=%dx%d offset=%d,%d pitch=%d "
                 "selected=%p key=%u sprite=%dx%d offset=%d,%d pitch=%d\n",
-                mode, x, y, selected != original ? 1 : 0,
+                mode, native_variant, x, y, selected != original ? 1 : 0,
                 (void*)original, (unsigned)original->color_index[0],
                 original->width, original->height, original->offset_x,
                 original->offset_y, original->pitch,
