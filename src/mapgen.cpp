@@ -1832,15 +1832,9 @@ void __cdecl mod_world_mesa(int x, int y) {
         int x2 = wrap(x + TableOffsetX[i]);
         int y2 = y + TableOffsetY[i];
         if (mapsq(x2, y2)) {
-            // Stepped Mesa: a 3x3 high plateau, 5x5 middle terrace,
-            // and lowland rim across the original 7x7 landmark.
-            int altitude = ALT_SHORE_LINE;
-            if (i < 9) {
-                altitude = ALT_TWO_ABOVE_SEA;
-            } else if (i < TableRange[2]) {
-                altitude = ALT_ONE_ABOVE_SEA;
-            }
-            world_alt_set(x2, y2, altitude, true);
+            // Keep the original low, flat-topped Mesa profile. Raising the
+            // inner 3x3 to 2000m made the native sprite appear domed.
+            world_alt_set(x2, y2, (i < TableRange[2]) + ALT_SHORE_LINE, true);
             bit2_set(x2, y2, LM_MESA, true);
             code_set(x2, y2, i);
         }
