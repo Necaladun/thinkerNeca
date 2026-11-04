@@ -10,7 +10,7 @@ with tempfile.TemporaryDirectory() as directory:
     source = Path(directory) / 'source.pcx'
     result = Path(directory) / 'clean.pcx'
     pixels = Image.new('P', (384, 64), 253)
-    pixels.putpalette([i for p in range(256) for i in (p, p, p)])
+    pixels.putpalette([i for p in range(256) for i in (p, (p*37) % 256, (p*13) % 256)])
     for x, y, value in ((2, 3, 252), (20, 30, 254), (30, 40, 41),
                         (134, 8, 252), (278, 8, 254), (44, 2, 253)):
         pixels.putpixel((x, y), value)
