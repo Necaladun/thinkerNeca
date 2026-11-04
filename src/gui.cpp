@@ -1913,10 +1913,14 @@ static Sprite minor_sprites[MINOR_TYPE_COUNT] = {};
 static bool minor_sprite_ready[MINOR_TYPE_COUNT] = {};
 static bool minor_sprites_attempted = false;
 
-// The first external-atlas diagnostic uses *unrecoloured* Uranium art.
-// This is a source-rectangle registry, not a new native rendering hook.
-// Original-game art is provided locally by the user, not redistributed.
-enum NecaSpriteId { NECA_SPRITE_URANIUM_TEST, NECA_SPRITE_COUNT };
+// The reference Uranium and experimental blue-grey Titanium use independent
+// atlas rectangles and validation. Reuse the existing native draw hook;
+// original-game art is provided locally and never redistributed in Git.
+enum NecaSpriteId {
+    NECA_SPRITE_URANIUM_TEST,
+    NECA_SPRITE_TITANIUM_TEST,
+    NECA_SPRITE_COUNT
+};
 struct NecaSpriteDef {
     const char* name;
     int x;
@@ -1927,6 +1931,7 @@ struct NecaSpriteDef {
 };
 static const NecaSpriteDef neca_sprite_defs[NECA_SPRITE_COUNT] = {
     {"uranium_test", 16, 16, 100, 62, 9},
+    {"titanium_test", 144, 16, 100, 62, 9},
 };
 static Sprite neca_sprites[NECA_SPRITE_COUNT] = {};
 static bool neca_sprite_ready[NECA_SPRITE_COUNT] = {};
@@ -2027,10 +2032,11 @@ static void load_minor_terrain_sprites(Buffer* canvas)
 }
 
 /*
-External Uranium reference, loaded only by mode 1. A missing, corrupt or
-incompatible sheet falls back to native Uranium; do not try another atlas.
-Apply the native TER1.PCX decode and mask substitutions to this raw
-external copy. Any pixel/hash mismatch must fall back to native Uranium.
+External Uranium reference and trial Titanium, loaded in modes 1/3.
+Missing/invalid artwork falls back to native Uranium. Both use native
+TER1.PCX index decoding and mask processing. Uranium remains checksum-
+locked as a known reference; Titanium validates structurally so its
+source pixel colours can be revised later without recompiling.
 */
 static void load_neca_test_sprites(Buffer* canvas)
 {
@@ -2077,14 +2083,16 @@ static void load_neca_test_sprites(Buffer* canvas)
         }
 
         if (rectangle_valid) {
-            const NecaSpriteDef& ref = neca_sprite_defs[NECA_SPRITE_URANIUM_TEST];
-            // Verify the raw PCX background was offset as expected before
-            // changing any source indices. (253 + 10) mod 256 = 7.
-            const int decoded_corner = Buffer_get_pixel(&image, ref.x, ref.y);
-            if (decoded_corner != 7) {
-                minor_graphics_trace("NECA SPRITE unexpected offset corner",
-                    NECA_SPRITE_URANIUM_TEST, decoded_corner, 7);
-                rectangle_valid = false;
+            // Verify every source rectangle's raw index-253 background
+            // became index 7 after the +10 offset, before remapping to 9.
+            for (int id = 0; id < NECA_SPRITE_COUNT; ++id) {
+                const NecaSpriteDef& def = neca_sprite_defs[id];
+                const int decoded_corner = Buffer_get_pixel(&image, def.x, def.y);
+                if (decoded_corner != 7) {
+                    minor_graphics_trace("NECA SPRITE unexpected offset corner",
+                        id, decoded_corner, 7);
+                    rectangle_valid = false;
+                }
             }
         }
 
@@ -2114,20 +2122,25 @@ static void load_neca_test_sprites(Buffer* canvas)
                         }
                     }
 
-                    // Reference values calculated independently from the
-                    // user's exact Uranium pixel copy. This verifies native
-                    // preprocessing, NOT final visual equivalence.
+                    // Only the unmodified Uranium control must match the
+                    // verified checksum exactly. Titanium is user artwork:
+                    // require a nonempty, nonopaque sprite with index-9
+                    // background, but merely LOG its checksum for comparison.
+                    const bool uranium_reference = id == NECA_SPRITE_URANIUM_TEST;
                     const bool pixels_match = corner == def.transparent_index
-                        && transparent_pixels == 5635
-                        && visible_pixels == 565
-                        && processed_hash == 0x24A1B67Au;
+                        && transparent_pixels > 0 && visible_pixels > 0
+                        && (!uranium_reference || (transparent_pixels == 5635
+                            && visible_pixels == 565
+                            && processed_hash == 0x24A1B67Au));
                     fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
                     if (fp) {
                         fprintf(fp, "NECA SPRITE processed name=%s "
                             "corner=%d transparent=%d visible=%d "
-                            "hash=%08X expected=24A1B67A verified=%d\n",
+                            "hash=%08X expected=%08X verified=%d\n",
                             def.name, corner, transparent_pixels, visible_pixels,
-                            (unsigned)processed_hash, pixels_match ? 1 : 0);
+                            (unsigned)processed_hash,
+                            (unsigned)(uranium_reference ? 0x24A1B67Au : 0u),
+                            pixels_match ? 1 : 0);
                         fclose(fp);
                     }
                     if (!pixels_match) {
@@ -2164,8 +2177,8 @@ static void load_neca_test_sprites(Buffer* canvas)
 
 /*
 Select the Develop-only Titanium sprite test at the original native
-resource drawing call. Mode 0=original sprite, mode 1=external Uranium
-control from neca_sprites.pcx, mode 2=legacy minor_terrain.pcx Titanium.
+resource drawing call. Mode 0=original, 1=external Uranium reference,
+2=legacy Titanium, 3=external blue-grey Titanium from neca_sprites.pcx.
 The original renderer still owns position, scale, clipping and layer.
 When substituting, the x86 shim forwards the selected sprite's colour
 key; missing assets retain the working native Uranium fallback.
@@ -2192,16 +2205,18 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
     const int mode = conf.minor_titanium_sprite_mode;
     Sprite* selected = original;
     // 0x465E2E selects 0x78A700 (variant 0) or 0x78A72C (variant 1).
-    // Only the first raw source rectangle is present in neca_sprites.pcx.
-    // A different/unknown native variant must remain untouched.
+    // The user atlas currently covers only the first native sprite
+    // variant's source geometry. Leave all other variants native.
     const uintptr_t original_address = reinterpret_cast<uintptr_t>(original);
     const int native_variant = original_address == 0x78A700u ? 0
         : original_address == 0x78A72Cu ? 1 : -1;
-    if (mode == 1) {
+    if (mode == 1 || mode == 3) {
         if (native_variant == 0 && original->color_index[0] == 9) {
             load_neca_test_sprites(canvas);
-            if (neca_sprite_ready[NECA_SPRITE_URANIUM_TEST]) {
-                selected = &neca_sprites[NECA_SPRITE_URANIUM_TEST];
+            const NecaSpriteId id = mode == 3
+                ? NECA_SPRITE_TITANIUM_TEST : NECA_SPRITE_URANIUM_TEST;
+            if (neca_sprite_ready[id]) {
+                selected = &neca_sprites[id];
             }
         }
     } else if (mode == 2) {

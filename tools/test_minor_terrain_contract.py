@@ -152,8 +152,8 @@ def main() -> None:
     require('minor_titanium_sprite_mode=0' in ini
             and 'int minor_titanium_sprite_mode = 0;' in config
             and 'MATCH("minor_titanium_sprite_mode")' in cfg
-            and 'cf->minor_titanium_sprite_mode = clamp(atoi(value), 0, 2);' in cfg,
-            'Titanium external sprite test must parse modes 0-2, default to native')
+            and 'cf->minor_titanium_sprite_mode = clamp(atoi(value), 0, 3);' in cfg,
+            'Titanium external sprite test must parse modes 0-3, default to native')
     require('static bool install_minor_native_titanium_sprite()' in patches
             and 'constexpr int bonus_site = 0x465DFC;' in patches
             and 'constexpr int type_four_site = 0x465E0E;' in patches
@@ -171,12 +171,16 @@ def main() -> None:
     require('static void load_neca_test_sprites(Buffer* canvas)' in renderer
             and 'minor_graphics_file("neca_sprites.pcx")' in renderer
             and '{"uranium_test", 16, 16, 100, 62, 9}' in renderer
+            and '{"titanium_test", 144, 16, 100, 62, 9}' in renderer
             and 'def.x + def.width > atlas_width' in renderer
             and 'decoded_corner != 7' in renderer
             and 'Buffer_load_pcx(&image, path.c_str(), nullptr, 10, 236)' in renderer
             and 'Buffer_change_color(&image, 0x107, 0x109)' in renderer
             and 'Buffer_change_color(&image, 0x106, 0x109)' in renderer
             and 'processed_hash == 0x24A1B67Au' in renderer
+            and 'const bool uranium_reference = id == NECA_SPRITE_URANIUM_TEST;' in renderer
+            and '(!uranium_reference || (transparent_pixels == 5635' in renderer
+            and 'visible_pixels > 0' in renderer
             and 'transparent_pixels == 5635' in renderer
             and 'visible_pixels == 565' in renderer
             and 'if (!pixels_match)' in renderer
@@ -196,12 +200,15 @@ def main() -> None:
     require('minor_titanium_select_native_sprite(' in renderer
             and 'frame[8], y = frame[9]' in renderer
             and 'minor_landmark_at(x, y) != MINOR_TITANIUM' in renderer
-            and 'mode == 1' in renderer
+            and 'mode == 1 || mode == 3' in renderer
+            and 'mode == 3' in renderer
+            and 'const NecaSpriteId id = mode == 3' in renderer
+            and 'NECA_SPRITE_TITANIUM_TEST : NECA_SPRITE_URANIUM_TEST' in renderer
             and 'native_variant == 0 && original->color_index[0] == 9' in renderer
             and 'original_address == 0x78A700u ? 0' in renderer
             and 'original_address == 0x78A72Cu ? 1 : -1' in renderer
             and 'load_neca_test_sprites(canvas);' in renderer
-            and 'selected = &neca_sprites[NECA_SPRITE_URANIUM_TEST];' in renderer
+            and 'selected = &neca_sprites[id];' in renderer
             and 'mode == 2' in renderer
             and 'selected = &minor_sprites[MINOR_TITANIUM];' in renderer
             and 'return selected;' in renderer
