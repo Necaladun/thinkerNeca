@@ -2021,7 +2021,8 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
 
 // Thiscall native resource sprite: ECX holds Sprite*, [ESP+4] holds
 // Buffer*. Preserve original registers/flags and all stack arguments.
-// After pushfl+pushal+push ebp, saved ECX is at +28, not +24 (EDX).
+// After addl $12 removes all three selector arguments, ESP points to
+// the pushal register block. Saved ECX is at +24 (EDX is at +20).
 // Tail-jump to the exact original callee with only ECX changed.
 // No custom screen-position or zoom calculation can be introduced here.
 extern "C" __attribute__((naked, used))
@@ -2035,7 +2036,7 @@ void minor_native_titanium_sprite_hook()
         "pushl 32(%esp)\n\t"
         "call _minor_titanium_select_native_sprite\n\t"
         "addl $12, %esp\n\t"
-        "movl %eax, 28(%esp)\n\t"
+        "movl %eax, 24(%esp)\n\t"
         "popal\n\t"
         "popfl\n\t"
         "jmp *_minor_titanium_native_draw_target\n\t"

@@ -167,8 +167,8 @@ def main() -> None:
             and 'minor_landmark_at(x, y) != MINOR_TITANIUM' in renderer
             and 'return &minor_sprites[MINOR_TITANIUM];' in renderer
             and 'jmp *_minor_titanium_native_draw_target' in renderer
-            and '"movl %eax, 28(%esp)' in renderer
-            and '"movl %eax, 24(%esp)' not in renderer
+            and '"movl %eax, 24(%esp)' in renderer
+            and '"movl %eax, 28(%esp)' not in renderer
             and 'static_cast<uintptr_t>(frame[3])' not in renderer
             and 'MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py)' not in renderer,
             'Titanium native wrapper must change saved ECX, not EDX, with verified tile coordinates')
