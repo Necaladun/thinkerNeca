@@ -35,7 +35,7 @@ The registry currently defines **unconditional +1 basic-resource bonuses** (subj
 
 Thinker's worker selection, crawler logic and former scoring consume modified actual tile yields in several paths. Settlement scoring also explicitly recognises independent terrain, but uses coarse fixed bonuses. The projected `item_yield()` calculation is not fully identical to actual `mod_crop_yield()`, `mod_mine_yield()` and `mod_energy_yield()` for certain future improvements (especially Ironstone/Jungle plus a Thermal Borehole). These discrepancies should be fixed in the later AI/terraform pass, once extraction rules are finalised.
 
-**Not implemented:** 1/1/1 Forests, 3/3/3 pre-tech caps, improvement-dependent extraction of geological deposits, or a general terraform-AI rewrite. Those are design discussions, not existing code.
+**Balance status:** The distributed test `thinker.ini` now sets `tile_output_limit=3,3,3` using Thinker's existing configurable pre-tech resource-cap mechanic (up from 2,2,2); this is an **experimental configuration**, not a new source-level yield rule. The proposed 1/1/1 Forests, improvement-dependent geological extraction, and general terraform-AI rewrite are **not** implemented.
 
 ## Testing and limitations
 
