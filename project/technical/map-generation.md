@@ -34,7 +34,7 @@ Original slot ordering is retained; **new independent minor types consume none o
 
 Additional modified features include changed Great Dunes geometry, resource distribution and a freshwater oasis. **Great Dunes have a positive user visual test**, while full regression on other landmarks remains outstanding.
 
-**Sunny Mesa (MAP-005):** the generator marks the complete `TableRange[3]` (7×7) area as `LM_MESA`, and elevates the central `TableRange[2]` area. Both `mod_energy_yield()` and AI `item_yield()` currently add +1E for **every** flagged tile. The user proposes a centre-only 3×3 bonus, like Garland Crater's `code_at() < 9` bonus. This is a proposed change, **not yet implemented**. Keeping the larger landmark footprint should retain its climate/elevation effects.
+**Sunny Mesa (MAP-005):** the generator marks the complete `TableRange[3]` (7×7) area as `LM_MESA`, and elevates the central `TableRange[2]` area. Both `mod_energy_yield()` and AI `item_yield()` currently add +1E for **every** flagged tile. The real `mod_energy_yield()` and projected AI `item_yield()` now both require `code_at() < 9` for Mesa's +1 energy, restricting it to the elevated central 3×3. The full 7×7 landmark, elevation and climate behaviour are unchanged. **In-game yield verification remains pending.**
 
 **Slot 10:** the old Canyon-shaped random terrain, name and economic bonus no longer generate, and the native WorldBuilder Canyon call is disabled. The original executable may still contain native Canyon graphics/editor interpretation for flag `0x200`; do not assign it to new terrain before implementing appropriate new rendering. No new landmark has been selected.
 

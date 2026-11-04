@@ -1165,7 +1165,8 @@ int __cdecl mod_energy_yield(int faction_id, int base_id, int x, int y, int flag
             value += ResInfo->bonus_sq.energy;
         }
         if ((sq->landmarks & LM_VOLCANO && sq->code_at() < 9)
-        || sq->landmarks & (LM_URANIUM|LM_GEOTHERMAL|LM_RIDGE|LM_MESA)) {
+        || (sq->landmarks & LM_MESA && sq->code_at() < 9)
+        || sq->landmarks & (LM_URANIUM|LM_GEOTHERMAL|LM_RIDGE)) {
             value += !(sq->landmarks & LM_DISABLE);
         }
         if (base_id >= 0 && project_base(FAC_MERCHANT_EXCHANGE) == base_id) {
@@ -1605,7 +1606,7 @@ int item_yield(int x, int y, int faction_id, int bonus, MapItem item) {
         if (sq->landmarks & LM_FRESH && is_ocean(sq)) { N++; }
         if (sq->landmarks & LM_GEOTHERMAL) { E++; }
         if (sq->landmarks & LM_RIDGE) { E++; }
-        if (sq->landmarks & LM_MESA) { E++; }
+        if (sq->landmarks & LM_MESA && sq->code_at() < 9) { E++; }
         if (sq->landmarks & LM_FOSSIL && sq->code_at() < 6) { M++; }
         if (Factions[faction_id].SE_economy_pending >= 2) {
             E++;

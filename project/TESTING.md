@@ -20,12 +20,12 @@
 | Ironstone rendering | +1 mineral confirmed; **sprite sometimes appears on a tile with no recorded Ironstone** (BUG-002) | Reproduce tile-to-sprite discrepancy, zoom/overlay effects; WIP art changes elsewhere |
 | Native tile Inspector | Jungle/Uranium labels confirmed; **Ironstone label intermittent** in latest user test (BUG-002) | Inspect same tile sprite vs registry data, click/focus/fog and composite feature cases |
 | New world generation | User observed generated independent terrain, current INI launches/works | Multiple deterministic seeds, map sizes, rainfall, count and major/minor overlap |
-| Major landmarks | Great Dunes look good; Sunny Mesa gives +1E across whole 7×7 as currently coded | Evaluate proposed centre-only 3×3 Mesa bonus; other landmarks and overlaps still need testing |
+| Major landmarks | Great Dunes look good; Sunny Mesa now gives +1E only at the centre in source; static regression added | In-game verify +1E on central 3×3 and no Mesa bonus on outer tiles; other landmarks still need testing |
 | Retired Canyon | Static source/INI/landmark-table guard passes | Observe random maps built with both generators |
 | Configuration | Parser/INI structural CI passed; user reports current settings seem to work | Confirm local overrides, starting allocation/event exclusions and cap effects in play |
 | Release build and PRACX | Not verified | Ironstone/Inspector not wired in Release; PRACX/reduced mode not established |
 
-**4 November 2026 in-game findings:** Jungle visually correct and +1 nutrient; Uranium visually correct, +1 energy, Inspector label present; Ironstone +1 mineral but intermittent Inspector label and sprites sometimes drawn on non-Ironstone tiles; Great Dunes look good; Sunny Mesa +1 energy on all 7×7 tiles; probe-team issue **appears** resolved with `base_capture_fix=0`. These are user-reported observations, not completed regression coverage. See BUG-001, BUG-002 and MAP-005.
+**4 November 2026 in-game findings:** Jungle visually correct and +1 nutrient; Uranium visually correct, +1 energy, Inspector label present; Ironstone +1 mineral but intermittent Inspector label and sprites sometimes drawn on non-Ironstone tiles; Great Dunes look good; Sunny Mesa previously +1E on all 7×7 tiles (source fix now centre-only, not yet tested); probe-team issue **appears** resolved with `base_capture_fix=0`. These are user-reported observations, not completed regression coverage. See BUG-001, BUG-002 and MAP-005.
 
 ## Recommended practical regression pass
 
