@@ -30,6 +30,71 @@ static bool install_minor_native_inspector()
 }
 
 /*
+Locate the exact resource sprite draw call following the native
+bonus_at() callsite in MapWin_gen_terrain_poly. We do not assume an
+unverified byte address or modify the working Uranium bonus path.
+Only patch when there is exactly ONE direct call to a known Sprite::draw
+entrypoint after that bonus_at call. Otherwise fail closed, leaving
+the shared Uranium placeholder and writing a diagnostic log.
+*/
+static bool install_minor_native_titanium_sprite()
+{
+#if defined(__GNUC__) && defined(__i386__) && !defined(BUILD_REL)
+    const int first = 0x4632D0;
+    const int end = 0x466600;
+    const int bonus_target = 0x592030;
+    const int known_draw_targets[] = {0x5E4AFA, 0x5E4B4A, 0x5E4B9A};
+    int bonus_site = 0, bonus_matches = 0;
+    for (int addr = first; addr <= end - 5; ++addr) {
+        if (*(const uint8_t*)addr != 0xE8) {
+            continue;
+        }
+        int32_t rel = 0;
+        memcpy(&rel, (const void*)(addr + 1), sizeof(rel));
+        if (addr + 5 + rel == bonus_target) {
+            bonus_site = addr;
+            ++bonus_matches;
+        }
+    }
+    if (bonus_matches != 1) {
+        minor_graphics_titanium_hook_result(bonus_site, 0, bonus_matches, 0);
+        return false;
+    }
+
+    int draw_site = 0, draw_target = 0, draw_matches = 0;
+    for (int addr = bonus_site + 5; addr <= end - 5; ++addr) {
+        if (*(const uint8_t*)addr != 0xE8) {
+            continue;
+        }
+        int32_t rel = 0;
+        memcpy(&rel, (const void*)(addr + 1), sizeof(rel));
+        const int target = addr + 5 + rel;
+        for (int known : known_draw_targets) {
+            if (target == known) {
+                draw_site = addr;
+                draw_target = target;
+                ++draw_matches;
+            }
+        }
+    }
+    if (draw_matches != 1) {
+        minor_graphics_titanium_hook_result(bonus_site, draw_site,
+            draw_matches, draw_target);
+        return false;
+    }
+    // Write the forwarding destination *before* installing the call hook.
+    minor_titanium_native_draw_target = (uintptr_t)draw_target;
+    write_call(draw_site, (int)minor_native_titanium_sprite_hook);
+    minor_native_titanium_sprite_installed = true;
+    minor_graphics_titanium_hook_result(bonus_site, draw_site,
+        draw_matches, draw_target);
+    return true;
+#else
+    return false;
+#endif
+}
+
+/*
 The supported SMAX executable checks native Jungle at three locations
 inside MapWin_gen_terrain_poly. Original instruction (6 bytes):
     and edx, 0x80000004
@@ -1447,7 +1512,13 @@ bool patch_setup(Config* cf) {
     }
 #endif
 
-    // Uranium and Titanium share the engine's native resource renderer.
+    // Titanium may replace only the native Uranium resource Sprite*.
+    // If no unique, validated draw call exists, use the working Uranium art.
+#ifndef BUILD_REL
+    if (cf->minor_native_titanium && !cf->reduced_mode) {
+        install_minor_native_titanium_sprite();
+    }
+#endif
 
 #ifndef BUILD_REL
     if (cf->minor_native_inspector && !cf->reduced_mode) {

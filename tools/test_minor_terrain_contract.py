@@ -149,6 +149,23 @@ def main() -> None:
     require('minor_native_titanium=1' in ini
             and 'MATCH("minor_native_titanium")' in cfg,
             'Titanium native rendering switch must be supported')
+    require('install_minor_native_titanium_sprite()' in patches
+            and 'int draw_site = 0, draw_target = 0, draw_matches = 0;' in patches
+            and 'draw_matches != 1' in patches
+            and 'known_draw_targets[]' in patches
+            and 'write_call(draw_site, (int)minor_native_titanium_sprite_hook);' in patches,
+            'Titanium sprite hook must verify one native sprite draw call or fail closed')
+    require('minor_titanium_select_native_sprite(' in renderer
+            and 'frame[8], y = frame[9]' in renderer
+            and 'minor_landmark_at(x, y) != MINOR_TITANIUM' in renderer
+            and 'return &minor_sprites[MINOR_TITANIUM];' in renderer
+            and 'jmp *_minor_titanium_native_draw_target' in renderer
+            and 'MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py)' not in renderer,
+            'Titanium must substitute only the native Sprite* and preserve draw parameters')
+    require('minor_titanium_native_draw_target = (uintptr_t)draw_target;' in patches
+            and 'minor_native_titanium_sprite_installed = true;' in patches
+            and 'minor_graphics_titanium_hook_result' in patches,
+            'Titanium native hook must publish guarded target and diagnostic state')
     require('const int site = 0x4B7A0C;' in patches
             and '0xE8, 0xCF, 0xD9, 0x18, 0x00' in patches
             and 'memcmp((const void*)site, expected, sizeof(expected))' in patches

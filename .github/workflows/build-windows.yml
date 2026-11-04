@@ -41,6 +41,7 @@ jobs:
         run: |
           python -m py_compile tools/make_minor_terrain.py
           python tools/test_minor_terrain_atlas.py
+          python tools/test_titanium_sprite_mask.py
           python tools/make_minor_terrain.py assets/minor_terrain.pcx build/ci/minor_terrain.pcx
       - name: Check independent terrain source contract
         run: python tools/test_minor_terrain_contract.py

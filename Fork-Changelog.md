@@ -4,6 +4,8 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unreleased — draft PR #4 (2026-11-04)
 
+- Added an **experimental Develop-only native Titanium Sprite pointer substitution** at a uniquely verified resource draw call. It uses the renderer's original draw coordinates and parameters, preserves Uranium unchanged, and falls back to the native sprite if the hook/PCX is unavailable. The old manual position calculation is not restored. **Runtime verification pending**.
+- Added a source-PCX mask normalizer and synthetic palette/mask test. It changes only Titanium-slot template indices 252/254 to transparency 253, without changing ore pixels; user-derived artwork is **not committed** to the public repository.
 - **Latest refactor:** renamed geological mineral minor type to **Titanium** throughout the active source, INI, tests, diagnostics and docs. The saved type ID remains 3 and the `THMIN001` v2 record format is unchanged.
 - Replaced duplicate Uranium/Titanium deposit generators with a single interleaved routine: same eligible tiles, lowland preference, 3–9 patch sizes, fungus clearing, two-tile inter-patch buffer, and independent RNG streams. Uranium patches are attempted first each round, then Titanium.
 - Removed the custom Titanium native drawing thunk and manual pixel-position calculations. Both minerals now use the existing Uranium renderer-only `bonus_at()==4` glyph, with separate +1E/+1M yields. Same-save alignment and new-game distribution are **pending in-game testing**.

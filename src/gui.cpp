@@ -1912,6 +1912,26 @@ its layering over units and PRACX support remain unresolved.
 static Sprite minor_sprites[MINOR_TYPE_COUNT] = {};
 static bool minor_sprite_ready[MINOR_TYPE_COUNT] = {};
 static bool minor_sprites_attempted = false;
+
+// Native sprite substitution is strictly scoped to one verified resource
+// drawing call in the supported terranx.exe, if that call can be found.
+// The actual resource sprite rendering position remains the game's own.
+bool minor_native_titanium_sprite_installed = false;
+extern "C" { uintptr_t minor_titanium_native_draw_target = 0; }
+
+void minor_graphics_titanium_hook_result(int bonus_site, int draw_site,
+    int candidates, int target)
+{
+    const std::string path = minor_graphics_file("minor_terrain_render.log");
+    FILE* fp = fopen(path.c_str(), "a");
+    if (fp) {
+        fprintf(fp, "TITANIUM DRAW HOOK bonus=0x%08X draw=0x%08X matches=%d target=0x%08X active=%d\n",
+            (unsigned)bonus_site, (unsigned)draw_site, candidates,
+            (unsigned)target, minor_native_titanium_sprite_installed ? 1 : 0);
+        fclose(fp);
+    }
+}
+
 static void load_minor_terrain_sprites(Buffer* canvas)
 {
     if (minor_sprites_attempted || !canvas || !canvas->palette) {
@@ -1960,6 +1980,68 @@ static void load_minor_terrain_sprites(Buffer* canvas)
     }
     Buffer_dtor(&image);
 }
+
+/*
+Select the custom Titanium sprite AT the native resource sprite call.
+The original renderer continues with its original parameters (canvas,
+position, scaling, clipping, and draw order); only the Sprite* in ECX
+is substituted. This deliberately does not call MapWin_tile_to_pixel.
+If the verified callsite or custom atlas is unavailable, the native
+Uranium sprite remains the fallback.
+*/
+#if defined(__GNUC__) && defined(__i386__)
+extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
+    Sprite* original, Buffer* canvas, const int* frame)
+{
+    if (!minor_native_titanium_sprite_installed || !conf.minor_native_titanium
+        || !original || !canvas || !canvas->palette || !frame
+        || reinterpret_cast<uintptr_t>(MapWin)
+            != static_cast<uintptr_t>(frame[3])) {
+        return original;
+    }
+
+    // Verified native MapWin_gen_terrain_poly stack layout: current tile
+    // coordinates occupy EBP+0x20 / EBP+0x24 at its resource stage.
+    const int x = frame[8], y = frame[9];
+    MAP* tile = mapsq(x, y);
+    if (!tile || minor_landmark_at(x, y) != MINOR_TITANIUM
+        || (tile->items & BIT_BONUS_RES)) {
+        // Normal resource icons take precedence over minor geology.
+        return original;
+    }
+    load_minor_terrain_sprites(canvas);
+    if (!minor_sprite_ready[MINOR_TITANIUM]) {
+        return original;
+    }
+    static int swaps_logged = 0;
+    if (swaps_logged < 12) {
+        minor_graphics_trace("native Titanium sprite substitute", x, y, ++swaps_logged);
+    }
+    return &minor_sprites[MINOR_TITANIUM];
+}
+
+// Thiscall native resource sprite: ECX holds Sprite*, [ESP+4] holds
+// Buffer*. Preserve original registers/flags and all stack arguments.
+// Tail-jump to the exact original callee with only ECX changed.
+// No custom screen-position or zoom calculation can be introduced here.
+extern "C" __attribute__((naked, used))
+void minor_native_titanium_sprite_hook()
+{
+    __asm__ __volatile__(
+        "pushfl\n\t"
+        "pushal\n\t"
+        "pushl %ebp\n\t"
+        "pushl 44(%esp)\n\t"
+        "pushl 32(%esp)\n\t"
+        "call _minor_titanium_select_native_sprite\n\t"
+        "addl $12, %esp\n\t"
+        "movl %eax, 24(%esp)\n\t"
+        "popal\n\t"
+        "popfl\n\t"
+        "jmp *_minor_titanium_native_draw_target\n\t"
+    );
+}
+#endif
 
 // This Draw-only preview uses the game's *already loaded* Monsoon Jungle
 // textures, native RainTransition neighbour mask and native polygon blitter.
