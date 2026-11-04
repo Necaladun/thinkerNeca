@@ -34,7 +34,7 @@ Original slot ordering is retained; **new independent minor types consume none o
 
 Additional modified features include changed Great Dunes geometry, resource distribution and a freshwater oasis. **Great Dunes have a positive user visual test**, while full regression on other landmarks remains outstanding.
 
-**Sunny Mesa (MAP-005):** the generator marks the complete `TableRange[3]` (7×7) area as `LM_MESA`, and elevates the central `TableRange[2]` area. Both `mod_energy_yield()` and AI `item_yield()` currently add +1E for **every** flagged tile. The real `mod_energy_yield()` and projected AI `item_yield()` now both require `code_at() < 9` for Mesa's +1 energy, restricting it to the elevated central 3×3. The full 7×7 landmark, elevation and climate behaviour are unchanged. **In-game yield verification remains pending.**
+**Sunny Mesa (MAP-005):** the generator marks the complete `TableRange[3]` (7×7) area as `LM_MESA`, and elevates the central `TableRange[2]` area. The actual `mod_energy_yield()` and AI `item_yield()` now require `code_at() < 9` for Mesa's +1 energy, restricting it to the elevated central 3×3. The full 7×7 landmark, elevation and climate behaviour are unchanged. **User confirmed in-game on 2026-11-04:** +1E in the central 3×3, none outside.
 
 **Slot 10:** the old Canyon-shaped random terrain, name and economic bonus no longer generate, and the native WorldBuilder Canyon call is disabled. The original executable may still contain native Canyon graphics/editor interpretation for flag `0x200`; do not assign it to new terrain before implementing appropriate new rendering. No new landmark has been selected.
 
@@ -43,3 +43,9 @@ Additional modified features include changed Great Dunes geometry, resource dist
 A new generation seed need not reproduce older builds if algorithms change. During the current testing pass, however, avoid RNG-affecting refactors without deliberate review, so seed comparisons remain meaningful.
 
 See [TESTING](../TESTING.md) for map distributions, overlaps, graphics, fog and save/reload coverage. Suggestions for future major slots belong in [IDEAS](../IDEAS.md), not this implemented-behavior reference.
+
+## Landmark minerals and Mine effects
+
+Current `src/map.cpp` mechanics: Garland Crater and Mount Planet grant **+1 mineral in their centre 3×3** (`code_at() < 9`); Mount Planet also grants **+1 energy** there. Fossil Field Ridge has +1 mineral in its special-coded tiles (`code_at() < 6`). These mineral bonuses are conditional on the landmark not being disabled.
+
+For ordinary land, a qualifying **landmark mineral bonus**, normal mineral resource bonus, or independent **Ironstone** mineral bonus also increments the Mine modifier by **+1**. Thus the central Crater/Mount Planet tiles and Ironstone can gain +1 inherent mineral plus an *additional* +1 mineral from Mine compared to equivalent tiles without that feature. The actual difference is subject to Mine-without-Road restrictions and mineral output caps (currently `tile_output_limit=3,3,3` in the test INI). Mines are **not required** for the inherent +1 mineral. Projected `item_yield()` should not be treated as a comprehensive Mine evaluation; see TERR-003.

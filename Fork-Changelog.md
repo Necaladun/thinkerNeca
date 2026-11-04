@@ -10,7 +10,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 - Integrated native-stage Jungle textures and Uranium sprite rendering; added a Develop-only Ironstone native-stage sprite from a dedicated indexed-PCX atlas. Adjusted Ironstone positioning, zoom scaling and opacity during in-game testing.
 - Added a guarded Develop-only tile-Inspector feature-line hook. User confirmed all three names display in the Inspector; additional UI regression tests remain.
 - Removed the old Nessus Canyon random-map generator, mineral effect and `canyon` INI setting. Reserved native landmark slot 10 (`0x200`) for later design.
-- Restricted Sunny Mesa's +1 energy to the central 3×3 tiles (codes 0–8) in both actual and AI-projected resource yields; preserved its larger geographical footprint. Runtime verification pending.
+- Restricted Sunny Mesa's +1 energy to the central 3×3 tiles (codes 0–8) in both actual and AI-projected resource yields; preserved its larger geographical footprint. User-confirmed centre-only bonus in-game on 2026-11-04.
 - Added Windows Develop CI and source/atlas/save/INI/slot-10 checks. CI compilation is **not** a substitute for in-game testing.
 - Reconciled independent-terrain documentation and standardised the distributed **test** `thinker.ini` with user's choices: `base_capture_fix=0` workaround, `spawn_free_units=0,2,2,0,2,2,1,2,2`, `tile_output_limit=3,3,3` experiment, no polar caps, and events 13/17 disabled.
 - Organised fork documentation into project status, work queue, decisions, ideas, testing, technical references and this changelog. No gameplay rules changed by that documentation reorganisation.
