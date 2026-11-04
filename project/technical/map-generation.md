@@ -32,7 +32,9 @@ Original slot ordering is retained; **new independent minor types consume none o
 | 15 | U.N.S. Unity Wreckage | `unity=1` (expansion context) |
 | 16 | Fossil Field Ridge | `fossil=1`; modified shelf placement |
 
-Additional modified features include changed Great Dunes geometry, resource distribution and a freshwater oasis. **These major-landmark edits are not yet covered by a full in-game regression pass.**
+Additional modified features include changed Great Dunes geometry, resource distribution and a freshwater oasis. **Great Dunes have a positive user visual test**, while full regression on other landmarks remains outstanding.
+
+**Sunny Mesa (MAP-005):** the generator marks the complete `TableRange[3]` (7×7) area as `LM_MESA`, and elevates the central `TableRange[2]` area. Both `mod_energy_yield()` and AI `item_yield()` currently add +1E for **every** flagged tile. The user proposes a centre-only 3×3 bonus, like Garland Crater's `code_at() < 9` bonus. This is a proposed change, **not yet implemented**. Keeping the larger landmark footprint should retain its climate/elevation effects.
 
 **Slot 10:** the old Canyon-shaped random terrain, name and economic bonus no longer generate, and the native WorldBuilder Canyon call is disabled. The original executable may still contain native Canyon graphics/editor interpretation for flag `0x200`; do not assign it to new terrain before implementing appropriate new rendering. No new landmark has been selected.
 

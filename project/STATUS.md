@@ -6,25 +6,25 @@
 
 The fork has an independent per-tile minor-terrain framework for **Jungle (+1 nutrient), Uranium (+1 energy), and Ironstone (+1 mineral)**. Storage/yields were merged with [PR #3](https://github.com/Necaladun/thinkerNeca/pull/3); generation, native graphics, native Inspector integration, Canyon retirement and test INI changes are on draft PR #4.
 
-**Working in initial Develop gameplay tests:** Jungle and Uranium rendering, Ironstone alignment at normal and far zoom, minor-terrain names in the tile Inspector, and the latest test configuration starting/running without reported problems. This is an **initial user-reported smoke test**, not full game/release certification.
+**Latest user-reported Develop tests:** Jungle graphics and +1 nutrient work; Uranium graphics, +1 energy and Inspector name work; Ironstone grants +1 mineral, but **its sprite sometimes appears on tiles without Ironstone and its Inspector name appears inconsistently**. Great Dunes look good. Sunny Mesa currently grants +1 energy over all 7×7 tiles, rather than the proposed 3×3 centre. The test INI starts and runs.
 
 **Automated:** Windows 32-bit Develop compilation, synthetic minor-save decoding, atlas tests, source/INI/Canyon contract tests. CI does not launch SMAC/X.
 
-**Not yet release-ready:** full real save/reload, fog/focus/redraw and extended resource interactions; native Jungle patch robustness; Ironstone/Inspector Release parity; PRACX/reduced mode. PR #4 remains **draft**.
+**Not yet release-ready:** Ironstone sprite/data/Inspector mismatch (BUG-002), full real save/reload, fog/focus/redraw and extended resource interactions; native Jungle patch robustness; Ironstone/Inspector Release parity; PRACX/reduced mode. PR #4 remains **draft**.
 
 ## What is active now
 
-- **Testing:** exercise the fresh-game map, terrain graphics, yields and save/reload matrix — [TESTING](TESTING.md), [TERR-001](WORK-QUEUE.md).
-- **Bugs/engineering:** isolate the probe-related `base_capture_fix=0` workaround; strengthen Jungle native-hook installation — [BUG-001](WORK-QUEUE.md), [REND-001](WORK-QUEUE.md).
+- **Testing:** reproduce Ironstone false-position sprites and intermittent Inspector names (BUG-002); check fresh-game save/reload, fog/zoom, yields and overlap (TERR-001). Jungle, Uranium and Dunes have positive observations.
+- **Bugs/engineering:** `base_capture_fix=0` seems to resolve the observed probe problem, but disables unrelated capture fixes (BUG-001). Native Jungle hook preflight remains outstanding (REND-001).
 - **Balance experiment:** current `tile_output_limit=3,3,3` (up from 2/2/2). Forest 1/1/1 and mine-only extraction are **not implemented**.
-- **New landmark:** slot 10 is reserved after retiring Nessus Canyon; replacement design is exploratory.
+- **Major landmarks:** Great Dunes appearance passed. User proposes a centre-only 3×3 Mesa energy bonus; current 7×7 effect is confirmed by source (MAP-005). Slot 10 remains reserved.
 
 ## What to do next
 
-1. Continue the same-build runtime checks, especially save/reload and special tile/improvement combinations ([TESTING](TESTING.md)).
-2. Record concrete findings as pass/fail observations and update [WORK-QUEUE](WORK-QUEUE.md) rather than expanding this status page.
-3. Once runtime behavior is stable, tackle Jungle hook preflight and packaging/Release parity before merging the draft PR.
-4. Defer Former AI and balance rewrites until the observed resource economy is clearer.
+1. Reproduce Ironstone sprite/data and Inspector mismatch with exact coordinates and zoom; coordinate with the ongoing sprite redesign (BUG-002, REND-003).
+2. Test same-build save/reload and special tile/resource/improvement combinations ([TESTING](TESTING.md)).
+3. Evaluate and implement the proposed centre-only 3×3 Mesa bonus if adopted, updating **both** energy calculation and AI projection (MAP-005).
+4. Once runtime behavior is stable, harden Jungle hooks and Release packaging. Defer broader AI/Forest changes.
 
 **Current configuration:** [`docs/thinker.ini`](../docs/thinker.ini) contains the active test profile, including `base_capture_fix=0`, extra starting units, no polar caps, excluded events 13/17 and 3/3/3 caps. Local `thinker_user.ini` may override it.
 

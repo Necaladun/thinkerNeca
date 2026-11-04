@@ -39,7 +39,7 @@ The current Release build does **not** include the Develop-only Ironstone native
 
 ## Verification
 
-**User-confirmed in-game:** native Jungle joins and normal layering, native Uranium sprite, revised Ironstone alignment/visibility at normal and maximum zoom-out, and Jungle/Uranium/Ironstone names in the native Inspector. Ironstone artwork remains provisional.
+**Latest user-reported in-game:** Jungle and Uranium graphics work and their Inspector names appear consistently. Ironstone +1 mineral works, but **sprites sometimes appear where no independent Ironstone exists and Ironstone's Inspector name is intermittent**. Earlier Ironstone zoom-alignment improvements did not establish correctness in all cases. Artwork redesign continues in a separate workstream (REND-003); investigate the tile-data/renderer disagreement separately (BUG-002).
 
 **Automated CI:** Windows 32-bit Develop compilation, static checks of hook locations/guarding and sprites, synthetic save parsing, and indexed atlas generation.
 

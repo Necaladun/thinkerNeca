@@ -14,17 +14,18 @@
 | Area | Evidence | Remaining checks |
 | --- | --- | --- |
 | Windows Develop compilation | CI passes for current PR head before this documentation change | Re-run CI on modified head; clean local install |
-| Independent minor storage / N/M/E logic | Synthetic `THMIN001` v2 parser; source contract; Jungle nutrient and Ironstone mineral user observations | Save→reload→save in a real new game; combinations with special improvements/resource bonuses |
-| Jungle rendering | User confirmed native texture, joins and layering beneath improvements | Fog, redraw/focus, border cases, unsupported preimages |
-| Uranium rendering | User confirmed native resource graphic | Native bonus-resource coexistence, redraw/zoom/fog |
-| Ironstone rendering | User confirmed native-stage positioning and maximum zoom-out | Visual polish, overlapped units/bases/terrain and matching PCX on deployment |
-| Native tile Inspector | User confirmed Jungle/Uranium/Ironstone names appear | Standalone/composite lines, repeated selection/clicking, fog and empty-feature cases |
+| Independent minor storage / N/M/E logic | Synthetic v2 save parser; source contract; Jungle +1N, Uranium +1E, Ironstone +1M confirmed by user | Real fresh-game save→reload→save; resource/improvement combinations |
+| Jungle rendering | User reports correct appearance and +1 food; no graphics issues reported | Fog, redraw/focus, border cases, unsupported preimages |
+| Uranium rendering | User reports correct sprite, +1 energy and Inspector label | Native resource coexistence, redraw/zoom/fog |
+| Ironstone rendering | +1 mineral confirmed; **sprite sometimes appears on a tile with no recorded Ironstone** (BUG-002) | Reproduce tile-to-sprite discrepancy, zoom/overlay effects; WIP art changes elsewhere |
+| Native tile Inspector | Jungle/Uranium labels confirmed; **Ironstone label intermittent** in latest user test (BUG-002) | Inspect same tile sprite vs registry data, click/focus/fog and composite feature cases |
 | New world generation | User observed generated independent terrain, current INI launches/works | Multiple deterministic seeds, map sizes, rainfall, count and major/minor overlap |
+| Major landmarks | Great Dunes look good; Sunny Mesa gives +1E across whole 7×7 as currently coded | Evaluate proposed centre-only 3×3 Mesa bonus; other landmarks and overlaps still need testing |
 | Retired Canyon | Static source/INI/landmark-table guard passes | Observe random maps built with both generators |
 | Configuration | Parser/INI structural CI passed; user reports current settings seem to work | Confirm local overrides, starting allocation/event exclusions and cap effects in play |
 | Release build and PRACX | Not verified | Ironstone/Inspector not wired in Release; PRACX/reduced mode not established |
 
-The user's latest report, **"tested and it seems to work fine"**, is a general gameplay smoke test of the current configuration. It is **not** a pass for every pending case above.
+**4 November 2026 in-game findings:** Jungle visually correct and +1 nutrient; Uranium visually correct, +1 energy, Inspector label present; Ironstone +1 mineral but intermittent Inspector label and sprites sometimes drawn on non-Ironstone tiles; Great Dunes look good; Sunny Mesa +1 energy on all 7×7 tiles; probe-team issue **appears** resolved with `base_capture_fix=0`. These are user-reported observations, not completed regression coverage. See BUG-001, BUG-002 and MAP-005.
 
 ## Recommended practical regression pass
 

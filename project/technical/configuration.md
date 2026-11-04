@@ -8,7 +8,7 @@ At startup, the fork reads `thinker.ini`, then optionally `thinker_user.ini` fro
 
 | Setting | Test value | Why / status |
 | --- | --- | --- |
-| `base_capture_fix` | `0` | Temporary workaround for reported probe/capture issue; investigation BUG-001 |
+| `base_capture_fix` | `0` | Probe-team problem appears mitigated in-game; temporary workaround, not a confirmed underlying fix (BUG-001) |
 | `probe_action_fix` | `1` | Separate probe-team mechanic fixes remain on |
 | `spawn_free_units` | `0,2,2,0,2,2,1,2,2` | Player-preferred additional starting Formers and scouts, including aquatic equivalents |
 | `tile_output_limit` | `3,3,3` | **Experimental** pre-tech resource cap; BAL-001, previously 2/2/2 |
@@ -31,3 +31,15 @@ The older major-landmark options `jungle=0` and `uranium=0` **are distinct** fro
 - `tools/test_thinker_ini_contract.py` checks names against the parser, expected array lengths, duplicates and the retired Canyon key. It does **not** prove every value is sensible in play.
 - The compiled `Config` defaults may differ from the distributed INI. An option missing from a local file normally inherits a compiled default, not necessarily `0`.
 - A clean game installation and a local `thinker_user.ini` can produce different behaviour despite identical repository contents; always record overrides when reporting bugs.
+
+## What `base_capture_fix=0` also disables
+
+The setting gates multiple corrections in `src/base.cpp`, not just probe-team behaviour:
+
+- **Captured-base drones/assimilation:** with the fix enabled, most newly captured foreign bases get a size/facility-dependent 20–50 turn assimilation penalty (modified by the REVOLT rule); without it, they generally revert to the original fixed 50 turns.
+- **Probe capture mixed-stack handling:** with the fix enabled, `mod_capture_base()` removes units at the captured base if they are not the **old defender's** units and are not pacted with that old defender. This can include the attacking probe team or allied units of the *attacker*. Suspected source of the probe issue; needs a reproduction.
+- **Refugee colony-pod relocation:** with the fix enabled, placement avoids nearby foreign non-pacted units in certain alien/human captures. Disabled by the workaround.
+- **Cloudbase Academy:** disables the fix for aircraft movement points after capturing the project.
+- **Post-capture diplomacy:** disables a check that prevents repeated AI requests to talk after losing a base.
+
+**Not disabled:** the captured base's old owner's units **supported by that base** are still reassigned to another eligible surviving base, or destroyed if none is suitable, in an unconditional section of `mod_capture_base()`. Also `facility_capture_fix=1` and `probe_action_fix=1` are separate switches that remain enabled. See [BUG-001](../WORK-QUEUE.md).
