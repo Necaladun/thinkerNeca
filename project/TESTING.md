@@ -8,7 +8,7 @@
 
 | Area | Evidence | Remaining checks |
 | --- | --- | --- |
-| Windows Develop | Compilation and source tests passed on `0757a6b` (prior cleanup head). `b76feed` adds safety and source-contract checks, not runtime evidence. | Re-check CI for the current PR head; clean installation and actual Windows tests |
+| Windows Develop | CI success on `4809cb7` (5 November 2026): x86 DLL/launcher cross-compilation plus synthetic sprite, save, config and source contracts | Clean installation and actual Windows runtime tests; compiler/CI does not execute the game |
 | Minor storage/yields | Synthetic THMIN001 v2 saves; user confirms Jungle +1N, Uranium +1E, Titanium +1M | Actual same-build save→reload→continue; resource/improvement and crawler interactions |
 | Jungle/Uranium graphics | User reports native sprites and resource effects working; `b76feed` preflights all three Jungle patch sites before modifying any | Check Jungle hook on the supported executable and forced unsupported preimage; fog/units, composite tiles and Release |
 | Titanium custom sprite | **User-verified:** mode-3 blue-grey art, transparency, positioning, zoom-in/out and +1M work on tested variant 0 | Native variant 1, fog, unit/base layering, partial redraw, clean-install fallback |
@@ -17,7 +17,7 @@
 | Major landmarks | Great Dunes accepted; Mesa central +1E confirmed; raised Mesa visually rejected and reverted | Other majors/improvement interactions and restored low Mesa confirmation |
 | Canyon retirement | Static slot-10/source/INI checks | In-game new-map smoke test under alternative builders |
 | Configuration | Parser/INI structural checks, mode 3 selected by user | Local overrides and experimental economic balance |
-| Release/PRACX | Separate Release compile-only CI job added; result pending. Native custom Titanium and Inspector remain Develop-only; PRACX unverified | Release graphics/Inspector strategy, actual in-game checks and supported binaries |
+| Release/PRACX | Release x86 DLL/launcher cross-compilation **passed** on `4809cb7`; custom Titanium/Inspector hooks remain Develop-only, PRACX unverified | Native art/Inspector parity, actual in-game checks, clean install and supported binaries |
 
 ## Verified sprite trace — 5 November 2026
 

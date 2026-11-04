@@ -4,7 +4,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unreleased — draft PR #4 (2026-11-05)
 
-- **Safe config bit shifts / Release cross-build:** both the `skip_facility` parser and the production-choice consumer now use 64-bit masks for IDs 33–64; `skip_event`/`skip_faction` parser masks are unsigned 32-bit. Added a parser/consumer source contract and separate compile-only Release CI job; neither proves high-ID gameplay or native Release graphics parity.
+- **Safe config bit shifts / Release cross-build:** both the `skip_facility` parser and the production-choice consumer now use 64-bit masks for IDs 33–64; `skip_event`/`skip_faction` parser masks are unsigned 32-bit. Parser/consumer contracts and separate Release cross-compilation passed CI on `4809cb7`; neither proves high-ID gameplay or native Release graphics parity.
 - **Native variant diagnostics (source-level):** log four native resource-draw samples per sprite variant (0, 1, unknown), so variant-1 geometry can be captured even if it first appears late; variant-1 artwork is still unsupported pending actual Windows measurements.
 - **Native hook safety / redraw cleanup (source-reviewed, Windows regression pending):** the Jungle installer preflights all three executable instruction sites before modifying any, avoiding half-installed optional native hooks. Develop skips redundant full-map overlay scans when every native minor type is enabled. The native Inspector now logs bounded successful label appends for comparison with hover diagnostics (`b76feed`).
 
