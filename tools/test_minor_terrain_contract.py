@@ -163,9 +163,12 @@ def main() -> None:
             and 'write_call(draw_site, (int)minor_native_titanium_sprite_hook);' in patches,
             'Titanium hook must target only the verified native resource-type-4 call')
     require('Sprite_extract_2(' in renderer
-            and '&minor_sprites[id], &image, 253,' in renderer
+            and 'transparent = Buffer_get_pixel(&image, sprite_x, 4);' in renderer
+            and '&minor_sprites[id], &image, transparent,' in renderer
+            and 'if (id == MINOR_TITANIUM)' in renderer
+            and 'transparent < 0 || transparent > 255' in renderer
             and '&minor_sprites[id], &image, 0x1FD,' not in renderer,
-            'Sprite extraction transparency key must equal an 8-bit palette index')
+            'Titanium extractor must sample the post-load indexed palette')
     require('minor_titanium_select_native_sprite(' in renderer
             and 'frame[8], y = frame[9]' in renderer
             and 'minor_landmark_at(x, y) != MINOR_TITANIUM' in renderer
@@ -173,6 +176,11 @@ def main() -> None:
             and 'jmp *_minor_titanium_native_draw_target' in renderer
             and '"movl %eax, 24(%esp)' in renderer
             and '"movl %eax, 28(%esp)' not in renderer
+            and '"cmpl 24(%esp), %eax' in renderer
+            and '"je 1f' in renderer
+            and '"movzbl 8(%eax), %edx' in renderer
+            and '"movl %edx, 44(%esp)' in renderer
+            and 'TITANIUM COLOR KEY x=%d y=%d native=%u loaded=%u' in renderer
             and 'static_cast<uintptr_t>(frame[3])' not in renderer
             and 'MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py)' not in renderer,
             'Titanium native wrapper must change saved ECX, not EDX, with verified tile coordinates')

@@ -1965,8 +1965,23 @@ static void load_minor_terrain_sprites(Buffer* canvas)
             // terranx.exe 0x5E39A0). The previous 0x1FD (509) could
             // never equal index 253, leaving bright-magenta rectangles.
             // Pass the actual 8-bit transparent palette index instead.
+            // Buffer_load_pcx(..., canvas->palette, ...) may remap the
+            // source PCX's transparent index 253 to an active-palette
+            // index. The prepared Titanium PCX has a transparent
+            // pixel at (sprite_x, 4). Sample it AFTER loading.
+            int transparent = 253;
+            if (id == MINOR_TITANIUM) {
+                transparent = Buffer_get_pixel(&image, sprite_x, 4);
+                minor_graphics_trace("Titanium PCX loaded key / source key",
+                    transparent, 253, loaded);
+            }
+            if (transparent < 0 || transparent > 255) {
+                minor_graphics_trace("minor sprite invalid transparency key",
+                    id, transparent, loaded);
+                continue;
+            }
             const int result = Sprite_extract_2(
-                &minor_sprites[id], &image, 253,
+                &minor_sprites[id], &image, transparent,
                 sprite_x, 4, 104, 56, nullptr);
             // The sprite extractor trims transparent borders while retaining
             // offset_x/offset_y for the final blit. Requiring width==104
@@ -2020,6 +2035,16 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
     static int swaps_logged = 0;
     if (swaps_logged < 12) {
         minor_graphics_trace("native Titanium sprite substitute", x, y, ++swaps_logged);
+        const std::string path = minor_graphics_file("minor_terrain_render.log");
+        FILE* fp = fopen(path.c_str(), "a");
+        if (fp) {
+            fprintf(fp, "TITANIUM COLOR KEY x=%d y=%d native=%u loaded=%u sprite=%dx%d\n",
+                x, y, static_cast<unsigned>(original->color_index[0]),
+                static_cast<unsigned>(minor_sprites[MINOR_TITANIUM].color_index[0]),
+                minor_sprites[MINOR_TITANIUM].width,
+                minor_sprites[MINOR_TITANIUM].height);
+            fclose(fp);
+        }
     }
     return &minor_sprites[MINOR_TITANIUM];
 }
@@ -2028,8 +2053,12 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
 // Buffer*. Preserve original registers/flags and all stack arguments.
 // After addl $12 removes all three selector arguments, ESP points to
 // the pushal register block. Saved ECX is at +24 (EDX is at +20).
-// Tail-jump to the exact original callee with only ECX changed.
-// No custom screen-position or zoom calculation can be introduced here.
+// Native resource drawing passes originalSprite->color_index[0] as a
+// separate argument at hook-entry ESP+8. When replacing the sprite,
+// forward the newly extracted sprite's *actual loaded* colour index.
+// After addl $12, saved ECX is at +24 and entry ESP+8 is at +44.
+// When no substitution occurs, both original arguments are untouched.
+// No native screen position, zoom or clipping parameters change.
 extern "C" __attribute__((naked, used))
 void minor_native_titanium_sprite_hook()
 {
@@ -2041,7 +2070,11 @@ void minor_native_titanium_sprite_hook()
         "pushl 32(%esp)\n\t"
         "call _minor_titanium_select_native_sprite\n\t"
         "addl $12, %esp\n\t"
-        "movl %eax, 24(%esp)\n\t"
+        "cmpl 24(%esp), %eax\n\t"
+        "je 1f\n\t"
+        "movzbl 8(%eax), %edx\n\t"
+        "movl %edx, 44(%esp)\n\t"
+        "1: movl %eax, 24(%esp)\n\t"
         "popal\n\t"
         "popfl\n\t"
         "jmp *_minor_titanium_native_draw_target\n\t"
