@@ -17,7 +17,7 @@
 | Major landmarks | Great Dunes accepted; Mesa central +1E confirmed; raised Mesa visually rejected and reverted | Other majors/improvement interactions and restored low Mesa confirmation |
 | Canyon retirement | Static slot-10/source/INI checks | In-game new-map smoke test under alternative builders |
 | Configuration | Parser/INI structural checks, mode 3 selected by user | Local overrides and experimental economic balance |
-| Release/PRACX | Not verified | Release graphics/Inspector strategy and supported binaries |
+| Release/PRACX | Separate Release compile-only CI job added; result pending. Native custom Titanium and Inspector remain Develop-only; PRACX unverified | Release graphics/Inspector strategy, actual in-game checks and supported binaries |
 
 ## Verified sprite trace — 5 November 2026
 
@@ -36,6 +36,6 @@
 
 ## CI and deployment
 
-[Windows workflow](../.github/workflows/build-windows.yml): Develop compilation; synthetic tests for the local-input [sprite atlas builder](technical/sprite-atlas.md), old legacy placeholder and source masks; source/INI/slot-10/Mesa contracts and synthetic save reader. **The artifact distributes DLL and EXE only**, not user/original-game art or the old placeholder PCX.
+[Windows workflow](../.github/workflows/build-windows.yml): Develop and Release compilation (separate jobs); synthetic tests for the local-input [sprite atlas builder](technical/sprite-atlas.md), old legacy placeholder and source masks; source/INI/slot-10/Mesa contracts and synthetic save reader. **The artifact distributes DLL and EXE only**, not user/original-game art or the old placeholder PCX.
 
 Record the commit, effective INI including overrides, map/save coordinates and year, screenshot, PCX source and `minor_terrain_render.log` when investigating remaining problems.

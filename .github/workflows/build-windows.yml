@@ -64,3 +64,28 @@ jobs:
             build/ci/thinker.dll
             build/ci/thinker.exe
           if-no-files-found: error
+
+  # Compile-only parity check. Custom Titanium/Inspector native hooks remain
+  # Develop-only; a passing Release build does not establish graphics parity.
+  build-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MinGW and CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++-mingw-w64-i686 binutils-mingw-w64-i686
+          python -m pip install 'cmake>=3.31,<4'
+      - name: Configure Release 32-bit Windows target
+        run: |
+          cat > win32-toolchain.cmake <<'EOF'
+          set(CMAKE_SYSTEM_NAME Windows)
+          set(CMAKE_C_COMPILER i686-w64-mingw32-gcc)
+          set(CMAKE_CXX_COMPILER i686-w64-mingw32-g++)
+          set(CMAKE_RC_COMPILER i686-w64-mingw32-windres)
+          EOF
+          cmake -S . -B build/ci-release -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=win32-toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Release
+      - name: Compile Release DLL and launcher (no runtime/artwork assertion)
+        run: cmake --build build/ci-release --parallel 2

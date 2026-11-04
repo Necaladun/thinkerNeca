@@ -4,6 +4,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unreleased — draft PR #4 (2026-11-05)
 
+- **Safe config bit shifts / Release cross-build:** the `skip_facility` parser now uses a 64-bit mask for IDs 33–64, and `skip_event`/`skip_faction` use unsigned 32-bit masks. Added a parser-width contract and separate compile-only Release CI job; neither proves high-ID gameplay or native Release graphics parity.
 - **Native hook safety / redraw cleanup (source-reviewed, Windows regression pending):** the Jungle installer preflights all three executable instruction sites before modifying any, avoiding half-installed optional native hooks. Develop skips redundant full-map overlay scans when every native minor type is enabled. The native Inspector now logs bounded successful label appends for comparison with hover diagnostics (`b76feed`).
 
 - **Native-stage external Titanium sprite working in Windows Develop (user-verified):** mode 3 selects blue-grey Titanium from user-local 1024×1024 indexed `neca_sprites.pcx` with correct transparency, alignment and zoom-in/out; separate +1 mineral yield still works. The external Uranium mode-1 control visually matches the original native sprite. This applies only to native resource sprite variant 0; variant 1, fog/units, save/reload and Release remain separate work.

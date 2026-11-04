@@ -42,6 +42,16 @@ def main() -> None:
             f"{name}: expected {length} integer values"
         )
 
+    # Static parser-width contract; this is not a game runtime test.
+    config = Path("src/main.h").read_text(encoding="utf-8")
+    assert "uint64_t skip_gov_facility = 0;" in config
+    assert "1ull << (val - 1)" in parser, (
+        "skip_facility IDs 33-64 require a 64-bit shift"
+    )
+    assert parser.count("1u << (val - 1)") == 2, (
+        "skip_event and skip_faction IDs 32 require unsigned 32-bit shifts"
+    )
+
     events = [int(v.split(";", 1)[0].strip())
               for k, v in entries if k == "skip_event"]
     assert len(events) == len(set(events)) and all(1 <= v <= 32 for v in events), (
