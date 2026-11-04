@@ -36,6 +36,8 @@ unverified byte address or modify the working Uranium bonus path.
 Only patch when there is exactly ONE direct call to a known Sprite::draw
 entrypoint after that bonus_at call. Otherwise fail closed, leaving
 the shared Uranium placeholder and writing a diagnostic log.
+Record all candidate sites and nearby instruction bytes for offline
+disassembly rather than guessing which of many draw calls is correct.
 */
 static bool install_minor_native_titanium_sprite()
 {
@@ -74,6 +76,8 @@ static bool install_minor_native_titanium_sprite()
                 draw_site = addr;
                 draw_target = target;
                 ++draw_matches;
+                minor_graphics_titanium_draw_candidate(
+                    bonus_site, addr, target, draw_matches);
             }
         }
     }

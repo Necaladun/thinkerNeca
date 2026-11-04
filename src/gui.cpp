@@ -1932,6 +1932,29 @@ void minor_graphics_titanium_hook_result(int bonus_site, int draw_site,
     }
 }
 
+// Read-only native callsite reconnaissance. A broad search currently finds
+// several Sprite::draw calls after bonus_at, and none may be chosen blindly.
+// Emit the exact E8 location, its target and nearby bytes for disassembly.
+// The whole inspected range is within the known mapped terranx.exe image.
+void minor_graphics_titanium_draw_candidate(int bonus_site, int site,
+    int target, int ordinal)
+{
+    const std::string path = minor_graphics_file("minor_terrain_render.log");
+    FILE* fp = fopen(path.c_str(), "a");
+    if (!fp) {
+        return;
+    }
+    fprintf(fp, "TITANIUM DRAW CANDIDATE %02d site=0x%08X target=0x%08X delta=+0x%X bytes[-12..+16]=",
+        ordinal, (unsigned)site, (unsigned)target,
+        (unsigned)(site - bonus_site));
+    const uint8_t* code = reinterpret_cast<const uint8_t*>(site);
+    for (int i = -12; i <= 16; ++i) {
+        fprintf(fp, "%02X", static_cast<unsigned>(code[i]));
+    }
+    fprintf(fp, "\n");
+    fclose(fp);
+}
+
 static void load_minor_terrain_sprites(Buffer* canvas)
 {
     if (minor_sprites_attempted || !canvas || !canvas->palette) {
