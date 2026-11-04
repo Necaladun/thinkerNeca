@@ -124,11 +124,10 @@ def main() -> None:
             and '(minor_type == MINOR_TITANIUM && conf.minor_native_titanium)' in yields
             and 'return 4;' in yields,
             'Both metals must share the native renderer-only Uranium sprite')
-    require('install_minor_native_titanium' not in patches
-            and 'minor_native_titanium_bonus_hook' not in renderer
+    require('minor_native_titanium_bonus_hook' not in renderer
             and 'minor_titanium_bonus_inner' not in renderer
             and 'type == MINOR_TITANIUM && conf.minor_native_titanium' in renderer,
-            'Do not install a custom Titanium sprite-positioning hook')
+            'Do not restore the old hand-positioned Titanium draw hook')
     require('minor_inspector_feature_line(const char* native, int x, int y)' in renderer
             and 'minor_terrain_name_at(x, y)' in renderer
             and 'line += ", ";' in renderer
