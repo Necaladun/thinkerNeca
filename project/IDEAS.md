@@ -13,6 +13,9 @@
 ## Major landmarks
 
 - **Slot 10 replacement:** now that Nessus Canyon is retired, design an attractive major landmark that does not inherit Canyon's broken visuals. Options range from geographic formations using existing terrain to unique mechanics requiring renderer hooks. See MAP-003.
+- **Failed Colony:** explore a distinctive ruined human settlement/terraforming site as a major landmark. It needs an era-consistent explanation, actual tile benefits and an art plan before promotion to MAP-003.
+- **Atoll/archipelago:** explore an ocean/coastal multi-tile landmark, with attention to sea/land transitions, AI colonisation, improvement rules and coast rendering; do not assume the native landmark renderer supports it.
+- **Mount Planet / volcano split:** consider keeping a generic volcanic landmark and representing Mount Planet as an unusually high non-volcanic mountain or separate major. The identity, altitude generation, artwork, ocean cases and gameplay bonuses are unresolved.
 - **Slots 3/4 replacements:** original Monsoon Jungle and Uranium Flats identities could be reused as majors in a future map design. Independent Jungle/Uranium already exist separately; native rendering currently still has legacy assumptions. See MAP-004.
 - **Distinct regional incentives:** regions/landmarks could influence settlement and terraforming priorities without reverting to single-tile supply-pod-like rewards.
 - **Sunny Mesa centre energy resource (unapproved):** could place one guaranteed normal +2 energy resource on its central tile, uniquely exempting the tile from the 3/3/3 energy cap. Current Mesa is restored to the 1,000–1,999 m 5×5 plateau after the failed 2,000 m bulge experiment (MAP-006). With its existing +1 landmark energy, a central energy resource would give 5 raw energy with Solar (absent other modifiers). **Not approved or implemented.**

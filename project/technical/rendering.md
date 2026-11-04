@@ -6,7 +6,7 @@
 
 | Feature | Current path | Status |
 | --- | --- | --- |
-| Jungle | Native map terrain/texture stage using three guarded hooks | Develop user-tested; all-or-nothing preflight outstanding (REND-001) |
+| Jungle | Native map terrain/texture stage using three guarded hooks | All-site preflight implemented on `b76feed`; Windows failure-path validation pending (REND-001) |
 | Uranium | Original native resource glyph through renderer-only `bonus_at()==4` | User-tested, +1 energy separate |
 | Titanium | Same native resource draw, with guarded `Sprite*` substitution | **Blue-grey custom art verified in-game for native variant 0**, with +1 mineral separate |
 | Tile Inspector | Narrow native feature-line append (`strlen` callsite hook) | Develop tested, intermittent Titanium label still to investigate (BUG-002) |
@@ -17,7 +17,7 @@ The normal resource-bonus icon takes precedence over a minor mineral feature. No
 
 Native Uranium selects `0x78A700` (**variant 0**) or `0x78A72C` (**variant 1**). The external atlas currently substitutes **only variant 0**; variant 1/unknown sprite remains native Uranium, including on Titanium tiles.
 
-Jungle's current patch sites are `0x463CC5`, `0x463D93` and `0x464E78`; all-or-nothing preflight still needs work. The Develop Inspector uses a guarded native `strlen` site at `0x4B7A0C`, without hijacking the status window or rewriting terrain flags. PRACX/reduced mode and Release custom-art parity are not established.
+Jungle's current patch sites are `0x463CC5`, `0x463D93` and `0x464E78`. The installer now compares all three original six-byte instruction sequences before writing any; an unsupported/mismatched site returns without installing a partial hook. This has source-level coverage, not yet Windows failure-path verification. The Develop Inspector uses a guarded native `strlen` site at `0x4B7A0C`, without hijacking the status window or rewriting terrain flags. PRACX/reduced mode and Release custom-art parity are not established.
 
 ## PCX loading and extraction
 
@@ -46,8 +46,10 @@ Modes 1 and 3 require a user-produced PCX next to `terranx.exe` and a matching D
 
 ## Retained legacy and diagnostics
 
-The early hand-positioned Titanium overlay and broad draw-call scan were superseded by the current native-stage hook. The old `minor_terrain.pcx` mode-2 loader and optional late overlay still have runtime and test dependencies, so they are retained temporarily under MAINT-001; do not substitute them for the verified custom-art path.
+When all three native rendering switches are set, the Develop redraw path now bypasses the old full-map overlay scan. The early hand-positioned Titanium overlay and broad draw-call scan were superseded by the current native-stage hook. The old `minor_terrain.pcx` mode-2 loader and optional late overlay still have runtime and test dependencies, so they are retained temporarily under MAINT-001; do not substitute them for the verified custom-art path.
 
 Develop logs `TITANIUM DRAW HOOK ... active=1`, `NECA SPRITE processed ... verified=1`, `NECA SPRITE extract ... ready=1` and `TITANIUM SPRITE TEST mode=3 variant=0 ... swapped=1` to `minor_terrain_render.log`. Obsolete read-only Inspector/native-mask hex reconnaissance at startup was removed; exact patch sites are known. A checksum match is preprocessing evidence, not proof of visual correctness.
+
+The Develop Inspector helper now emits up to 24 `INSPECTOR APPEND` records for successful native label insertions, separate from hover-only samples, to isolate BUG-002.
 
 **Observed in Windows Develop on 5 Nov 2026:** external Uranium matches native, custom blue-grey Titanium draws correctly with transparent mask and zoom-in/out, and +1M works. **Still open:** variant 1, fog/unit/base combinations, save/reload, Release/PRACX and intermittent Inspector names.

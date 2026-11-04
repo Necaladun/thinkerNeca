@@ -8,11 +8,11 @@
 
 | Area | Evidence | Remaining checks |
 | --- | --- | --- |
-| Windows Develop | Compilation and source tests passed through the mode-3 commit `197426a` | Re-run for cleanup commit and clean installation |
+| Windows Develop | Compilation and source tests passed on `0757a6b` (prior cleanup head). `b76feed` adds safety and source-contract checks, not runtime evidence. | Re-check CI for the current PR head; clean installation and actual Windows tests |
 | Minor storage/yields | Synthetic THMIN001 v2 saves; user confirms Jungle +1N, Uranium +1E, Titanium +1M | Actual same-build save→reload→continue; resource/improvement and crawler interactions |
-| Jungle/Uranium graphics | User reports native sprites and resource effects working | Fog/units, composite tiles and Release |
+| Jungle/Uranium graphics | User reports native sprites and resource effects working; `b76feed` preflights all three Jungle patch sites before modifying any | Check Jungle hook on the supported executable and forced unsupported preimage; fog/units, composite tiles and Release |
 | Titanium custom sprite | **User-verified:** mode-3 blue-grey art, transparency, positioning, zoom-in/out and +1M work on tested variant 0 | Native variant 1, fog, unit/base layering, partial redraw, clean-install fallback |
-| Inspector | Jungle/Uranium labels and some Titanium labels observed | Earlier intermittent Titanium name, feature-line combinations, focus/fog (BUG-002) |
+| Inspector | Jungle/Uranium labels and some Titanium labels observed; `INSPECTOR APPEND` now logs successful native-hook writes (`b76feed`) | Compare actual append vs hover at the same coordinate, then check feature combinations, focus/fog (BUG-002) |
 | World generation | Independent Jungle/Uranium/Titanium appeared in new games | Several map seeds/sizes/climates and real save/reload; mirrored modes unsupported |
 | Major landmarks | Great Dunes accepted; Mesa central +1E confirmed; raised Mesa visually rejected and reverted | Other majors/improvement interactions and restored low Mesa confirmation |
 | Canyon retirement | Static slot-10/source/INI checks | In-game new-map smoke test under alternative builders |
@@ -28,7 +28,7 @@
 ## Remaining runtime regression procedure
 
 1. Install matching Develop `thinker.dll` and user-prepared `neca_sprites.pcx`; set mode 3 in the effective INI, restart the game.
-2. Confirm Titanium graphics, Inspector name and +1M at several zooms; distinguish the native second sprite variant, which still appears as Uranium.
+2. Confirm Titanium graphics, Inspector name and +1M at several zooms; correlate `INSPECTOR HOVER` and `INSPECTOR APPEND` log lines for the same tile. Distinguish the native second sprite variant, which still appears as Uranium.
 3. Check ordinary resources, fungus, forests, bases, units, fog and partial redraw; record coordinates/screenshot and log on discrepancies.
 4. Start a **new game**, save, quit, reload using the **same DLL**, compare tiles and yields, advance turns and save again.
 5. Remove the PCX in a disposable install to verify native Uranium fallback; mode 0 is native reference, mode 1 is external Uranium reference, mode 2 is legacy-only.

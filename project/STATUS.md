@@ -8,7 +8,7 @@
 - **Windows Develop user test (5 Nov):** local `neca_sprites.pcx` with distinct blue-grey Titanium art displays on Titanium tiles, with correct transparency, positioning and zoom-in/out; +1 mineral works. This is a successful **native sprite variant-0** test, not a complete graphics regression.
 - External Uranium reference mode 1 visually matched native Uranium. Runtime log confirmed processed hash `24A1B67A`, 5635 transparent / 565 visible pixels and identical sprite size, offsets, pitch and transparency key. Mode-3 Titanium log: hash `D4B3AC2C` and 559 visible pixels.
 - New-map geology, native Jungle and Uranium art have positive user reports. Great Dunes look good; Sunny Mesa centre-only +1E confirmed. Raised Mesa experiment was rejected and reverted (MAP-006).
-- CI compiles Windows 32-bit Develop and runs synthetic save/atlas/configuration/source checks; **CI does not execute SMAC/X**.
+- CI compiles Windows 32-bit Develop and runs synthetic save/atlas/configuration/source checks; the pre-cleanup head `0757a6b` passed. **CI does not execute SMAC/X**. A new source change (`b76feed`) adds Jungle patch preflight, avoids redundant overlay scans and traces successful native Inspector appends; its Windows runtime effects are not yet verified.
 
 ## Active test configuration
 
@@ -19,8 +19,8 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 ## Remaining before PR #4 can merge
 
 - [TERR-001](WORK-QUEUE.md): new-game **same-build save→reload→continue**, unusual improvements, fog, unit/base drawing and Inspector checks.
-- [REND-001/002/004](WORK-QUEUE.md): all-or-nothing Jungle patch preflight, Release/packaging parity, and second Uranium/Titanium sprite variant (currently native Uranium only).
+- [REND-001/002/004](WORK-QUEUE.md): Jungle all-site preflight is implemented but needs Windows verification; Release/packaging parity and the second Uranium/Titanium sprite variant remain open (variant 1 still uses native Uranium).
 - [BUG-002](WORK-QUEUE.md): earlier intermittent Inspector name; distinct sprite is no longer the blocker. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
 - More map seeds/climates and landmark regressions remain open. PR #4 stays **draft**.
 
-**Next:** same-build save/reload, fog/unit/Inspector checks with the working mode-3 atlas; then variant 1 and Release parity. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).
+**Next:** same-build save/reload, fog/unit/Inspector checks with the working mode-3 atlas; verify the new all-site Jungle preflight, then variant 1 and Release parity. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).
