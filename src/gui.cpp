@@ -1948,7 +1948,14 @@ static void load_minor_terrain_sprites(Buffer* canvas)
 
     Buffer image;
     Buffer_ctor(&image);
-    const int loaded = Buffer_load_pcx(&image, path.c_str(), canvas->palette, 0, 0);
+    // Source art is already indexed against ter1.pcx's 256-colour
+    // palette (verified byte-for-byte against the user's terrain PCX).
+    // Passing the map canvas palette invokes an optional colour-table
+    // conversion in the native PCX loader, changing the sprite's
+    // individual ore pixels. Keep the original palette indices here.
+    // Native Buffer_load_pcx_2 at 0x5E29C9 skips palette remapping when
+    // the Palette* parameter is null, leaving the 8-bit PCX bytes.
+    const int loaded = Buffer_load_pcx(&image, path.c_str(), nullptr, 0, 0);
     minor_graphics_trace("minor terrain atlas loaded / width / height",
         loaded, image.clipRect.right, image.clipRect.bottom);
 

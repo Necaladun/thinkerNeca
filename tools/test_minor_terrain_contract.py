@@ -162,6 +162,9 @@ def main() -> None:
             and 'if (!valid)' in patches
             and 'write_call(draw_site, (int)minor_native_titanium_sprite_hook);' in patches,
             'Titanium hook must target only the verified native resource-type-4 call')
+    require('Buffer_load_pcx(&image, path.c_str(), nullptr, 0, 0)' in renderer
+            and 'Buffer_load_pcx(&image, path.c_str(), canvas->palette, 0, 0)' not in renderer,
+            'PCX ore indices must not be remapped into the canvas palette before sprite extraction')
     require('Sprite_extract_2(' in renderer
             and 'transparent = Buffer_get_pixel(&image, sprite_x, 4);' in renderer
             and '&minor_sprites[id], &image, transparent,' in renderer
