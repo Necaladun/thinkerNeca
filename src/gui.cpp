@@ -1932,29 +1932,6 @@ void minor_graphics_titanium_hook_result(int bonus_site, int draw_site,
     }
 }
 
-// Read-only native callsite reconnaissance. A broad search currently finds
-// several Sprite::draw calls after bonus_at, and none may be chosen blindly.
-// Emit the exact E8 location, its target and nearby bytes for disassembly.
-// The whole inspected range is within the known mapped terranx.exe image.
-void minor_graphics_titanium_draw_candidate(int bonus_site, int site,
-    int target, int ordinal)
-{
-    const std::string path = minor_graphics_file("minor_terrain_render.log");
-    FILE* fp = fopen(path.c_str(), "a");
-    if (!fp) {
-        return;
-    }
-    fprintf(fp, "TITANIUM DRAW CANDIDATE %02d site=0x%08X target=0x%08X delta=+0x%X bytes[-12..+16]=",
-        ordinal, (unsigned)site, (unsigned)target,
-        (unsigned)(site - bonus_site));
-    const uint8_t* code = reinterpret_cast<const uint8_t*>(site);
-    for (int i = -12; i <= 16; ++i) {
-        fprintf(fp, "%02X", static_cast<unsigned>(code[i]));
-    }
-    fprintf(fp, "\n");
-    fclose(fp);
-}
-
 static void load_minor_terrain_sprites(Buffer* canvas)
 {
     if (minor_sprites_attempted || !canvas || !canvas->palette) {
@@ -2017,14 +1994,13 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
     Sprite* original, Buffer* canvas, const int* frame)
 {
     if (!minor_native_titanium_sprite_installed || !conf.minor_native_titanium
-        || !original || !canvas || !canvas->palette || !frame
-        || reinterpret_cast<uintptr_t>(MapWin)
-            != static_cast<uintptr_t>(frame[3])) {
+        || !original || !canvas || !canvas->palette || !frame) {
         return original;
     }
 
-    // Verified native MapWin_gen_terrain_poly stack layout: current tile
-    // coordinates occupy EBP+0x20 / EBP+0x24 at its resource stage.
+    // Verified from the user's executable: EBP+0x20 and EBP+0x24
+    // hold x/y at 0x465E37. EBP+0x0C is NOT Thinker's MapWin pointer;
+    // do not reject a valid resource draw using that unrelated argument.
     const int x = frame[8], y = frame[9];
     MAP* tile = mapsq(x, y);
     if (!tile || minor_landmark_at(x, y) != MINOR_TITANIUM
@@ -2045,6 +2021,7 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
 
 // Thiscall native resource sprite: ECX holds Sprite*, [ESP+4] holds
 // Buffer*. Preserve original registers/flags and all stack arguments.
+// After pushfl+pushal+push ebp, saved ECX is at +28, not +24 (EDX).
 // Tail-jump to the exact original callee with only ECX changed.
 // No custom screen-position or zoom calculation can be introduced here.
 extern "C" __attribute__((naked, used))
@@ -2058,7 +2035,7 @@ void minor_native_titanium_sprite_hook()
         "pushl 32(%esp)\n\t"
         "call _minor_titanium_select_native_sprite\n\t"
         "addl $12, %esp\n\t"
-        "movl %eax, 24(%esp)\n\t"
+        "movl %eax, 28(%esp)\n\t"
         "popal\n\t"
         "popfl\n\t"
         "jmp *_minor_titanium_native_draw_target\n\t"

@@ -30,68 +30,46 @@ static bool install_minor_native_inspector()
 }
 
 /*
-Locate the exact resource sprite draw call following the native
-bonus_at() callsite in MapWin_gen_terrain_poly. We do not assume an
-unverified byte address or modify the working Uranium bonus path.
-Only patch when there is exactly ONE direct call to a known Sprite::draw
-entrypoint after that bonus_at call. Otherwise fail closed, leaving
-the shared Uranium placeholder and writing a diagnostic log.
-Record all candidate sites and nearby instruction bytes for offline
-disassembly rather than guessing which of many draw calls is correct.
+Verified from the user's terranx.exe:
+  0x465DFC  call bonus_at
+  0x465E0E  cmp eax,4; jne other resources
+  0x465E2E  lea ecx,[edx*4+0x78A700] (native Uranium Sprite*)
+  0x465E37  call Sprite_draw_3 at 0x5E4B9A
+This is the exact type-4 resource branch. The old broad scan matched
+15 unrelated Sprite::draw_3 callsites and refused to hook.
+Validate every relevant instruction boundary before changing any bytes.
 */
 static bool install_minor_native_titanium_sprite()
 {
 #if defined(__GNUC__) && defined(__i386__) && !defined(BUILD_REL)
-    const int first = 0x4632D0;
-    const int end = 0x466600;
-    const int bonus_target = 0x592030;
-    const int known_draw_targets[] = {0x5E4AFA, 0x5E4B4A, 0x5E4B9A};
-    int bonus_site = 0, bonus_matches = 0;
-    for (int addr = first; addr <= end - 5; ++addr) {
-        if (*(const uint8_t*)addr != 0xE8) {
-            continue;
-        }
-        int32_t rel = 0;
-        memcpy(&rel, (const void*)(addr + 1), sizeof(rel));
-        if (addr + 5 + rel == bonus_target) {
-            bonus_site = addr;
-            ++bonus_matches;
-        }
-    }
-    if (bonus_matches != 1) {
-        minor_graphics_titanium_hook_result(bonus_site, 0, bonus_matches, 0);
+    constexpr int bonus_site = 0x465DFC;
+    constexpr int type_four_site = 0x465E0E;
+    constexpr int sprite_site = 0x465E2E;
+    constexpr int draw_site = 0x465E37;
+    constexpr int target = 0x5E4B9A;
+    const byte bonus_expected[] = {0xE8, 0x2F, 0xC2, 0x12, 0x00};
+    const byte type_four_expected[] = {0x83, 0xF8, 0x04, 0x75, 0x2B};
+    const byte sprite_expected[] = {0x8D, 0x0C, 0x95, 0x00, 0xA7, 0x78, 0x00};
+    const byte draw_expected[] = {0x50, 0x53, 0xE8, 0x5E, 0xED, 0x17, 0x00};
+    const byte after_expected[] = {0xEB, 0x40};
+    const bool valid =
+        !memcmp((const void*)bonus_site, bonus_expected, sizeof(bonus_expected))
+        && !memcmp((const void*)type_four_site, type_four_expected,
+            sizeof(type_four_expected))
+        && !memcmp((const void*)sprite_site, sprite_expected,
+            sizeof(sprite_expected))
+        && !memcmp((const void*)(draw_site - 2), draw_expected,
+            sizeof(draw_expected))
+        && !memcmp((const void*)(draw_site + 5), after_expected,
+            sizeof(after_expected));
+    if (!valid) {
+        minor_graphics_titanium_hook_result(bonus_site, draw_site, 0, target);
         return false;
     }
-
-    int draw_site = 0, draw_target = 0, draw_matches = 0;
-    for (int addr = bonus_site + 5; addr <= end - 5; ++addr) {
-        if (*(const uint8_t*)addr != 0xE8) {
-            continue;
-        }
-        int32_t rel = 0;
-        memcpy(&rel, (const void*)(addr + 1), sizeof(rel));
-        const int target = addr + 5 + rel;
-        for (int known : known_draw_targets) {
-            if (target == known) {
-                draw_site = addr;
-                draw_target = target;
-                ++draw_matches;
-                minor_graphics_titanium_draw_candidate(
-                    bonus_site, addr, target, draw_matches);
-            }
-        }
-    }
-    if (draw_matches != 1) {
-        minor_graphics_titanium_hook_result(bonus_site, draw_site,
-            draw_matches, draw_target);
-        return false;
-    }
-    // Write the forwarding destination *before* installing the call hook.
-    minor_titanium_native_draw_target = (uintptr_t)draw_target;
+    minor_titanium_native_draw_target = (uintptr_t)target;
     write_call(draw_site, (int)minor_native_titanium_sprite_hook);
     minor_native_titanium_sprite_installed = true;
-    minor_graphics_titanium_hook_result(bonus_site, draw_site,
-        draw_matches, draw_target);
+    minor_graphics_titanium_hook_result(bonus_site, draw_site, 1, target);
     return true;
 #else
     return false;

@@ -73,8 +73,6 @@ void minor_graphics_inspector_hook_result(int addr, bool active);
 extern bool minor_native_titanium_sprite_installed;
 void minor_graphics_titanium_hook_result(int bonus_site, int draw_site,
     int candidates, int target);
-void minor_graphics_titanium_draw_candidate(int bonus_site, int site,
-    int target, int ordinal);
 extern "C" uintptr_t minor_titanium_native_draw_target;
 #if defined(__GNUC__) && defined(__i386__)
 extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
