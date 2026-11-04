@@ -1960,8 +1960,13 @@ static void load_minor_terrain_sprites(Buffer* canvas)
         if (slot >= 0 && image.clipRect.right >= sprite_x + 104
             && image.clipRect.bottom >= 60) {
             Sprite_ctor(&minor_sprites[id]);
+            // Sprite_extract_2 compares the FULL argument to 8-bit
+            // pixel values while stripping transparency (confirmed from
+            // terranx.exe 0x5E39A0). The previous 0x1FD (509) could
+            // never equal index 253, leaving bright-magenta rectangles.
+            // Pass the actual 8-bit transparent palette index instead.
             const int result = Sprite_extract_2(
-                &minor_sprites[id], &image, 0x1FD,
+                &minor_sprites[id], &image, 253,
                 sprite_x, 4, 104, 56, nullptr);
             // The sprite extractor trims transparent borders while retaining
             // offset_x/offset_y for the final blit. Requiring width==104

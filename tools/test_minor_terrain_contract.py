@@ -162,6 +162,10 @@ def main() -> None:
             and 'if (!valid)' in patches
             and 'write_call(draw_site, (int)minor_native_titanium_sprite_hook);' in patches,
             'Titanium hook must target only the verified native resource-type-4 call')
+    require('Sprite_extract_2(' in renderer
+            and '&minor_sprites[id], &image, 253,' in renderer
+            and '&minor_sprites[id], &image, 0x1FD,' not in renderer,
+            'Sprite extraction transparency key must equal an 8-bit palette index')
     require('minor_titanium_select_native_sprite(' in renderer
             and 'frame[8], y = frame[9]' in renderer
             and 'minor_landmark_at(x, y) != MINOR_TITANIUM' in renderer
