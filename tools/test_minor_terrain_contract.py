@@ -174,7 +174,7 @@ def main() -> None:
             and 'minor_landmark_at(x, y) != MINOR_TITANIUM' in renderer
             and 'return &minor_sprites[MINOR_TITANIUM];' in renderer
             and 'jmp *_minor_titanium_native_draw_target' in renderer
-            and '"movl %eax, 24(%esp)' in renderer
+            and '"1: movl %eax, 24(%esp)' in renderer
             and '"movl %eax, 28(%esp)' not in renderer
             and '"cmpl 24(%esp), %eax' in renderer
             and '"je 1f' in renderer
