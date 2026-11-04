@@ -221,6 +221,8 @@ def main() -> None:
             and 'selected = &minor_sprites[MINOR_TITANIUM];' in renderer
             and 'return selected;' in renderer
             and 'TITANIUM SPRITE TEST mode=%d' in renderer
+            and 'reports_per_variant[3]' in renderer
+            and 'reports_per_variant[report_slot] < 4' in renderer
             and 'jmp *_minor_titanium_native_draw_target' in renderer
             and '"1: movl %eax, 24(%esp)' in renderer
             and '"movl %eax, 28(%esp)' not in renderer

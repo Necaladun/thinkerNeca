@@ -15,7 +15,7 @@ The normal resource-bonus icon takes precedence over a minor mineral feature. No
 
 **Native hook contract (supported x86 `terranx.exe` only):** Uranium bonus call `0x465DFC`, type-4 branch `0x465E0E`, verified original sprite draw at `0x465E37` targeting `0x5E4B9A`. `src/patch.cpp` checks expected instruction bytes before installing. The wrapper swaps the Sprite pointer in saved ECX at +24 and forwards its transparency colour index at the original draw argument, retaining original zoom, clipping, position and layering.
 
-Native Uranium selects `0x78A700` (**variant 0**) or `0x78A72C` (**variant 1**). The external atlas currently substitutes **only variant 0**; variant 1/unknown sprite remains native Uranium, including on Titanium tiles.
+Native Uranium selects `0x78A700` (**variant 0**) or `0x78A72C` (**variant 1**). The external atlas currently substitutes **only variant 0**; variant 1/unknown sprite remains native Uranium, including on Titanium tiles. Develop diagnostics now log up to four samples **per native variant** (not merely the first 12 draws overall), ensuring a later-encountered variant 1 can report native dimensions, offsets, pitch and key for REND-004.
 
 Jungle's current patch sites are `0x463CC5`, `0x463D93` and `0x464E78`. The installer now compares all three original six-byte instruction sequences before writing any; an unsupported/mismatched site returns without installing a partial hook. This has source-level coverage, not yet Windows failure-path verification. The Develop Inspector uses a guarded native `strlen` site at `0x4B7A0C`, without hijacking the status window or rewriting terrain flags. PRACX/reduced mode and Release custom-art parity are not established.
 

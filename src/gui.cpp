@@ -2114,13 +2114,18 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
     }
     // The wrapper compares the returned pointer against original. A
     // non-replacement leaves ECX and the original draw key unchanged.
-    static int diagnostics_logged = 0;
-    if (diagnostics_logged < 12) {
-        ++diagnostics_logged;
+    // Capture the native geometry of each variant independently. Variant 1
+    // may first occur well after the initial Titanium draws; an overall
+    // log quota would hide the evidence needed to build its atlas entry.
+    static int reports_per_variant[3] = {};
+    const int report_slot = native_variant == 0 ? 0
+        : native_variant == 1 ? 1 : 2;
+    if (reports_per_variant[report_slot] < 4) {
+        ++reports_per_variant[report_slot];
         minor_graphics_trace(selected != original
                 ? "native Titanium sprite substitute"
                 : "native Titanium sprite fallback",
-            x, y, diagnostics_logged);
+            x, y, reports_per_variant[report_slot]);
         const std::string path = minor_graphics_file("minor_terrain_render.log");
         FILE* fp = fopen(path.c_str(), "a");
         if (fp) {

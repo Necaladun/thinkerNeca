@@ -28,7 +28,7 @@
 ## Remaining runtime regression procedure
 
 1. Install matching Develop `thinker.dll` and user-prepared `neca_sprites.pcx`; set mode 3 in the effective INI, restart the game.
-2. Confirm Titanium graphics, Inspector name and +1M at several zooms; correlate `INSPECTOR HOVER` and `INSPECTOR APPEND` log lines for the same tile. Distinguish the native second sprite variant, which still appears as Uranium.
+2. Confirm Titanium graphics, Inspector name and +1M at several zooms; correlate `INSPECTOR HOVER` and `INSPECTOR APPEND` log lines for the same tile. The `TITANIUM SPRITE TEST` log captures up to four independent samples for each native sprite variant; record a variant-1 line and its geometry (variant 1 still appears as Uranium).
 3. Check ordinary resources, fungus, forests, bases, units, fog and partial redraw; record coordinates/screenshot and log on discrepancies.
 4. Start a **new game**, save, quit, reload using the **same DLL**, compare tiles and yields, advance turns and save again.
 5. Remove the PCX in a disposable install to verify native Uranium fallback; mode 0 is native reference, mode 1 is external Uranium reference, mode 2 is legacy-only.
