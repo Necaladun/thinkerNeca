@@ -1902,25 +1902,16 @@ int __cdecl mod_design_new_veh(int faction_id, int unit_id) {
 
 
 /*
-Independent minor-terrain renderer. The atlas has 128x64 slots for
-Ironstone (legacy-compatible first slot), Jungle, and Uranium. The native
-LM_* sprite system and names remain untouched.
-
-This is still a Develop-only post-map overlay, NOT a verified terrain-layer
-hook: drawing over units/base graphics and PRACX support remain unresolved.
+Independent minor-terrain FALLBACK renderer. The atlas has 128x64 slots:
+Titanium, Jungle, Uranium. With native options enabled, both geological
+types bypass this atlas and use the game's original Uranium sprite.
+Only the experimental fallback is a Develop-only late post-map overlay;
+its layering over units and PRACX support remain unresolved.
 */
 #ifndef BUILD_REL
 static Sprite minor_sprites[MINOR_TYPE_COUNT] = {};
 static bool minor_sprite_ready[MINOR_TYPE_COUNT] = {};
 static bool minor_sprites_attempted = false;
-bool minor_native_ironstone_installed = false;
-
-void minor_graphics_ironstone_hook_result(int addr, int matches)
-{
-    minor_graphics_trace("native Ironstone bonus_at site / count / active",
-        addr, matches, minor_native_ironstone_installed);
-}
-
 static void load_minor_terrain_sprites(Buffer* canvas)
 {
     if (minor_sprites_attempted || !canvas || !canvas->palette) {
@@ -1941,7 +1932,7 @@ static void load_minor_terrain_sprites(Buffer* canvas)
     minor_graphics_trace("minor terrain atlas loaded / width / height",
         loaded, image.clipRect.right, image.clipRect.bottom);
 
-    // Retain legacy Ironstone at x=12 so existing 128x64 assets continue
+    // Retain legacy Titanium at x=12 so existing 128x64 assets continue
     // to render it. The new 384x64 atlas adds Jungle and Uranium to the right.
     for (int id = MINOR_JUNGLE; id < MINOR_TYPE_COUNT; ++id) {
         const int slot = minor_terrain_definition(static_cast<MinorLandmark>(id)).sprite_slot;
@@ -2045,118 +2036,6 @@ static void draw_native_minor_jungle(Console* win, int x, int y)
     *texture_key = old_key;
 }
 
-// Native bonus_at call adapter: the caller still gets exactly the usual
-// resource value, apart from the existing display-only Uranium=4 case.
-// Its native EBP frame supplies the real destination canvas, map window,
-// tile coordinates and sprite origin. Draw Ironstone at the same stage as
-// native resource icons, not during a late whole-map repaint.
-#if defined(__GNUC__) && defined(__i386__)
-extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* frame)
-{
-    const int original = mod_bonus_at(x, y);
-    MAP* tile = mapsq(x, y);
-    if (!tile) {
-        return original;
-    }
-    if (conf.minor_native_uranium
-        && minor_landmark_at(x, y) == MINOR_URANIUM
-        && !(tile->items & BIT_BONUS_RES)) {
-        // The original renderer-facing bonus_at returned this sentinel
-        // directly; the new wrapper would otherwise obscure its caller.
-        return 4;
-    }
-    if (!conf.minor_native_ironstone
-        || minor_landmark_at(x, y) != MINOR_IRONSTONE
-        || !frame
-        || frame[8] != x || frame[9] != y
-        || reinterpret_cast<uintptr_t>(MapWin) != static_cast<uintptr_t>(frame[3])) {
-        return original;
-    }
-
-    Buffer* dest = reinterpret_cast<Buffer*>(static_cast<uintptr_t>(frame[2]));
-    if (!dest || !dest->palette) {
-        return original;
-    }
-    load_minor_terrain_sprites(dest);
-    if (!minor_sprite_ready[MINOR_IRONSTONE]) {
-        return original;
-    }
-    // The tile polygon position is NOT the resource-sprite origin.
-    // In original MapWin_gen_terrain_poly
-    // it applies:
-    //   q = (zoom_unit(zoom)+1)/4
-    //   px -= 4*q
-    //   py -= lift + 2*q
-    // immediately before all sprite rendering. Omitting these offsets
-    // made Ironstone float away from its tile as zoom/height changed.
-    const int zoom = frame[4]; // [EBP+0x10]
-    const int zoom_num = *piZoomNum;
-    const int zoom_den = *piZoomDenom;
-    if (zoom_num >= 1 && zoom_den <= 0) {
-        return original;
-    }
-    const int scaled_zoom = zoom_num < 1
-        ? (zoom + 16) * 50 / 16
-        : zoom_num * 50 / zoom_den;
-    const int quarter = (scaled_zoom + 1) / 4;
-    if (quarter <= 0) {
-        return original;
-    }
-    Console* win = reinterpret_cast<Console*>(static_cast<uintptr_t>(frame[3]));
-    const int lift =
-        (pfncMapGetCornerYOffset(win, x, y, 1)
-        + pfncMapGetCornerYOffset(win, x, y, 2)
-        + pfncMapGetCornerYOffset(win, x, y, 3)
-        + pfncMapGetCornerYOffset(win, x, y, 4)) >> 2;
-    // Recompute the raw tile position from the native map window.
-    // The original renderer may reuse/modify its stack argument slots
-    // before the resource pass, so frame[10]/frame[11] aren't reliable.
-    long tile_px = 0, tile_py = 0;
-    MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py);
-    // The native renderer normally suppresses *ordinary* resource
-    // sprites at zoom <= -8. Ironstone is a map feature, so keep it
-    // visible at maximum zoom-out as well. Use a smaller glyph at -8/-6
-    // to prevent dense geological clusters merging into a large blotch.
-    // Adjust sprite origins by the same scaling ratio so the deposit
-    // stays centred over its actual tile, rather than drifting.
-    const int dest_scale = *piDestScale;
-    const int source_scale = *piSourceScale;
-    if (dest_scale > 0 && source_scale > 0) {
-        const bool far_zoom = zoom <= -6;
-        const int draw_scale = far_zoom
-            ? max(1, (2 * dest_scale) / 3) : dest_scale;
-        const int sprite_x = static_cast<int>(tile_px)
-            - (4 * quarter * draw_scale) / dest_scale;
-        const int sprite_y = static_cast<int>(tile_py) - lift
-            - (2 * quarter * draw_scale) / dest_scale;
-        Sprite* sprite = &minor_sprites[MINOR_IRONSTONE];
-        // Atlas pixels use explicit transparent palette index 253.
-        // The native drawing routine applies extracted trimming offsets.
-        Sprite_draw_2(sprite, dest, 253,
-            sprite_x, sprite_y, draw_scale, source_scale);
-    }
-    return original;
-}
-
-// This thunk is invoked only after verifying a native E8 call from
-// MapWin_gen_terrain_poly to bonus_at(0x592030). At thunk entry EBP
-// belongs to the original renderer. Its cdecl arguments are x and y;
-// the saved EBP pointer is an additional internal argument for drawing.
-extern "C" __attribute__((naked, used)) void minor_native_ironstone_bonus_hook()
-{
-    __asm__ __volatile__(
-        "pushl %ebp\n\t"
-        "pushl %ebp\n\t"
-        "pushl 16(%esp)\n\t"
-        "pushl 16(%esp)\n\t"
-        "call _minor_ironstone_bonus_inner\n\t"
-        "addl $12, %esp\n\t"
-        "popl %ebp\n\t"
-        "ret\n\t"
-    );
-}
-#endif
-
 static void draw_minor_terrain_tile(Console* win, int x, int y)
 {
     if (conf.reduced_mode || win != MapWin || !*MapTiles
@@ -2168,21 +2047,16 @@ static void draw_minor_terrain_tile(Console* win, int x, int y)
         return;
     }
     MAP* tile = mapsq(x, y);
-    if (type == MINOR_IRONSTONE && minor_native_ironstone_installed) {
-        // The native resource stage now handles this custom sprite,
-        // including focus/partial redraws and correct unit layering.
-        return;
-    }
     if (type == MINOR_JUNGLE && conf.minor_native_jungle) {
         // The original terrain function draws native Jungle from the
         // game's texture array before resources, fungus and improvements.
         // Never repeat Jungle in our late sprite/diagnostic overlay.
         return;
     }
-    if (type == MINOR_URANIUM && conf.minor_native_uranium
-        && tile && !(tile->items & BIT_BONUS_RES)) {
-        // The native renderer already drew Uranium at the correct
-        // resource stage; never paint a second PCX sprite over it.
+    if ((type == MINOR_URANIUM && conf.minor_native_uranium)
+        || (type == MINOR_TITANIUM && conf.minor_native_titanium)) {
+        // The engine draws both minerals using the same native resource
+        // sprite. Never duplicate them with a late custom PCX overlay.
         return;
     }
     if (!tile || !(tile->is_known(win->cOwner)

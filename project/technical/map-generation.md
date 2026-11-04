@@ -5,8 +5,8 @@
 ## Generation paths
 
 - `new_world_builder=1` invokes Thinker's generator. The current test profile has `modified_landmarks=1`.
-- The modified generator places independent climate-sensitive Jungle **early**, then native major landmarks; major placement clears any overlapping earlier minor terrain. It finalises climate/rockiness before depositing independent Uranium/Ironstone **late**.
-- Independent Uranium and Ironstone do not use `LM_URANIUM` or any other major slot. The old major Jungle/Uranium generators are disabled under the modified-map route.
+- The modified generator places independent climate-sensitive Jungle **early**, then native major landmarks; major placement clears overlapping earlier minor terrain. It finalises climate/rockiness before a **shared late geology pass**, alternating one Uranium and one Titanium deposit each round (if both enabled).
+- Independent Uranium and Titanium do not use `LM_URANIUM` or any other major slot. Each deposit shares Uranium's former lowland eligibility and fungus clearing, and completed patches enforce a two-tile buffer against both types and major landmarks. Different geology preferences are future ideas, not current rules. The old major Jungle/Uranium generators are disabled under the modified-map route.
 - Mirrored world generation currently skips independent minor terrain. Neither mirrored modes nor the native original builder are a supported target for the current fresh-game terrain experience.
 
 ## Sixteen native major slots
@@ -48,4 +48,4 @@ See [TESTING](../TESTING.md) for map distributions, overlaps, graphics, fog and 
 
 Current `src/map.cpp` mechanics: Garland Crater and Mount Planet grant **+1 mineral in their centre 3×3** (`code_at() < 9`); Mount Planet also grants **+1 energy** there. Fossil Field Ridge has +1 mineral in its special-coded tiles (`code_at() < 6`). These mineral bonuses are conditional on the landmark not being disabled.
 
-For ordinary land, a qualifying **landmark mineral bonus**, normal mineral resource bonus, or independent **Ironstone** mineral bonus also increments the Mine modifier by **+1**. Thus the central Crater/Mount Planet tiles and Ironstone can gain +1 inherent mineral plus an *additional* +1 mineral from Mine compared to equivalent tiles without that feature. The actual difference is subject to Mine-without-Road restrictions and mineral output caps (currently `tile_output_limit=3,3,3` in the test INI). Mines are **not required** for the inherent +1 mineral. Projected `item_yield()` should not be treated as a comprehensive Mine evaluation; see TERR-003.
+For ordinary land, a qualifying **landmark mineral bonus**, normal mineral resource bonus, or independent **Titanium** mineral bonus also increments the Mine modifier by **+1**. Thus the central Crater/Mount Planet tiles and Titanium can gain +1 inherent mineral plus an *additional* +1 mineral from Mine compared to equivalent tiles without that feature. The actual difference is subject to Mine-without-Road restrictions and mineral output caps (currently `tile_output_limit=3,3,3` in the test INI). Mines are **not required** for the inherent +1 mineral. Projected `item_yield()` should not be treated as a comprehensive Mine evaluation; see TERR-003.

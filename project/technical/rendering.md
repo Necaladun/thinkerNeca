@@ -2,48 +2,38 @@
 
 **Reference document.** Actionable follow-ups: [work queue](../WORK-QUEUE.md); test matrix: [testing](../TESTING.md).
 
-**Status:** Initial Windows Develop in-game verification succeeded for Jungle, Uranium, Ironstone and their native tile-Inspector names. This remains draft work: regression coverage, Release parity and PRACX/reduced-mode support are incomplete. This document records the *current* implementation, not each historical rendering experiment.
+**Status:** Initial Windows Develop in-game verification succeeded for Jungle, Uranium, Titanium and their native tile-Inspector names. This remains draft work: regression coverage, Release parity and PRACX/reduced-mode support are incomplete. This document records the *current* implementation, not each historical rendering experiment.
 
 ## Rendering paths
 
 | Feature | Current preferred rendering | Notes |
 | --- | --- | --- |
-| Jungle | Native `MapWin_gen_terrain_poly` terrain/texture stage | Reads the independently stored Jungle type via three verified x86 hook locations and uses the game's loaded Jungle transitions; no `LM_JUNGLE` spoofing |
-| Uranium | Native resource sprite stage | `mod_bonus_at()` supplies renderer-only bonus value 4 for independent Uranium with no normal resource bonus; normal AI/yield calls still see 0–3 |
-| Ironstone | Custom indexed-PCX sprite at native resource stage | Develop-only wrapper at the uniquely located `bonus_at` callsite; uses native tile position, elevation/zoom adjustment and a smaller glyph at far zoom |
-| Tile Inspector | Native feature-line append | Develop-only verified `strlen` callsite hook adds Jungle/Uranium/Ironstone to the River/Forest/Fungus line, including standalone minor terrain |
+| Jungle | Native `MapWin_gen_terrain_poly` terrain/texture stage | Independent Jungle flag is read through three x86 hooks |
+| Uranium | Native resource sprite stage | Renderer-only `bonus_at() == 4` displays the original Uranium resource art |
+| Titanium | **Exactly the same native resource sprite stage and placeholder art as Uranium** | Distinct independent terrain type and +1 mineral gameplay effect |
+| Tile Inspector | Native feature-line append | Develop-only `strlen` callsite hook appends minor terrain names |
 
-The features remain independent map-tile type/code records. Rendering does not allocate or overwrite native landmark flags, `#NATURAL` entries or major-landmark names. Resource calculations are documented in [minor-terrain.md](minor-terrain.md).
+Uranium and Titanium both use the already loaded native resource glyph. The custom Titanium `bonus_at` wrapper and its hand-computed pixel offsets have been removed. This is intended to eliminate the prior systematic apparent (-1,-1) tile placement fault; **it is not yet verified in the game**.
 
 ## Native hooks and controls
 
-- **Jungle:** `minor_native_jungle=1` installs patches at `0x463CC5`, `0x463D93` and `0x464E78`, extending the native `0x80000004` checks to independently stored Jungle. It uses the game's existing Jungle artwork and transition logic. Disabled for `reduced_mode` / PRACX.
-- **Uranium:** `minor_native_uranium=1` returns renderer-only `bonus_at == 4` for Uranium when the direct caller is within the supported native terrain renderer and the tile has no normal resource bonus. Normal bonuses take precedence. A Develop fallback can draw the atlas sprite in cases the native shortcut does not cover.
-- **Ironstone:** `minor_native_ironstone=1` installs a Develop-only wrapper after finding exactly one call from the native terrain renderer to `bonus_at`. The wrapper preserves gameplay bonus results and draws the loaded Ironstone atlas sprite into the native renderer canvas. `minor_native_ironstone=0` disables this route.
-- **Inspector:** `minor_native_inspector=1` installs a Develop-only hook at `0x4B7A0C`, only if the original five-byte call matches `E8 CF D9 18 00`. It appends a minor name to the native 256-byte `StrBuffer`, respecting its capacity and the tile's visibility. `minor_native_inspector=0` disables this route.
+- **Jungle:** `minor_native_jungle=1` installs three original-terrain-stage patches at `0x463CC5`, `0x463D93` and `0x464E78`. Disabled for reduced/PRACX mode.
+- **Uranium and Titanium:** `minor_native_uranium=1` and `minor_native_titanium=1` independently permit the **same** renderer-only value-4 shortcut in `mod_bonus_at()`, only for the supported terrain renderer and when no ordinary resource bonus is present. All gameplay/AI calls still receive 0–3. No separate Titanium sprite hook is installed.
+- **Inspector:** `minor_native_inspector=1` installs the Develop-only verified `strlen` hook at `0x4B7A0C` if its native five-byte preimage matches `E8 CF D9 18 00`. The Inspector is independent of geology rendering; intermittent labels require separate verification.
 
-**Native-hook failure semantics differ:** the Ironstone unique-callsite and Inspector mismatch paths skip their hook; the current Jungle path instead uses `write_bytes()`, whose mismatch calls `exit_fail()`. It is therefore *not* an all-or-nothing soft fallback if a Jungle instruction site differs. Reworking Jungle validation before broader distribution is outstanding.
-
-The hooking addresses and stack assumptions are specific to the supported 32-bit `terranx.exe`; successful compilation does not validate a different executable. Do not apply those hooks to arbitrary versions.
+The Jungle byte-site preflight is not yet all-or-nothing and remains REND-001. Hook assumptions remain specific to the supported x86 `terranx.exe`; do not assume PRACX/reduced-mode parity.
 
 ## Atlas and deployment
 
-`minor_terrain.pcx` is a 384x64 indexed atlas with three 128x64 slots (Ironstone, Jungle, Uranium). The current native Jungle and ordinary native Uranium rendering do not require their atlas entries; **Ironstone does**.
+`minor_terrain.pcx` remains a 384×64 indexed fallback atlas (Titanium, Jungle, Uranium slots). **With both native geological options enabled, the game draws its own Uranium sprite for both deposits and does not need the Titanium atlas artwork.** This avoids the external palette-conversion issue for the normal rendering path.
 
-- CI constructs a fallback indexed atlas from the repository's original 128x64 PCX. Its Ironstone art is regenerated as opaque rust-coloured outcrops. The other slots primarily serve legacy fallback/debug rendering.
-- `tools/make_minor_terrain.py` can build an atlas using the player's locally installed `ter1.pcx`; the repository does not redistribute original game art.
-- For the Develop build, install the `thinker.dll` **and** the atlas from the same build alongside `terranx.exe`. Replacing only the DLL can retain obsolete Ironstone art.
-- `minor_native_jungle_preview=1`, `minor_render_mode=0|1`, and `minor_debug_tile_names=1` provide experimental Develop fallback/diagnostic rendering. Late overlays may cover improvements, bases or units, so they are not an equivalent production route.
+`tools/make_minor_terrain.py` now copies the same placeholder artwork to Titanium and Uranium atlas slots for the optional fallback/diagnostic path. The late post-map overlay is not equivalent to the native rendering layer, and can obscure units or terrain if explicitly enabled. CI checks the atlas format but cannot validate the native game.
 
-The current Release build does **not** include the Develop-only Ironstone native wrapper, Inspector hook or fallback sprite painter. The Release packaging script also omits the atlas. Do not claim feature parity with the tested Develop build. The Jungle, Ironstone and Inspector hooks are skipped in PRACX/reduced mode; the Uranium renderer-specific shortcut is likewise not established as PRACX-compatible.
+The native Uranium/Titanium shortcut is no longer tied to the custom Develop-only Titanium wrapper. Release and PRACX/reduced modes are still unverified. The Inspector remains Develop-only.
 
 ## Verification
 
-**Latest user-reported in-game:** Jungle and Uranium graphics work and their Inspector names appear consistently. Ironstone +1 mineral works, but **sprites sometimes appear where no independent Ironstone exists and Ironstone's Inspector name is intermittent**. Earlier Ironstone zoom-alignment improvements did not establish correctness in all cases. Artwork redesign continues in a separate workstream (REND-003); investigate the tile-data/renderer disagreement separately (BUG-002).
-
-**Automated CI:** Windows 32-bit Develop compilation, static checks of hook locations/guarding and sprites, synthetic save parsing, and indexed atlas generation.
-
-**Not fully tested:** normal-resource bonus co-location, standalone/composite Inspector lines under all UI states, fog-of-war, repeated click/focus/redraw, base and vehicle tiles, full save/reload, unsupported executables, Release/PRACX parity.
+**Previously observed:** Uranium placed and drew correctly; Titanium +1M worked but the custom icon appeared on some non-Titanium tiles and the Inspector name was intermittent. **Pending:** same-save 2101 native placeholder alignment; game effects, fog/focus/redraw, existing resource bonus co-location; fresh-map alternate generation and 2-tile separation; Release tests.
 
 ## Diagnostics
 

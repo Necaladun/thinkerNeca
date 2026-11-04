@@ -14,27 +14,27 @@
 | Area | Evidence | Remaining checks |
 | --- | --- | --- |
 | Windows Develop compilation | CI passes for current PR head before this documentation change | Re-run CI on modified head; clean local install |
-| Independent minor storage / N/M/E logic | Synthetic v2 save parser; source contract; Jungle +1N, Uranium +1E, Ironstone +1M confirmed by user | Real fresh-game save→reload→save; resource/improvement combinations |
+| Independent minor storage / N/M/E logic | Synthetic v2 save parser; source contract; Jungle +1N, Uranium +1E, Titanium +1M confirmed by user | Real fresh-game save→reload→save; resource/improvement combinations |
 | Jungle rendering | User reports correct appearance and +1 food; no graphics issues reported | Fog, redraw/focus, border cases, unsupported preimages |
 | Uranium rendering | User reports correct sprite, +1 energy and Inspector label | Native resource coexistence, redraw/zoom/fog |
-| Ironstone rendering | +1 mineral confirmed; **sprite sometimes appears on a tile with no recorded Ironstone** (BUG-002) | Reproduce tile-to-sprite discrepancy, zoom/overlay effects; WIP art changes elsewhere |
-| Native tile Inspector | Jungle/Uranium labels confirmed; **Ironstone label intermittent** in latest user test (BUG-002) | Inspect same tile sprite vs registry data, click/focus/fog and composite feature cases |
-| New world generation | User observed generated independent terrain, current INI launches/works | Multiple deterministic seeds, map sizes, rainfall, count and major/minor overlap |
+| Titanium rendering | +1 mineral previously confirmed; old custom hook had systematic apparent (-1,-1) tile offset. New code routes Titanium through native Uranium sprite, **not yet in-game tested**. | Reload the same 2101 save and compare all seven stored Titanium coordinates against markers; check zoom/focus and existing resource-bonus icons. |
+| Native tile Inspector | Jungle/Uranium labels confirmed; **Titanium label intermittent** in latest user test (BUG-002) | Inspect same tile sprite vs registry data, click/focus/fog and composite feature cases |
+| New world generation | Previous independently generated patches worked; new untested shared Uranium/Titanium generator alternates completed patches, uses identical lowland/fungus rules and a shared two-tile buffer | Fresh games: check alternating counts, per-type 3–9 patches, separation, fungus clearing, resource bonuses, map sizes and saves. |
 | Major landmarks | Great Dunes look good; Mesa's +1E centre-only verified. **Stepped 2,000 m Mesa visually failed:** screenshot shows bulging, non-flat summit; generator restored to original 5×5 plateau at 1,000–1,999 m and outer low rim. | Optionally verify restored flat-topped visual in a new game; other landmarks/improvement interactions remain. |
 | Retired Canyon | Static source/INI/landmark-table guard passes | Observe random maps built with both generators |
 | Configuration | Parser/INI structural CI passed; user reports current settings seem to work | Confirm local overrides, starting allocation/event exclusions and cap effects in play |
-| Release build and PRACX | Not verified | Ironstone/Inspector not wired in Release; PRACX/reduced mode not established |
+| Release build and PRACX | Not verified | Native Uranium/Titanium value-4 rendering is now common in source; Release runtime still unverified, Inspector remains Develop-only; PRACX/reduced mode not established |
 
-**4 November 2026 in-game findings:** Jungle visually correct and +1 nutrient; Uranium visually correct, +1 energy, Inspector label present; Ironstone +1 mineral but intermittent Inspector label and sprites sometimes drawn on non-Ironstone tiles; Great Dunes look good; Sunny Mesa previously +1E on all 7×7 tiles (now corrected; user confirmed +1E central 3×3 only); probe-team issue **appears** resolved with `base_capture_fix=0`. These are user-reported observations, not completed regression coverage. See BUG-001, BUG-002 and MAP-005.
+**4 November 2026 in-game findings:** Jungle visually correct and +1 nutrient; Uranium visually correct, +1 energy, Inspector label present; Titanium +1 mineral but intermittent Inspector label and sprites sometimes drawn on non-Titanium tiles; Great Dunes look good; Sunny Mesa previously +1E on all 7×7 tiles (now corrected; user confirmed +1E central 3×3 only); probe-team issue **appears** resolved with `base_capture_fix=0`. These are user-reported observations, not completed regression coverage. See BUG-001, BUG-002 and MAP-005.
 
 ## Recommended practical regression pass
 
 1. Create a new game with `new_world_builder=1`, `modified_landmarks=1`, all three minor types, `minor_native_*=1` and the chosen test INI.
-2. Inspect Jungle, Uranium and Ironstone with and without improvements, normal resource bonuses, fungus, rivers and overlapping unit/base artwork. Compare displayed N/M/E to base worker and crawler outputs.
+2. Inspect Jungle, Uranium and Titanium with and without improvements, normal resource bonuses, fungus, rivers and overlapping unit/base artwork. Compare displayed N/M/E to base worker and crawler outputs.
 3. Zoom from maximum out to close in; switch selection and map focus repeatedly; verify tile Inspector text and fog-of-war rules.
 4. Save, close the game, relaunch the **same build**, load and inspect the same minor tiles; save again. Old-version save interoperability is **not** a requirement.
 5. Check several seeds/map sizes and modified landmarks; Mesa's raised 2,000 m inner summit was **rejected** after a user screenshot showed a rounded bulge. On a fresh map, optionally confirm the reverted low 5×5 Mesa looks as before, with +1E only on the centre 3×3. Record seed and anomalies.
-6. Test the actual deployed ZIP pair of DLL/PCX, not just source compilation. Separately assess Release when engineering catches up.
+6. Test the compiled DLL against the installed game. The native Uranium/Titanium placeholder now uses game artwork and does not require replacing the PCX. A custom atlas remains an optional fallback when native rendering is disabled. Separately assess Release.
 
 ## CI coverage
 
@@ -48,3 +48,5 @@ Workflow: [`.github/workflows/build-windows.yml`](../.github/workflows/build-win
 - Upload the DLL/EXE/atlas artifact.
 
 CI does not run SMAC/X, validate native hook behavior on arbitrary executables, or render screenshots. When reporting a bug, include PR/commit, `thinker.ini` overrides, map seed/year, exact coordinates or screenshot, matching PCX and `minor_terrain_render.log` if relevant.
+
+**After shared-geology refactor (pending Windows runtime):** Retest the 2101 save where stored Titanium tiles include (84,96), (83,97), (82,98), (81,99), (83,99), (84,100), (86,100). Old custom-sprite markers appeared one map coordinate northwest of most of these tiles; this must not be considered fixed until native rendering is observed at the recorded positions. A new game is needed to validate alternating patch generation.

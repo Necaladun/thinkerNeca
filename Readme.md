@@ -3,7 +3,7 @@
 
 **This is Necaladun's experimental fork of [Induktio's Thinker Mod](https://github.com/induktio/thinker)**, not an upstream Thinker release. Its current focus is independent minor terrain, major-landmark generation, graphics integration and adjustable terrain economics for **fresh SMAC/X games**. Draft [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4) carries the latest work; the fork is **not yet a validated Release build**.
 
-The new independent minor features are **Jungle (+1 nutrient), Uranium (+1 energy) and Ironstone (+1 mineral)**, rendered without consuming original major-landmark slots. Nessus Canyon's generator has been retired; major slot 10 is reserved. The distributed `docs/thinker.ini` is a **specific gameplay test profile**, currently using 3/3/3 resource caps, additional starting units and selected event exclusions.
+The new independent minor features are **Jungle (+1 nutrient), Uranium (+1 energy) and Titanium (+1 mineral)**, rendered without consuming original major-landmark slots. Uranium and Titanium use the same native resource sprite provisionally, with an alternating shared geology generator that keeps the two deposit types apart. Nessus Canyon's generator has been retired; major slot 10 is reserved. The distributed `docs/thinker.ini` is a **specific gameplay test profile**, currently using 3/3/3 resource caps, additional starting units and selected event exclusions.
 
 **Project navigation:** [What is happening now?](project/STATUS.md) · [Work queue / WIP / TODO / TBD](project/WORK-QUEUE.md) · [Fork changelog](Fork-Changelog.md) · [Testing](project/TESTING.md) · [Project guide](PROJECT.md) · [Decisions](project/DECISIONS.md) · [Ideas](project/IDEAS.md).
 

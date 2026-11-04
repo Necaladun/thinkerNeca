@@ -183,13 +183,13 @@ struct Config {
     int modified_landmarks = 0;
     int minor_jungle = 1;
     int minor_uranium = 1;
-    int minor_ironstone = 1;
+    int minor_titanium = 1;
     // Render-only native uranium special-resource sprite via the original
     // MapWin_gen_terrain_poly -> bonus_at call (does not change stored flags).
     int minor_native_uranium = 1;
-    // Draw custom Ironstone during the native special-resource stage;
+    // Draw custom Titanium during the native special-resource stage;
     // uses a runtime-verified renderer bonus_at callsite in Develop.
-    int minor_native_ironstone = 1;
+    int minor_native_titanium = 1;
     // Develop-only, expected-byte-validated native tile-inspector feature-line append.
     int minor_native_inspector = 1;
     // Develop-only: original loaded Jungle textures, drawn at an overlay

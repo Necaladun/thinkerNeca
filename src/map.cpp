@@ -1354,10 +1354,10 @@ int __cdecl mod_bonus_at(int x, int y) {
     }
 
     // The native map renderer uses bonus_at(x,y)==4 to draw its already
-    // loaded terrestrial special-resource sprite (same art as Uranium).
+    // loaded terrestrial special-resource sprite for both Uranium and Titanium.
     // Present 4 ONLY at that renderer's direct callsite. All real resource
     // calculations and AI calls still receive ordinary 0..3 bonuses, so
-    // the independent Uranium +1 energy is not counted a second time.
+    // the independent +1 energy/mineral yields are not counted twice.
     //
     // OpenSMAC reconstructs this path in MapWin_gen_terrain_poly
     // (0x4632D0, before the next MapWin functions). The bounded return
@@ -1369,10 +1369,14 @@ int __cdecl mod_bonus_at(int x, int y) {
 #else
     const uintptr_t caller = 0; // Unsupported compiler: skip native visual shortcut.
 #endif
-    if (conf.minor_native_uranium
+    const MinorLandmark minor_type = minor_landmark_at(x, y);
+    const bool native_geology =
+        (minor_type == MINOR_URANIUM && conf.minor_native_uranium)
+        || (minor_type == MINOR_TITANIUM && conf.minor_native_titanium);
+    if (native_geology
         && caller >= 0x4632D0u && caller < 0x467000u
-        && minor_landmark_at(x, y) == MINOR_URANIUM
         && !(sq->items & BIT_BONUS_RES)) {
+        // Renderer-only sentinel. Normal yields and AI still get 0..3.
         return 4;
     }
     uint32_t bit = sq->items;

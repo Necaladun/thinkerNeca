@@ -15,7 +15,7 @@ MAGIC = b'THMIN001'
 VERSION = 2
 HEADER_SIZE = 0xAA4
 MAP_TILE_BYTES = 44
-NAMES = ('None', 'Jungle', 'Uranium', 'Ironstone')
+NAMES = ('None', 'Jungle', 'Uranium', 'Titanium')
 NEIGHBOURS = ((2, 0), (-2, 0), (0, 2), (0, -2),
               (1, 1), (-1, 1), (1, -1), (-1, -1))
 

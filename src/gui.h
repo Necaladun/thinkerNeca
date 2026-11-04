@@ -69,12 +69,8 @@ int __thiscall mod_calc_dim(Console* This);
 int __thiscall mod_gen_map(Console* This, int faction_id, int units_only);
 #ifndef BUILD_REL
 void minor_graphics_startup_trace();
-extern bool minor_native_ironstone_installed;
-void minor_graphics_ironstone_hook_result(int addr, int matches);
 void minor_graphics_inspector_hook_result(int addr, bool active);
 #if defined(__GNUC__) && defined(__i386__)
-extern "C" int __cdecl minor_ironstone_bonus_inner(int x, int y, const int* frame);
-extern "C" void minor_native_ironstone_bonus_hook();
 extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x, int tile_y);
 extern "C" int __cdecl minor_native_inspector_strlen_hook();
 #endif

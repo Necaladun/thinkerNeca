@@ -5,7 +5,7 @@ Record choices that materially constrain implementation. **Established** means i
 | ID | State | Decision / rationale | Revisit when |
 | --- | --- | --- | --- |
 | DEC-001 | Established | **Fresh games are the target.** Old saves and legacy scenarios need not remain compatible across mod revisions. New-game same-build save/reload still must work. | A specific compatibility need appears |
-| DEC-002 | Established | **Independent minor terrain** has its own type/code per tile; no repurposing native major landmark flags/names to represent Jungle, Uranium or Ironstone. | Changing core terrain architecture |
+| DEC-002 | Established | **Independent minor terrain** has its own type/code per tile; no repurposing native major landmark flags/names to represent Jungle, Uranium or Titanium. | Changing core terrain architecture |
 | DEC-003 | Established | **Retire Nessus Canyon**; preserve unused native slot 10 (`LM_RESERVED_10=0x200`) for future major design. The former Canyon generator, bonus and `canyon` setting are gone. | MAP-003 design approved |
 | DEC-004 | Established, implementation under test | **Prefer native-stage terrain rendering** to overlays drawn over units/fungus/improvements. Retain experimental fallbacks until verified. | Release/PRACX renderer strategy decided |
 | DEC-005 | Established | **No broad AI/terrain rebalance while verifying terrain foundations.** Preserve strong altitude-dependent Solar yields; focus on getting AI to exploit specialised improvements rather than automatically nerfing Solar. | BAL-002/003 or AI-001 advanced |

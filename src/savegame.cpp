@@ -18,7 +18,7 @@ static const MinorTerrainDefinition MinorTerrainDefinitions[] = {
     {"", 0, 0, 0, -1, MINOR_GENERATE_NEVER},
     {"Jungle", 1, 0, 0, 1, MINOR_GENERATE_EARLY},
     {"Uranium", 0, 0, 1, 2, MINOR_GENERATE_LATE},
-    {"Ironstone", 0, 1, 0, 0, MINOR_GENERATE_LATE},
+    {"Titanium", 0, 1, 0, 0, MINOR_GENERATE_LATE},
 };
 
 const MinorTerrainDefinition& minor_terrain_definition(MinorLandmark type) {

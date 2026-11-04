@@ -4,10 +4,14 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unreleased — draft PR #4 (2026-11-04)
 
+- **Latest refactor:** renamed geological mineral minor type to **Titanium** throughout the active source, INI, tests, diagnostics and docs. The saved type ID remains 3 and the `THMIN001` v2 record format is unchanged.
+- Replaced duplicate Uranium/Titanium deposit generators with a single interleaved routine: same eligible tiles, lowland preference, 3–9 patch sizes, fungus clearing, two-tile inter-patch buffer, and independent RNG streams. Uranium patches are attempted first each round, then Titanium.
+- Removed the custom Titanium native drawing thunk and manual pixel-position calculations. Both minerals now use the existing Uranium renderer-only `bonus_at()==4` glyph, with separate +1E/+1M yields. Same-save alignment and new-game distribution are **pending in-game testing**.
+
 [PR #4: independent minor-terrain generation/rendering](https://github.com/Necaladun/thinkerNeca/pull/4) — **draft, not merged**.
 
-- Migrated Jungle, Uranium and Ironstone world generation to independent minor type/code records rather than native major-landmark flags. Jungle uses climate-sensitive early patches; Uranium and Ironstone use dispersed late geological deposits.
-- Integrated native-stage Jungle textures and Uranium sprite rendering; added a Develop-only Ironstone native-stage sprite from a dedicated indexed-PCX atlas. Adjusted Ironstone positioning, zoom scaling and opacity during in-game testing.
+- Migrated Jungle, Uranium and Titanium world generation to independent minor type/code records rather than native major-landmark flags. Jungle uses climate-sensitive early patches; Uranium and Titanium use dispersed late geological deposits.
+- Integrated native-stage Jungle textures and Uranium sprite rendering; previously used an experimental Develop-only Titanium native-stage PCX sprite. That renderer was removed in the latest refactor after inconsistent positioning was observed.
 - Added a guarded Develop-only tile-Inspector feature-line hook. User confirmed all three names display in the Inspector; additional UI regression tests remain.
 - Removed the old Nessus Canyon random-map generator, mineral effect and `canyon` INI setting. Reserved native landmark slot 10 (`0x200`) for later design.
 - Restricted Sunny Mesa's +1 energy to the central 3×3 tiles (codes 0–8) in both actual and AI-projected resource yields; preserved its larger geographical footprint. User-confirmed centre-only bonus in-game on 2026-11-04.
@@ -20,9 +24,9 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Merged foundation — 2026-11-03
 
-- [PR #3](https://github.com/Necaladun/thinkerNeca/pull/3): established independent per-tile `MinorTerrainTile { type, code }` and versioned `THMIN001` v2 save format; centralised Jungle +1 nutrient, Uranium +1 energy and Ironstone +1 mineral resource definitions; began AI yield integration. Native generation/rendering migration followed in PR #4.
-- [PR #2](https://github.com/Necaladun/thinkerNeca/pull/2): removed the unsafe experimental tile-Inspector wrapper and temporary native landmark/name spoofing after an Ironstone click crash; removed false native named-landmark handling. These removed approaches are **not** part of the present design.
-- [PR #1](https://github.com/Necaladun/thinkerNeca/pull/1): early attempt to show Ironstone in the original tile Inspector. It was superseded by PR #2 and later by the narrow verified hook in PR #4. Do not treat PR #1's implementation as current.
+- [PR #3](https://github.com/Necaladun/thinkerNeca/pull/3): established independent per-tile `MinorTerrainTile { type, code }` and versioned `THMIN001` v2 save format; centralised Jungle +1 nutrient, Uranium +1 energy and Titanium +1 mineral resource definitions; began AI yield integration. Native generation/rendering migration followed in PR #4.
+- [PR #2](https://github.com/Necaladun/thinkerNeca/pull/2): removed the unsafe experimental tile-Inspector wrapper and temporary native landmark/name spoofing after an Titanium click crash; removed false native named-landmark handling. These removed approaches are **not** part of the present design.
+- [PR #1](https://github.com/Necaladun/thinkerNeca/pull/1): early attempt to show Titanium in the original tile Inspector. It was superseded by PR #2 and later by the narrow verified hook in PR #4. Do not treat PR #1's implementation as current.
 
 ## Upstream
 

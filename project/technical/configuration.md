@@ -15,14 +15,14 @@ At startup, the fork reads `thinker.ini`, then optionally `thinker_user.ini` fro
 | `world_polar_caps` | `0` | Player preference |
 | `skip_event` | `13`, `17` on separate lines | Exclude Sunspots and Base Asteroid Strike |
 | `new_world_builder` / `modified_landmarks` | `1` / `1` | Intended modified-map path |
-| `minor_jungle` / `minor_uranium` / `minor_ironstone` | All `1` | Independent minor-terrain generation |
-| `minor_native_jungle` / `minor_native_uranium` / `minor_native_ironstone` | All `1` | Current native rendering integrations; Ironstone Develop-only |
+| `minor_jungle` / `minor_uranium` / `minor_titanium` | All `1` | Independent minor-terrain generation |
+| `minor_native_jungle` / `minor_native_uranium` / `minor_native_titanium` | All `1` | Native Jungle and shared Uranium/Titanium resource rendering; Inspector remains Develop-only |
 | `minor_native_inspector` | `1` | Develop-only native feature-line labels |
 | `minor_render_mode` / `minor_debug_tile_names` | `0` / `0` | Prototype fallback mode selection; no debug tile-name overlays |
 
 The older major-landmark options `jungle=0` and `uranium=0` **are distinct** from the independent minor settings. **`canyon=` is no longer recognised**; the retired native major slot 10 is reserved. Delete old `canyon=1` or `canyon=0` lines from *both* INI files to avoid parser warnings.
 
-`modified_landmarks=1` currently gates independent Jungle/Uranium generation, while Ironstone's generator is not tied to that switch in the same way; the three types still require `new_world_builder=1`. See [minor terrain](minor-terrain.md) and [CFG-001](../WORK-QUEUE.md).
+`modified_landmarks=1` and `new_world_builder=1` are required for all three independent minor types. Uranium and Titanium each retain an on/off switch but share alternating late generation. See [minor terrain](minor-terrain.md) and [CFG-001](../WORK-QUEUE.md).
 
 ## Config maintenance
 

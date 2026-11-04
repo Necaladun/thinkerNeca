@@ -5,8 +5,9 @@
 ## Terraforming and terrain economics
 
 - **Less universal Forests:** reduce Forest from 1 nutrient / 2 minerals / 1 energy to 1/1/1 to increase the relevance of dedicated Farms, Mines and Solar Collectors. Needs evaluation alongside Tree Farms, upkeep, terraforming turns and Thinker AI choices. See BAL-002.
-- **Geology requiring extraction:** Ironstone provides +1 mineral only with Mine; Uranium provides +1 energy with an appropriate improvement (Mine was suggested). Would make regions resource-specialised instead of all-purpose Forest terrain. Open cases: nonrocky mine legality, boreholes, base tiles, fungus, regular resource bonuses, crawler strategies. See BAL-003.
+- **Geology requiring extraction:** Titanium provides +1 mineral only with Mine; Uranium provides +1 energy with an appropriate improvement (Mine was suggested). Would make regions resource-specialised instead of all-purpose Forest terrain. Open cases: nonrocky mine legality, boreholes, base tiles, fungus, regular resource bonuses, crawler strategies. See BAL-003.
 - **Solar still powerful:** keep elevation scaling as a feature, but teach Formers to build Solars at worthwhile elevations. Contrast projectable yields, worker demand and Former-turn opportunity costs. See AI-001.
+- **Distinct geological environments (future):** Uranium and Titanium currently use identical placement rules, alternating one 3–9 tile patch per round, preferring lowlands and clearing fungus. After native rendering/placement is verified, consider Titanium preference for rolling/rocky terrain, allowing fungus to remain on Titanium (versus Uranium clearing it), or other ecological distinctions. Keep shared placement, separation and resource-yield machinery; evaluate actual map balance before changing rules.
 - **More minor terrain features:** potential environmental/geological patches, but only once existing types have mature visuals, yield rules and balancing.
 
 ## Major landmarks

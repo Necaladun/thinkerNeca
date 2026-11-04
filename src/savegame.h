@@ -11,7 +11,7 @@ enum MinorLandmark : uint8_t {
     MINOR_NONE = 0,
     MINOR_JUNGLE = 1,
     MINOR_URANIUM = 2,
-    MINOR_IRONSTONE = 3,
+    MINOR_TITANIUM = 3,
     MINOR_TYPE_COUNT = 4,
 };
 

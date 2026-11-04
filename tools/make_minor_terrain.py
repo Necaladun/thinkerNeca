@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Build a three-type PCX atlas with an opaque custom Ironstone outcrop.
+"""Build a three-type PCX atlas with matching Titanium/Uranium placeholders.
 
 Usage: python tools/make_minor_terrain.py <source.pcx> <minor_terrain.pcx>
 Sources: installed SMAC ter1.pcx (1024x768), or legacy minor_terrain.pcx
 (128x64). Requires Pillow. The original game artwork is not committed.
 
-Layout: three 128x64 slots: Ironstone, Jungle, Uranium.
+Layout: three 128x64 slots: Titanium, Jungle, Uranium.
 Each sprite uses slot + (12,4), size 104x56. Transparency index 253.
-Ironstone is original, procedural high-contrast ore artwork drawn using
-the installed game's palette (or fallback asset palette).
+Titanium duplicates Uranium art; native mode uses the game's own sprite.
 """
 import random
 import sys
@@ -64,74 +63,14 @@ def main() -> None:
         return sprite.point(recolor)
 
 
-    def make_ironstone():
-        # Geologically distinct angular ferruginous outcrops, not a sparse
-        # recolour of Uranium. Indexed PCX remains entirely opaque wherever
-        # rock is drawn; only the outside background is transparent 253.
-        sprite = Image.new('P', (SPRITE_W, SPRITE_H), TRANSPARENT)
-        sprite.putpalette(palette)
-        d = ImageDraw.Draw(sprite)
-        c = {name: palette_index(rgb) for name, rgb in {
-            'shade': (40, 28, 25),
-            'low': (84, 43, 31),
-            'rust': (129, 64, 38),
-            'mid': (179, 93, 53),
-            'warm': (210, 134, 73),
-            'bright': (244, 193, 117),
-            'vein': (71, 79, 82),
-            'veinlit': (184, 184, 156),
-        }.items()}
-        # Ground contact and shallow talus rather than an elevated icon.
-        d.ellipse((10, 40, 93, 54), fill=c['shade'])
-        d.polygon([(9, 47), (27, 42), (36, 47), (57, 42),
-                   (79, 46), (96, 48), (88, 53), (19, 53)], fill=c['low'])
-        # Left rock face.
-        d.polygon([(14, 44), (24, 25), (35, 21), (46, 29),
-                   (48, 42), (39, 49), (19, 48)], fill=c['shade'])
-        d.polygon([(19, 42), (26, 27), (35, 23), (39, 31),
-                   (36, 43)], fill=c['rust'])
-        d.polygon([(35, 23), (43, 30), (46, 40), (36, 43),
-                   (39, 31)], fill=c['mid'])
-        d.line([(24, 28), (27, 33), (24, 41)], fill=c['warm'], width=2)
-        # Tall central ironstone ridge with a dark mineral seam.
-        d.polygon([(31, 46), (39, 22), (54, 12), (65, 20),
-                   (69, 39), (57, 50), (40, 50)], fill=c['shade'])
-        d.polygon([(39, 42), (44, 24), (54, 16), (58, 29),
-                   (54, 44), (44, 49)], fill=c['rust'])
-        d.polygon([(54, 16), (62, 23), (66, 39), (57, 47),
-                   (54, 44), (58, 29)], fill=c['mid'])
-        d.polygon([(45, 25), (53, 17), (51, 32),
-                   (44, 41)], fill=c['warm'])
-        d.line([(54, 19), (58, 29), (54, 44)], fill=c['bright'], width=2)
-        d.line([(40, 45), (45, 36), (49, 41), (51, 49)],
-               fill=c['vein'], width=3)
-        d.line([(45, 36), (49, 41)], fill=c['veinlit'], width=1)
-        # Right-hand outcrop and ferric highlights.
-        d.polygon([(62, 46), (67, 30), (79, 25), (91, 34),
-                   (92, 46), (84, 51), (69, 50)], fill=c['shade'])
-        d.polygon([(68, 44), (70, 33), (79, 28), (83, 37),
-                   (79, 47)], fill=c['rust'])
-        d.polygon([(79, 28), (88, 35), (89, 44), (80, 48),
-                   (83, 37)], fill=c['mid'])
-        d.line([(74, 35), (80, 31)], fill=c['bright'], width=2)
-        d.line([(25, 47), (38, 44), (51, 48), (65, 46),
-                (77, 48)], fill=c['vein'], width=3)
-        d.line([(35, 43), (46, 46), (52, 45)],
-               fill=c['veinlit'], width=1)
-        for point in [(16, 49), (30, 51), (60, 51), (87, 49)]:
-            d.point(point, fill=c['bright'])
-        return sprite
-
+    # Both fallback atlas slots use identical placeholders. In normal
+    # native rendering, the game itself draws Uranium for both minerals.
     if native_source:
-        # Native Uranium art from the user's local installation.
         uranium = original.crop((815, 256, 919, 312)).point(clean)
-        ironstone = make_ironstone()
     else:
-        # Generate the same solid Ironstone in CI from the palette of
-        # the legacy asset; tint legacy art only for fallback Uranium.
-        ironstone = make_ironstone()
         legacy = original.crop((12, 4, 116, 60)).point(clean)
         uranium = tint(legacy, ((15, 0.55), (35, 0.94), (6, 0.37)))
+    titanium = uranium.copy()
 
     # Provisional canopy marker; this is NOT extracted native Jungle art.
     # Transparent gaps leave much of the normal terrain visible.
@@ -160,7 +99,7 @@ def main() -> None:
 
     atlas = Image.new('P', (3*SLOT_W, SLOT_H), TRANSPARENT)
     atlas.putpalette(palette)
-    for slot, sprite in enumerate((ironstone, jungle, uranium)):
+    for slot, sprite in enumerate((titanium, jungle, uranium)):
         atlas.paste(sprite, (slot*SLOT_W+12, 4))
     output.parent.mkdir(parents=True, exist_ok=True)
     atlas.save(output)

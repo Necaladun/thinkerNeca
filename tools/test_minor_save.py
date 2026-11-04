@@ -11,7 +11,7 @@ tiles = bytearray(count*44)
 abstract_x, abstract_y = (width+4)//5, (height+4)//5
 abstract_size = abstract_y*((abstract_x+1)//2)
 minor = bytearray(count*2)
-# (10,8) Ironstone, (11,9) Jungle, (12,8) Uranium
+# (10,8) Titanium, (11,9) Jungle, (12,8) Uranium
 for x, y, typ, code in ((10,8,3,1),(11,9,1,120),(12,8,2,7)):
     idx = y*(width//2)+x//2
     minor[2*idx:2*idx+2] = bytes((typ,code))
@@ -26,7 +26,7 @@ assert parsed[(11,9)]['type']==1 and parsed[(11,9)]['code']==120
 assert parsed[(12,8)]['type']==2 and parsed[(12,8)]['code']==7
 assert parsed[(14,8)]['type']==0
 report=summary(w,h,v,parsed)
-assert 'Ironstone: 1 tiles' in report
+assert 'Titanium: 1 tiles' in report
 assert 'Minor tiles overlapping native landmarks: 0' in report
 assert 'Invalid type/code/ocean entries: 0' in report
 print('Independent minor SAV parser: synthetic header, tile offsets and codes passed')

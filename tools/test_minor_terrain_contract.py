@@ -40,14 +40,14 @@ def main() -> None:
     expected = {
         'Jungle': ('1', '0', '0', '1', 'MINOR_GENERATE_EARLY'),
         'Uranium': ('0', '0', '1', '2', 'MINOR_GENERATE_LATE'),
-        'Ironstone': ('0', '1', '0', '0', 'MINOR_GENERATE_LATE'),
+        'Titanium': ('0', '1', '0', '0', 'MINOR_GENERATE_LATE'),
     }
     for name, fields in expected.items():
         pattern = re.escape('{"' + name + '", ' + ', '.join(fields) + '}')
         require(re.search(pattern, store) is not None,
                 f'Missing shared yield, atlas and phase definition for {name}')
 
-    for option in ('minor_jungle', 'minor_uranium', 'minor_ironstone'):
+    for option in ('minor_jungle', 'minor_uranium', 'minor_titanium'):
         require(f'MATCH("{option}")' in cfg and re.search(
             rf'^\s*{option}=1$', ini, re.M) is not None,
             f'Missing independent configuration for {option}')
@@ -72,17 +72,23 @@ def main() -> None:
 
     jungle = body_between(mapgen, '// Use a smaller overall Jungle budget',
                           'void __cdecl mod_world_sargasso(')
-    uranium = body_between(mapgen, '// Uranium is distributed as compact',
-                           'void __cdecl mod_world_fresh(')
+    geology = body_between(mapgen, 'static bool place_minor_geology_patch(',
+                           '// Each type selects a generation phase')
     require('minor_landmark_set(p.x, p.y, MINOR_JUNGLE' in jungle
             and 'bit2_set(p.x, p.y, LM_JUNGLE' not in jungle
             and 'code_set(p.x, p.y' not in jungle,
             'Modified Jungle must use independent storage only')
-    require('minor_landmark_set(p.x, p.y, MINOR_URANIUM' in uranium
-            and 'bit2_set(p.x, p.y, LM_URANIUM' not in uranium
-            and 'code_set(p.x, p.y' not in uranium,
-            'Modified Uranium must use independent storage only')
-    require('new_landmark(' not in jungle + uranium,
+    require('minor_landmark_set(p.x, p.y, type' in geology
+            and 'MINOR_URANIUM' in geology and 'MINOR_TITANIUM' in geology
+            and 'minor_landmark_at(tx, ty) == MINOR_NONE' in geology,
+            'Uranium and Titanium must share non-overlapping independent storage')
+    require('TableRange[2]' in geology
+            and 'for (int round = 0; round < patch_count; ++round)' in geology
+            and geology.index('place_minor_geology_patch(MINOR_URANIUM')
+                < geology.index('place_minor_geology_patch(MINOR_TITANIUM')
+            and 'bit_set(p.x, p.y, BIT_FUNGUS, false)' in geology,
+            'The two geological types must alternate, keep separation, and clear fungus')
+    require('new_landmark(' not in jungle + geology,
             'Minor terrain may not create native named landmarks')
     require('minor_landmark_clear(tx, ty)' in mapgen,
             'Major landmark footprints must clear earlier minor terrain')
@@ -113,22 +119,16 @@ def main() -> None:
     require('const byte original[6] = {0x81, 0xE2, 0x04, 0, 0, 0x80};' in patches
             and 'write_bytes(site.addr, original, redirect' in patches,
             'Never install native Jungle hooks without expected-byte validation')
-    require('native Ironstone bonus_at site' in renderer
-            and 'minor_native_ironstone_bonus_hook' in renderer
-            and 'matches != 1' in patches,
-            'Ironstone must require a unique verified native bonus_at call')
-    require('write_call(site, (int)minor_native_ironstone_bonus_hook)' in patches
-            and 'sprite_x, sprite_y, draw_scale, source_scale' in renderer,
-            'Ironstone must paint at native tile sprite origin')
-    require('frame[4] <= -8' not in renderer
-            and 'MapWin_tile_to_pixel(win, x, y, &tile_px, &tile_py)' in renderer
-            and 'const bool far_zoom = zoom <= -6;' in renderer
-            and 'draw_scale, source_scale' in renderer
-            and 'sprite_y = static_cast<int>(tile_py) - lift' in renderer,
-            'Ironstone must draw at minimum zoom and remain tile-centred')
-    require('minor_sprites[id].width > 0' in renderer
-            and 'minor_sprites[id].height <= 56' in renderer,
-            'Transparent trimming must not disable solid Ironstone art')
+    require('const bool native_geology' in yields
+            and '(minor_type == MINOR_URANIUM && conf.minor_native_uranium)' in yields
+            and '(minor_type == MINOR_TITANIUM && conf.minor_native_titanium)' in yields
+            and 'return 4;' in yields,
+            'Both metals must share the native renderer-only Uranium sprite')
+    require('install_minor_native_titanium' not in patches
+            and 'minor_native_titanium_bonus_hook' not in renderer
+            and 'minor_titanium_bonus_inner' not in renderer
+            and 'type == MINOR_TITANIUM && conf.minor_native_titanium' in renderer,
+            'Do not install a custom Titanium sprite-positioning hook')
     require('minor_inspector_feature_line(const char* native, int x, int y)' in renderer
             and 'minor_terrain_name_at(x, y)' in renderer
             and 'line += ", ";' in renderer
@@ -146,6 +146,9 @@ def main() -> None:
     require('minor_native_inspector=1' in ini
             and 'MATCH("minor_native_inspector")' in cfg,
             'Native Inspector hook needs a reversible configuration switch')
+    require('minor_native_titanium=1' in ini
+            and 'MATCH("minor_native_titanium")' in cfg,
+            'Titanium native rendering switch must be supported')
     require('const int site = 0x4B7A0C;' in patches
             and '0xE8, 0xCF, 0xD9, 0x18, 0x00' in patches
             and 'memcmp((const void*)site, expected, sizeof(expected))' in patches
