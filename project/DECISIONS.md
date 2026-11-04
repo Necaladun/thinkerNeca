@@ -1,6 +1,6 @@
 # Decisions and working assumptions
 
-Record choices that materially constrain implementation. **Established** means intentional and current; **Trial** means subject to gameplay testing. A proposal remains in [IDEAS](IDEAS.md), not here, unless adopted. Updated 2026-11-04.
+Record choices that materially constrain implementation. **Established** means intentional and current; **Trial** means subject to gameplay testing. A proposal remains in [IDEAS](IDEAS.md), not here, unless adopted. Updated 2026-11-05.
 
 | ID | State | Decision / rationale | Revisit when |
 | --- | --- | --- | --- |
@@ -14,6 +14,7 @@ Record choices that materially constrain implementation. **Established** means i
 | DEC-008 | Current play preference | **No polar caps; exclude Sunspots and Base Asteroid Strike; extra starting units.** Test-profile values are in [configuration](technical/configuration.md). Not a universal balance standard. | Player preference changes |
 | DEC-009 | Established, user-verified | **Sunny Mesa adds +1 energy only in its central 3×3**, not the wider 7×7. Both actual and projected energy use tile codes 0–8; user confirmed this effect in-game. | Future landmark balance decision |
 | DEC-010 | Rejected / reverted | **Do not raise Mesa's 3×3 centre to ~2,000 m with the existing renderer.** The stepped variant produced a rounded/bulging summit instead of a flat top in the 2026-11-04 user screenshot. Restore the 5×5 1,000–1,999 m plateau and surrounding sub-1,000 m rim; keep core +1E. | A different rendering/terrain solution is explicitly proposed |
+| DEC-011 | Established for supported Develop variant 0 | **Custom minor resource art uses a local indexed `neca_sprites.pcx` and native-stage Sprite-pointer substitution.** User confirmed actual blue-grey Titanium, transparency, zoom and +1M. Keep native draw geometry, layering and fallback, not a hand-positioned overlay. This decision does not assert variant 1, Release/PRACX or arbitrary-size art support. | Additional drawing contexts or different sprite formats become necessary |
 
 **Not decided:** reducing Forest to 1/1/1; making geological bonuses Mine-only; a replacement for major slot 10; reworking Former scoring. Those are tracked as TBD in [WORK-QUEUE](WORK-QUEUE.md) or exploratory [IDEAS](IDEAS.md).
 

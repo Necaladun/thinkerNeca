@@ -16,6 +16,7 @@ REQUIRED = [
     "project/DECISIONS.md", "project/IDEAS.md", "project/TESTING.md",
     "project/technical/minor-terrain.md",
     "project/technical/rendering.md",
+    "project/technical/sprite-atlas.md",
     "project/technical/map-generation.md",
     "project/technical/configuration.md",
 ]

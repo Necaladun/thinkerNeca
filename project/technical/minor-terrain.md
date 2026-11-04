@@ -41,10 +41,10 @@ Thinker's worker selection, crawler logic and former scoring consume modified ac
 
 ## Testing and limitations
 
-**Previous user observations:** all three minor types generated; +1 nutrient/energy/mineral effects worked, and native Jungle/Uranium artwork was correct. The old Titanium custom sprite and Inspector were inconsistent on some tiles. **The shared native Uranium/Titanium sprite path and alternating generator are newly implemented but not yet tested in-game.**
+**User-verified Windows Develop:** all three minor types generated and +1 nutrient/energy/mineral effects appeared; native Jungle/Uranium art worked. A user-local `neca_sprites.pcx` in mode 3 now renders distinct blue-grey Titanium art with correct transparency, alignment and zoom-in/out. The custom sprite covers native variant 0 only; variant 1 retains Uranium. The Inspector name was previously intermittent on Titanium and still needs isolated testing.
 
 **Automated:** the Windows Develop CI builds the DLL/launcher, checks static source invariants, generates/tests the indexed PCX fallback and parses synthetic `THMIN001` v2 saves. These are **not** executable world-generation or full save/reload tests.
 
 **Still to verify:** multiple seeds and map sizes; fragment/spacing statistics; complete fog, focus and partial redraw behaviour; resource and improvement combinations; native Inspector on standalone/composite features; real in-game save/reload; mirrored maps (currently excluded); Release and PRACX/reduced-mode behaviour.
 
-See [rendering.md](rendering.md) for the rendering architecture, deployment and diagnostics.
+See [rendering.md](rendering.md) for graphics architecture and deployment, and [sprite-atlas.md](sprite-atlas.md) for the reproducible local indexed-artwork pipeline.

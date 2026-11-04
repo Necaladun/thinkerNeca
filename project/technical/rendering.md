@@ -1,63 +1,53 @@
-# Independent minor-terrain rendering — current implementation
+# Independent minor-terrain rendering — implementation
 
-**Reference document.** Actionable follow-ups: [work queue](../WORK-QUEUE.md); test matrix: [testing](../TESTING.md).
+**Code:** [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4). **Evidence:** [testing](../TESTING.md). **Open work:** [queue](../WORK-QUEUE.md). **Artwork:** [sprite atlas](sprite-atlas.md).
 
-**Status:** Initial Windows Develop in-game verification succeeded for Jungle, Uranium, Titanium and their native tile-Inspector names. This remains draft work: regression coverage, Release parity and PRACX/reduced-mode support are incomplete. This document records the *current* implementation, not each historical rendering experiment.
+## Native renderer integration
 
-## Rendering paths
-
-| Feature | Current preferred rendering | Notes |
+| Feature | Current path | Status |
 | --- | --- | --- |
-| Jungle | Native `MapWin_gen_terrain_poly` terrain/texture stage | Independent Jungle flag is read through three x86 hooks |
-| Uranium | Native resource sprite stage | Renderer-only `bonus_at() == 4` displays the original Uranium resource art |
-| Titanium | Native resource stage, with a **guarded Develop-only Sprite* substitution** | Native position, scale, clipping and layering are retained. Uses first atlas slot; if hook/PCX unavailable, shows original Uranium sprite |
-| Tile Inspector | Native feature-line append | Develop-only `strlen` callsite hook appends minor terrain names |
+| Jungle | Native map terrain/texture stage using three guarded hooks | Develop user-tested; all-or-nothing preflight outstanding (REND-001) |
+| Uranium | Original native resource glyph through renderer-only `bonus_at()==4` | User-tested, +1 energy separate |
+| Titanium | Same native resource draw, with guarded `Sprite*` substitution | **Blue-grey custom art verified in-game for native variant 0**, with +1 mineral separate |
+| Tile Inspector | Narrow native feature-line append (`strlen` callsite hook) | Develop tested, intermittent Titanium label still to investigate (BUG-002) |
 
-Uranium and Titanium both use the native renderer-only `bonus_at()==4` path. The user confirmed the shared Uranium placeholder aligned correctly on existing saves and newly generated maps. For distinct art, a **new narrow native sprite-substitution hook** changes the Sprite pointer and, when required, the sprite's matching transparency key for Titanium immediately before a verified resource draw call; it does not compute screen coordinates. This new hook is **not yet verified in-game**. No custom replacement of `bonus_at` is installed.
+The normal resource-bonus icon takes precedence over a minor mineral feature. No native major-landmark flag is spoofed for minor terrain.
 
-## Native hooks and controls
+**Native hook contract (supported x86 `terranx.exe` only):** Uranium bonus call `0x465DFC`, type-4 branch `0x465E0E`, verified original sprite draw at `0x465E37` targeting `0x5E4B9A`. `src/patch.cpp` checks expected instruction bytes before installing. The wrapper swaps the Sprite pointer in saved ECX at +24 and forwards its transparency colour index at the original draw argument, retaining original zoom, clipping, position and layering.
 
-- **Jungle:** `minor_native_jungle=1` installs three original-terrain-stage patches at `0x463CC5`, `0x463D93` and `0x464E78`. Disabled for reduced/PRACX mode.
-- **Uranium and Titanium:** `minor_native_uranium=1` and `minor_native_titanium=1` independently permit the same renderer-only `bonus_at()==4` shortcut, only for supported native terrain calls and without an ordinary resource bonus. Normal gameplay/AI still receives 0–3. For Titanium, a **Develop-only guarded hook** now targets exactly `0x465E37`, the `Sprite_draw_3` call inside the resource type-4 branch following `bonus_at` at `0x465DFC`. An uploaded supported `terranx.exe` was disassembled to verify `cmp eax,4` at `0x465E0E`, the native Sprite pointer calculation at `0x465E2E`, and the direct `0x5E4B9A` call. All relevant instruction bytes are preflight-checked before patching; unsupported/modified bytes fail closed. The native wrapper preserves the draw arguments. After the helper call's three arguments are removed, ESP again points to the `pushal` register block and saved **ECX is at +24**. An intermediate draft mistakenly changed that offset to +28; the correction was reversed before runtime verification. The original resource draw also passes the Uranium Sprite's colour index separately at hook-entry ESP+8. With the actual Sprite pointer replaced, the new shim forwards the substitute Sprite's own `color_index[0]` in that argument (ESP+44 after register saving), **only when Titanium is substituted**. This preserves Uranium, all coordinates and all other arguments. The erroneous `EBP+0x0C == MapWin` check has been removed; `EBP+0x20/+0x24` provide tile x/y. No `MapWin_tile_to_pixel` calculation is used. The callsite and register contract have now been verified by offline disassembly of the user's supported terranx.exe, but runtime rendering/PCX behaviour still requires a new Windows test.
-- **Inspector:** `minor_native_inspector=1` installs the Develop-only verified `strlen` hook at `0x4B7A0C` if its native five-byte preimage matches `E8 CF D9 18 00`. The Inspector is independent of geology rendering; intermittent labels require separate verification.
+Native Uranium selects `0x78A700` (**variant 0**) or `0x78A72C` (**variant 1**). The external atlas currently substitutes **only variant 0**; variant 1/unknown sprite remains native Uranium, including on Titanium tiles.
 
-The Jungle byte-site preflight is not yet all-or-nothing and remains REND-001. Hook assumptions remain specific to the supported x86 `terranx.exe`; do not assume PRACX/reduced-mode parity.
+Jungle's current patch sites are `0x463CC5`, `0x463D93` and `0x464E78`; all-or-nothing preflight still needs work. The Develop Inspector uses a guarded native `strlen` site at `0x4B7A0C`, without hijacking the status window or rewriting terrain flags. PRACX/reduced mode and Release custom-art parity are not established.
 
-## Atlas and deployment
+## PCX loading and extraction
 
-`minor_terrain.pcx` is a 384×64 indexed atlas (Titanium, Jungle, Uranium slots). The custom Titanium artwork uses the first 128×64 slot; the renderer extracts its 104×56 region at (12,4). The original `ter1.pcx` source includes control indices **252** (purple V mask) and **254** (cyan atlas separator), which the native game does not show as ordinary painted pixels. The supplied recolour's background is **palette index 253**. The native `Sprite_extract_2` masks its supplied key to 8 bits, so `0x1FD` and `253` are **equivalent at extraction**; an earlier claim that 509 could never match was incorrect. Pink persisted when the caller was changed to 253. A later full-call audit corrected another earlier claim: `push 0xFD` at `0x45328E` is the **Y source coordinate**, not the transparency key. Native Uranium extracts with `0x109` (low byte 9) after indexed-colour preprocessing; the custom Titanium PCX's mode-2 key 253 is not equivalent to that native path.
+The **local** `neca_sprites.pcx` is a 1024×1024 8-bit indexed image with the exact original `TER1.PCX` palette. The verified native processing sequence is:
 
-**Latest user test:** the background is now transparent, but the blue-grey ore pixels look cyan, white and saturated blue, unlike the prepared PCX. The supplied indexed PCX uses the exact 256-colour palette from `ter1.pcx` (all 256 entries compare equal). The game's `Buffer_load_pcx(..., canvas->palette, ...)` path can invoke indexed-palette conversion before extraction; the native loader at `0x5E29C9` skips that conversion when its `Palette*` argument is null. **New experimental fix:** load the custom PCX with `nullptr` for the palette argument, retaining its original palette indices, while still sampling the *loaded* transparent background at (12,4), extracting with that index and forwarding the resulting sprite's key during the native draw. No artwork or generator changes. CI only verifies compilation/source; the correct visual colours still require in-game confirmation.
+1. `Buffer_load_pcx(&image, path, nullptr, 10, 236)` applies a +10 modulo-256 index offset.
+2. `Buffer_change_color(&image, 0x107, 0x109)` and `(0x106, 0x109)` convert the raw source masks 253 and 252 (now decoded 7 and 6) to transparent index **9**.
+3. `Sprite_extract_2` extracts a registered rectangle with key **9**. The native draw call receives the selected sprite's matching colour key.
 
-**Deployment:** The compiled `thinker.dll` and user's prepared `minor_terrain.pcx` belong next to `terranx.exe`. CI's default atlas is a separately generated placeholder and **does not contain the user's recoloured original-game sprite**. Do not replace the prepared custom PCX with the CI placeholder when installing the DLL. Original SMAC art is not redistributed in the public repository.
+The Uranium reference at `(16,16,100,62)` retains a strict processed FNV-1a hash `24A1B67A` (5635 transparent / 565 visible pixels). Titanium at `(144,16,100,62)` validates a real nonempty sprite and transparency but only **logs** its checksum; the tested artwork yielded `D4B3AC2C` and 559 visible pixels. This means later colour edits do not require recompilation.
 
-`tools/make_minor_terrain.py` now copies the same placeholder artwork to Titanium and Uranium atlas slots for the optional fallback/diagnostic path. The late post-map overlay is not equivalent to the native rendering layer, and can obscure units or terrain if explicitly enabled. CI checks the atlas format but cannot validate the native game.
+**Failure behaviour:** absent/invalid PCX, failed validation/extraction or unsupported native sprite variant returns the original native Uranium sprite. This works for the tested compatible sprite dimensions; differently-sized sprites or other render contexts have not been verified.
 
-The native Titanium substitution hook remains Develop-only and intentionally fails closed if the known draw call is absent/ambiguous or the PCX cannot be loaded. Release retains the shared native Uranium placeholder pending REND-002. PRACX/reduced modes remain unsupported. Inspector remains Develop-only.
+## Config and deployment
 
-## Verification
+The distributed experimental [`docs/thinker.ini`](../../docs/thinker.ini) selects `minor_native_titanium=1` and **`minor_titanium_sprite_mode=3`**, matching the user's successful Windows Develop art test. The compiled default when the mode entry is missing is `0`.
 
-**Previously observed:** The first hand-positioned custom Titanium sprite sometimes drew offset; subsequently, the user confirmed Uranium and Titanium both appear correctly using the shared native Uranium placeholder, including a newly generated map. **New and untested:** guard/preflight, sprite-pointer substitution, actual custom blue art, fog/zoom/partial redraw, normal bonus precedence, failure fallback, Release and PRACX.
+| Mode | Behaviour |
+| --- | --- |
+| `0` | Original Uranium on Titanium, no PCX required |
+| `1` | External Uranium reference from `neca_sprites.pcx`; user-verified variant 0 |
+| `2` | **Legacy** experimental `minor_terrain.pcx` Titanium; not recommended |
+| `3` | **User-verified** blue-grey Titanium from `neca_sprites.pcx`; variant 0 only |
 
-## Diagnostics
+Modes 1 and 3 require a user-produced PCX next to `terranx.exe` and a matching Develop DLL. The public Git repository and CI artifact contain **no copyrighted game art or user-created PCX**. See [sprite-atlas.md](sprite-atlas.md) for a reproducible local build tool, mask rules and coordinates. `thinker_user.ini` can override mode 3.
 
-The Develop build writes `minor_terrain_render.log` beside the game. For the verified supported binary, expect `TITANIUM DRAW HOOK bonus=0x00465DFC draw=0x00465E37 matches=1 target=0x005E4B9A active=1`, then `Titanium PCX loaded key / source key`, `native Titanium sprite substitute`, and `TITANIUM COLOR KEY` for affected tiles. Those values distinguish a remapped source pixel from a native draw-key mismatch. If any expected instructions differ, `active=0` and Uranium's original artwork remains. `active=1` alone proves hook installation, **not** successful asset loading or in-game alignment.
+## Retained legacy and diagnostics
 
-**Previous failing build (before executable disassembly):** log reported `draw=0x0046658B matches=15 active=0`; the broad scan matched 15 unrelated sprite calls. The corrected hook targets the disassembled type-4 resource branch directly. The old run never exercised sprite substitution. The separate Inspector installation line is `INSPECTOR HOOK native feature strlen ... active=1`.
+The early hand-positioned Titanium overlay and broad draw-call scan were superseded by the current native-stage hook. The old `minor_terrain.pcx` mode-2 loader and optional late overlay still have runtime and test dependencies, so they are retained temporarily under MAINT-001; do not substitute them for the verified custom-art path.
 
-Turn off the relevant `minor_native_*` setting to isolate a rendering issue; note that disabling a hook may expose the experimental late-overlay fallback rather than perfectly suppressing that feature. Record which DLL/PCX and map/save were used when reporting bugs. Once runtime testing is settled, remove superseded preview and reconnaissance code in a separate cleanup.
+Develop logs `TITANIUM DRAW HOOK ... active=1`, `NECA SPRITE processed ... verified=1`, `NECA SPRITE extract ... ready=1` and `TITANIUM SPRITE TEST mode=3 variant=0 ... swapped=1` to `minor_terrain_render.log`. Obsolete read-only Inspector/native-mask hex reconnaissance at startup was removed; exact patch sites are known. A checksum match is preprocessing evidence, not proof of visual correctness.
 
-
-## Develop-only external atlas control (REND-003)
-
-`minor_titanium_sprite_mode` is an **INI setting (default 0, valid 0..3)**, used only when native Titanium rendering and the guarded Develop hook are active. Mode `0` passes through the original native Uranium sprite/key without opening external assets. Mode `1` opens **user-supplied** `neca_sprites.pcx` beside `terranx.exe`, decodes an original Uranium reference sprite from the rectangle `(16,16,100,62)` (source mask indices 252/253), reproduces the native loader's +10 indexed-colour offset and decoded `7→9`, `6→9` substitutions, then extracts with runtime transparent index `9`. It substitutes only when the native renderer selects the first Uranium variant at `0x78A700`; for variant `0x78A72C`, it leaves the native sprite untouched. Mode `2` preserves the earlier experimental `minor_terrain.pcx` Titanium renderer. Mode `3` substitutes the user's blue-grey Titanium test sprite from the same atlas at `(144,16,100,62)`, after the identical native index offset and remaps, again only for native variant 0. Missing PCX, invalid rectangle/key, or failed extraction falls back to original native Uranium. Neither PCX is redistributed in Git; mode 1's original-game art remains local.
-
-The mode-1 loader uses a named `NecaSpriteDef` registry and one-time caching. Its raw PCX source is an exact pixel-for-pixel copy of native TER1 art from (822,253,100,62). A full native-call disassembly resolved the earlier argument confusion: `0xFD` is Y, `0x109` is the transparency key; `Buffer_load_pcx` adds 10 to indices modulo 256, then `Buffer_change_color` changes 7/6 to 9. The loader now fails closed if the decoded corner is not 7, either remap fails, or the processed 100×62 rectangle differs from **FNV-1a `24A1B67A`, 5635 transparent, 565 visible** (independently computed from the supplied atlas). It logs `NECA SPRITE processed ... verified=1` and extracted geometry, while `TITANIUM SPRITE TEST` reports mode, native variant, selected/native sprite pointers and their keys. It never reinterprets native `Sprite::data` memory. A matching checksum is a preprocessing check, **not proof of identical rendering**.
-
-**Local test:** deploy a matching Develop `thinker.dll`, place `neca_sprites.pcx` beside the executable, set `minor_titanium_sprite_mode=1` under `[thinker]`, load the same test save, compare a Titanium tile against native Uranium at the same zoom and inspect `minor_terrain_render.log`. Switching modes requires restarting the game, not regenerating the map. Keep this as draft REND-003 work until in-game verification.
-
-### Blue-grey Titanium sample (new mode 3)
-
-The user's `Titanium_minor_terrain_READY.pcx` has exactly the 256-entry `ter1.pcx` palette. Its active 104×56 region has **559 visible pixels**, background index **253** and **41 used visible palette indices (0..230)**; neither special source-mask index 252 nor guide index 254 occurs inside this prepared sprite. The +10 loader offset therefore preserves visible art indices in native range, maps background to decoded index 7, and converts 7→9 as with Uranium. Local atlas retains the original Uranium control (16,16,100,62) and puts Titanium in a separate 100×62 rectangle (144,16); source pixels are translated 11 right/3 down to preserve correspondence with the original Uranium silhouette. The older 104×56 source crop already omitted six edge pixels; no replacement pixels are invented. Processed Titanium expected for the **unchanged local test asset**: FNV-1a `D4B3AC2C`, 5641 transparent and 559 visible pixels. These are **diagnostics, not a hardcoded gate**, so future art edits require no source change. External Uranium remains checksum-locked to `24A1B67A`.
-
-User confirmed mode-1 external Uranium looks identical to native Uranium in-game, with all native geometry/colour-key fields matching in the log. Mode 3 is **not visually verified yet**. The local PCX retains original-game Uranium art; distribute the prepared atlas to the user as a ZIP, not as repository content.
+**Observed in Windows Develop on 5 Nov 2026:** external Uranium matches native, custom blue-grey Titanium draws correctly with transparent mask and zoom-in/out, and +1M works. **Still open:** variant 1, fog/unit/base combinations, save/reload, Release/PRACX and intermittent Inspector names.

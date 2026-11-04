@@ -1,31 +1,26 @@
 # Current status
 
-**Updated:** 2026-11-04. **Repository:** `Necaladun/thinkerNeca`. **Active work:** [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), `feature/minor-terrain-generation-migration` → `master`.
+**Updated:** 2026-11-05. **Repository:** `Necaladun/thinkerNeca`. **Active:** [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), `feature/minor-terrain-generation-migration` → `master`.
 
-## Where we are
+## Verified foundation
 
-The fork has an independent per-tile minor-terrain framework for **Jungle (+1 nutrient), Uranium (+1 energy), and Titanium (+1 mineral)**. Storage/yields were merged with [PR #3](https://github.com/Necaladun/thinkerNeca/pull/3); generation, native graphics, native Inspector integration, Canyon retirement and test INI changes are on draft PR #4.
+- Independent **Jungle +1 nutrient**, **Uranium +1 energy**, **Titanium +1 mineral** per-tile storage and yields are in the fork. Storage/yields merged in PR #3; generation, rendering, Inspector, Canyon retirement and test INI changes remain on PR #4.
+- **Windows Develop user test (5 Nov):** local `neca_sprites.pcx` with distinct blue-grey Titanium art displays on Titanium tiles, with correct transparency, positioning and zoom-in/out; +1 mineral works. This is a successful **native sprite variant-0** test, not a complete graphics regression.
+- External Uranium reference mode 1 visually matched native Uranium. Runtime log confirmed processed hash `24A1B67A`, 5635 transparent / 565 visible pixels and identical sprite size, offsets, pitch and transparency key. Mode-3 Titanium log: hash `D4B3AC2C` and 559 visible pixels.
+- New-map geology, native Jungle and Uranium art have positive user reports. Great Dunes look good; Sunny Mesa centre-only +1E confirmed. Raised Mesa experiment was rejected and reverted (MAP-006).
+- CI compiles Windows 32-bit Develop and runs synthetic save/atlas/configuration/source checks; **CI does not execute SMAC/X**.
 
-**Latest user-reported Develop tests:** Jungle and Uranium native graphics work; Titanium +1 mineral works; the shared native Uranium placeholder now renders for Titanium **without the old positioning problem**, and Uranium/Titanium generation looks correct in a fresh map. **Latest Titanium observation:** external Uranium mode 1 rendered translucent/fragmented, but missing PCX fell back to good native Uranium. The copied PCX source pixels are correct; inspection of the supported executable shows the external path omitted native +10 palette-index decoding and mask conversions 6/7→9. Mode 1 now reproduces those steps with a processed-pixel checksum gate and substitutes only the matching first native variant. **The corrected mode 1 was confirmed visually identical to native Uranium by the user**, with matching indexed checksum, geometry, offsets and key in the runtime log. A new mode 3 now tests the user's existing blue-grey Titanium sprite through the same loader. Titanium art itself is **pending a new runtime visual test**; modes 0–2, generation and yields unchanged. Previous broad-scan hook returned active=0 (15 candidates). The Inspector's earlier intermittent Titanium label remains unverified. Great Dunes look good. Sunny Mesa's centre-only +1 energy is confirmed in-game. **Mesa elevation experiment rejected after user visual test:** the 2,000 m centre bulged into a dome beneath the native artwork; restored the original 5×5 plateau at 1,000–1,999 m with the low outer rim (MAP-006 closed). The test INI starts and runs.
+## Active test configuration
 
-**Automated:** Windows 32-bit Develop compilation, synthetic minor-save decoding, atlas tests, source/INI/Canyon contract tests. CI does not launch SMAC/X.
+Distributed [test INI](../docs/thinker.ini): `minor_native_titanium=1` and `minor_titanium_sprite_mode=3`, matching the user's successful local art test. Compiled absent-option default is mode 0 (native Uranium). Mode 3 needs a separately prepared 1024×1024 indexed `neca_sprites.pcx` next to the executable; neither Git nor public CI provides that art. Missing art falls back to native Uranium. `thinker_user.ini` may override the distributed profile, and the complete user's installed INI is not independently inspected.
 
-**Not yet release-ready:** Titanium sprite/data/Inspector mismatch (BUG-002), full real save/reload, fog/focus/redraw and extended resource interactions; native Jungle patch robustness; Titanium/Inspector Release parity; PRACX/reduced mode. PR #4 remains **draft**.
+Other current test-profile values include `base_capture_fix=0` (probe workaround), `tile_output_limit=3,3,3` (balance trial), extra starting units, polar caps disabled and excluded events 13/17. See [configuration](technical/configuration.md).
 
-## What is active now
+## Remaining before PR #4 can merge
 
-- **Testing:** use matching Develop DLL with local `neca_sprites.pcx` and `minor_titanium_sprite_mode=1` to compare corrected external Uranium against native mode 0. Confirm `NECA SPRITE processed ... verified=1`, native variant 0 substitution, variant 1 untouched, zoom/fog/layering, Inspector and same-build save/reload (REND-003, BUG-002). Shared native placeholder rendering and new-map geology have positive user reports.
-- **Bugs/engineering:** `base_capture_fix=0` seems to resolve the observed probe problem, but disables unrelated capture fixes (BUG-001). Native Jungle hook preflight remains outstanding (REND-001).
-- **Balance experiment:** current `tile_output_limit=3,3,3` (up from 2/2/2). Forest 1/1/1 and mine-only extraction are **not implemented**.
-- **Major landmarks:** Great Dunes appearance passed; Sunny Mesa's centre-only +1E verified (MAP-005). The stepped Mesa profile was visually rejected and reverted (MAP-006). No special energy resource has been added. Slot 10 remains reserved.
+- [TERR-001](WORK-QUEUE.md): new-game **same-build save→reload→continue**, unusual improvements, fog, unit/base drawing and Inspector checks.
+- [REND-001/002/004](WORK-QUEUE.md): all-or-nothing Jungle patch preflight, Release/packaging parity, and second Uranium/Titanium sprite variant (currently native Uranium only).
+- [BUG-002](WORK-QUEUE.md): earlier intermittent Inspector name; distinct sprite is no longer the blocker. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
+- More map seeds/climates and landmark regressions remain open. PR #4 stays **draft**.
 
-## What to do next
-
-1. Install matching Develop DLL and local PCX containing both sprites, test Titanium mode 3 and check `NECA SPRITE processed name=titanium_test ... verified=1` and `TITANIUM SPRITE TEST mode=3 variant=0 ... swapped=1`; compare colour, transparency, positioning, zoom/fog/units and missing-asset fallback. Uranium mode 1 is a working regression control; native variant 1 remains untouched (REND-003, BUG-002).
-2. Test same-build save/reload and special tile/resource/improvement combinations ([TESTING](TESTING.md)).
-3. Confirm the restored low, flat-topped Mesa appearance on a new generated map if convenient; continue other major-landmark checks (MAP-001).
-4. Once runtime behavior is stable, harden Jungle hooks and Release packaging. Defer broader AI/Forest changes.
-
-**Current configuration:** [`docs/thinker.ini`](../docs/thinker.ini) contains the active test profile, including `base_capture_fix=0`, extra starting units, no polar caps, excluded events 13/17 and 3/3/3 caps. Local `thinker_user.ini` may override it.
-
-See [WORK-QUEUE](WORK-QUEUE.md) for actual tasks, [Fork changelog](../Fork-Changelog.md) for recent changes, and [Decisions](DECISIONS.md) for established positions.
+**Next:** same-build save/reload, fog/unit/Inspector checks with the working mode-3 atlas; then variant 1 and Release parity. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).

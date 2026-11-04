@@ -37,9 +37,10 @@ jobs:
             -DCMAKE_BUILD_TYPE=Develop
       - name: Compile Develop DLL and launcher
         run: cmake --build build/ci --parallel 2
-      - name: Test indexed minor-terrain atlas generation
+      - name: Test indexed sprite atlas generation (synthetic art only)
         run: |
-          python -m py_compile tools/make_minor_terrain.py
+          python -m py_compile tools/make_minor_terrain.py tools/build_neca_sprites.py
+          python tools/test_neca_sprites.py
           python tools/test_minor_terrain_atlas.py
           python tools/test_titanium_sprite_mask.py
           python tools/make_minor_terrain.py assets/minor_terrain.pcx build/ci/minor_terrain.pcx
@@ -62,5 +63,4 @@ jobs:
           path: |
             build/ci/thinker.dll
             build/ci/thinker.exe
-            build/ci/minor_terrain.pcx
           if-no-files-found: error

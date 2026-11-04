@@ -134,11 +134,10 @@ def main() -> None:
             and 'line += ", ";' in renderer
             and 'minor_inspector_trace_hover(ptTile.x, ptTile.y);' in renderer,
             'Build a format-only feature-line seam without native landmark spoofing')
-    require('minor_inspector_scan_native(fp);' in renderer
-            and 'INSPECTOR SCAN' in renderer
-            and '0x4B6570' in renderer
-            and '0x4B8890' in renderer,
-            'Status feature-line diagnostics must read native executable bytes')
+    require('void minor_graphics_startup_trace()' in renderer
+            and 'Thinker minor-terrain graphics: Develop build startup reached' in renderer
+            and 'minor_inspector_scan_native' not in renderer,
+            'Startup must keep a concise diagnostic header without obsolete native scans')
     require('write_jump(0x4B6570' not in patches
             and 'Natural[13]' not in renderer
             and 'sq->landmarks |= LM_NEXUS' not in renderer,
@@ -149,7 +148,7 @@ def main() -> None:
     require('minor_native_titanium=1' in ini
             and 'MATCH("minor_native_titanium")' in cfg,
             'Titanium native rendering switch must be supported')
-    require('minor_titanium_sprite_mode=0' in ini
+    require('minor_titanium_sprite_mode=3' in ini
             and 'int minor_titanium_sprite_mode = 0;' in config
             and 'MATCH("minor_titanium_sprite_mode")' in cfg
             and 'cf->minor_titanium_sprite_mode = clamp(atoi(value), 0, 3);' in cfg,

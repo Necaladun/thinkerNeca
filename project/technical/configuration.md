@@ -16,8 +16,9 @@ At startup, the fork reads `thinker.ini`, then optionally `thinker_user.ini` fro
 | `skip_event` | `13`, `17` on separate lines | Exclude Sunspots and Base Asteroid Strike |
 | `new_world_builder` / `modified_landmarks` | `1` / `1` | Intended modified-map path |
 | `minor_jungle` / `minor_uranium` / `minor_titanium` | All `1` | Independent minor-terrain generation |
-| `minor_native_jungle` / `minor_native_uranium` / `minor_native_titanium` | All `1` | Native Jungle and shared Uranium/Titanium resource rendering; Inspector remains Develop-only |
+| `minor_native_jungle` / `minor_native_uranium` / `minor_native_titanium` | All `1` | Native Jungle and Uranium; Titanium has native-stage custom art in supported Develop mode |
 | `minor_native_inspector` | `1` | Develop-only native feature-line labels |
+| `minor_titanium_sprite_mode` | `3` | **User-verified** local blue-grey Titanium atlas in Develop; compiled absent-option default `0` |
 | `minor_render_mode` / `minor_debug_tile_names` | `0` / `0` | Prototype fallback mode selection; no debug tile-name overlays |
 
 The older major-landmark options `jungle=0` and `uranium=0` **are distinct** from the independent minor settings. **`canyon=` is no longer recognised**; the retired native major slot 10 is reserved. Delete old `canyon=1` or `canyon=0` lines from *both* INI files to avoid parser warnings.
@@ -45,6 +46,17 @@ The setting gates multiple corrections in `src/base.cpp`, not just probe-team be
 **Not disabled:** the captured base's old owner's units **supported by that base** are still reassigned to another eligible surviving base, or destroyed if none is suitable, in an unconditional section of `mod_capture_base()`. Also `facility_capture_fix=1` and `probe_action_fix=1` are separate switches that remain enabled. See [BUG-001](../WORK-QUEUE.md).
 
 
-### Develop Titanium sprite test (REND-003)
+## Titanium sprite modes and overrides
 
-`minor_titanium_sprite_mode=0` (default) retains native Uranium art on independent Titanium tiles; `1` loads the user-supplied `neca_sprites.pcx` atlas's Uranium reference at (16,16,100,62); `2` uses the previous experimental `minor_terrain.pcx` loader. Mode only affects graphics and needs `minor_native_titanium=1`, supported native executable and Develop DLL. An installed `thinker_user.ini` can override the distributed default. Mode 1 does not require the legacy PCX and falls back to native Uranium if its asset is absent or invalid. **Mode 3** loads the same local atlas's blue-grey Titanium sprite at `(144,16,100,62)`, with native palette-index preprocessing. Mode 3 accepts revised artwork with nonempty pixels and correct transparency; it does not demand the Uranium reference checksum. Both external modes currently substitute only the original first resource sprite variant, leaving the second native. Mode 3 remains a visual experiment.
+The **distributed experimental test INI** selects `minor_native_titanium=1` and **`minor_titanium_sprite_mode=3`** because the user confirmed that setup rendered blue-grey Titanium correctly (transparency, positioning, zoom and +1M) in Windows Develop on 5 November 2026. The **compiled Config default** when this option is absent remains `0` (native Uranium art).
+
+| Mode | Behaviour |
+| --- | --- |
+| 0 | Native Uranium on Titanium tiles; no PCX |
+| 1 | External Uranium reference from local `neca_sprites.pcx`; user-verified |
+| 2 | Old experimental `minor_terrain.pcx` loader (legacy, not recommended) |
+| 3 | Distinct blue-grey Titanium from local `neca_sprites.pcx`; **user-verified**, native variant 0 only |
+
+Modes 1/3 require the separately user-produced indexed PCX next to `terranx.exe`; missing/invalid art or an unmatched native sprite variant falls back to original Uranium. The **public CI artifact does not include user art**. A local `thinker_user.ini` entry can override the distributed `thinker.ini`; the user's successful mode-3 setting is known, but the complete installed INI contents have not been inspected. Check both files when reproducing a report.
+
+See [sprite-atlas.md](sprite-atlas.md) for layout, palette/mask rules and local builder. Parser/default authority is `src/main.cpp`/`src/main.h`; drawing selection is `src/gui.cpp`.

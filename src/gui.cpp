@@ -1024,146 +1024,17 @@ static std::string minor_graphics_file(const char* name)
 
 
 /*
-Read-only reconnaissance of StatusWin_draw_status. OpenSMAC reconstructs
-the terrain-feature line (river / forest / fungus) but NOT the original
-terranx.exe instruction offsets. Do not modify LM flags or replace the
-StatusWin entry point. Instead, log E8 text-call candidates and the
-native forest/fungus bit tests for instruction-level verification.
-
-The original binary is required to distinguish:
-  * feature text appended when a forest/fungus/river already exists;
-  * the empty-feature case, where the native line draw is skipped.
-A hook must handle BOTH without moving the inspector's resource and
-improvement text, or silently duplicating native lines.
+Create the Develop diagnostic log at startup. The earlier broad native
+instruction scanners have been retired: they were read-only exploratory
+tools and flooded every run with obsolete hex dumps. Exact supported hook
+sites have their own expected-byte preflight in patch.cpp.
 */
-static void minor_inspector_scan_native(FILE* fp)
-{
-    if (!fp) {
-        return;
-    }
-    const uintptr_t start = 0x4B6570;
-    const uintptr_t end = 0x4B8890; // StatusWin_on_redraw begins here.
-    struct TextTarget {
-        uintptr_t address;
-        const char* name;
-        int count;
-    };
-    TextTarget targets[] = {
-        {0x5DCEA0, "Buffer_write_l_3", 0},
-        {0x5DCF40, "Buffer_write_l_4", 0},
-        {0x5DD530, "Buffer_wrap_2", 0},
-        {0x5DB580, "Buffer_write_l", 0},
-        {0x6169A0, "Strings_get", 0}
-    };
-    fprintf(fp, "INSPECTOR SCAN StatusWin_draw_status 0x%08X..0x%08X (read-only)\n",
-        (unsigned)start, (unsigned)end);
-    const uint8_t* begin = reinterpret_cast<const uint8_t*>(start);
-    const uint8_t* finish = reinterpret_cast<const uint8_t*>(end);
-    for (const uint8_t* at = begin; at + 5 <= finish; ++at) {
-        if (*at != 0xE8) {
-            continue;
-        }
-        int32_t relative = 0;
-        memcpy(&relative, at + 1, sizeof(relative));
-        const uintptr_t dest = reinterpret_cast<uintptr_t>(at + 5) + relative;
-        for (TextTarget& target : targets) {
-            if (dest != target.address) {
-                continue;
-            }
-            ++target.count;
-            if (target.count > 36) {
-                break;
-            }
-            fprintf(fp, "INSPECTOR CALL %s at 0x%08X target=0x%08X bytes:",
-                target.name, (unsigned)(uintptr_t)at, (unsigned)dest);
-            const uint8_t* left = at >= begin + 14 ? at - 14 : begin;
-            const uint8_t* right = at + 25 < finish ? at + 25 : finish;
-            for (const uint8_t* p = left; p < right; ++p) {
-                fprintf(fp, " %02X", *p);
-            }
-            fputc('\n', fp);
-            break;
-        }
-    }
-    for (const TextTarget& target : targets) {
-        fprintf(fp, "INSPECTOR CALL COUNT %s = %d\n", target.name, target.count);
-    }
-    const struct {
-        uint8_t literal[4];
-        const char* name;
-    } masks[] = {
-        {{0x00, 0x00, 0x20, 0x00}, "Forest BIT_FOREST (0x00200000)"},
-        {{0x20, 0x00, 0x00, 0x00}, "Fungus BIT_FUNGUS (0x00000020)"},
-        {{0x80, 0x00, 0x00, 0x00}, "River BIT_RIVER (0x00000080)"}
-    };
-    for (const auto& mask : masks) {
-        int matches = 0;
-        for (const uint8_t* at = begin; at + 4 <= finish; ++at) {
-            if (memcmp(at, mask.literal, 4)) {
-                continue;
-            }
-            ++matches;
-            if (matches > 12) {
-                continue;
-            }
-            fprintf(fp, "INSPECTOR MASK %s at 0x%08X bytes:",
-                mask.name, (unsigned)(uintptr_t)at);
-            // Include enough code context to reconstruct the conditional
-            // fallthrough and skip branch around the feature line; the
-            // short Jungle-mask diagnostic was insufficient for this.
-            const uint8_t* left = at >= begin + 112 ? at - 112 : begin;
-            const uint8_t* right = at + 160 < finish ? at + 160 : finish;
-            for (const uint8_t* p = left; p < right; ++p) {
-                fprintf(fp, " %02X", *p);
-            }
-            fputc('\n', fp);
-        }
-        fprintf(fp, "INSPECTOR MASK COUNT %s = %d\n", mask.name, matches);
-    }
-    fprintf(fp, "INSPECTOR SCAN END. Bytes are candidates, not verified hooks.\n");
-}
-
-// Write a fresh diagnostic header at DLL startup so a missing map callback
-// cannot be mistaken for an absent or incorrectly deployed DLL.
 void minor_graphics_startup_trace()
 {
     const std::string path = minor_graphics_file("minor_terrain_render.log");
     FILE* fp = fopen(path.c_str(), "w");
     if (fp) {
         fprintf(fp, "Thinker minor-terrain graphics: Develop build startup reached\n");
-
-        // Instruction reconnaissance only: the original SMAX executable
-        // uses masks 0x80000004 (Jungle) and 0x80000008 (Uranium).
-        // Scan the native terrain function for the *literal constants*
-        // and log adjacent instruction bytes. A match is NOT a validated
-        // hook site. Never modify executable instructions here.
-        const uint8_t* begin = reinterpret_cast<const uint8_t*>(0x4632D0);
-        const uint8_t* end = reinterpret_cast<const uint8_t*>(0x466600);
-        int jungle_hits = 0, uranium_hits = 0;
-        for (const uint8_t* p = begin; p + 4 <= end; ++p) {
-            const bool jungle_mask = p[0] == 0x04 && p[1] == 0
-                && p[2] == 0 && p[3] == 0x80;
-            const bool uranium_mask = p[0] == 0x08 && p[1] == 0
-                && p[2] == 0 && p[3] == 0x80;
-            if (!jungle_mask && !uranium_mask) {
-                continue;
-            }
-            int& hits = jungle_mask ? jungle_hits : uranium_hits;
-            if (++hits > 20) {
-                continue;
-            }
-            fprintf(fp, "Native %s mask candidate 0x%08X:",
-                jungle_mask ? "Jungle" : "Uranium", (unsigned)(uintptr_t)p);
-            const uint8_t* left = p - 16 < begin ? begin : p - 16;
-            const uint8_t* right = p + 24 > end ? end : p + 24;
-            for (const uint8_t* b = left; b != right; ++b) {
-                fprintf(fp, " %02X", *b);
-            }
-            fprintf(fp, "\n");
-        }
-        fprintf(fp, "Native mask literals: Jungle=%d Uranium=%d\n",
-            jungle_hits, uranium_hits);
-        minor_inspector_scan_native(fp);
         fclose(fp);
     }
 }
