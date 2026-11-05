@@ -26,7 +26,7 @@ const int REPORT_SCREEN_MARGIN = 64;
 const int BASE_FIRST_ROW_Y = 315;
 const int BASE_ROW_HEIGHT = 22;
 const int BASE_BOTTOM_RESERVE = 70; // Only the scroll footer remains below the base rows.
-enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS, VIEW_GARRISON, VIEW_ATTENTION, VIEW_GROWTH, VIEW_ECONOMY, VIEW_DEFENSES };
+enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS, VIEW_GARRISON, VIEW_ATTENTION, VIEW_GROWTH, VIEW_ECONOMY, VIEW_DEFENSES, VIEW_UNITS, VIEW_MESSAGES };
 const int REPORT_TAB_Y = 264;
 const int REPORT_TAB_TOP = 260;
 const int REPORT_TAB_BOTTOM = 287;
@@ -44,45 +44,78 @@ const ReportTab REPORT_TABS[] = {
     { VIEW_GROWTH, "Growth", 683, 82 },
     { VIEW_ECONOMY, "Economy", 777, 102 },
     { VIEW_DEFENSES, "Defenses", 891, 112 },
+    { VIEW_UNITS, "Units", 1015, 80 },
+    { VIEW_MESSAGES, "Messages", 1107, 110 },
 };
 BaseListView base_view = VIEW_PRODUCTION;
 
-// The existing seven tabs stay on one line on a wide report. Later tabs
-// wrap to one second row on smaller screens, without overlapping base rows.
+// Tab labels flow into additional rows on narrower screens.
+// Drawing, click detection, column headings and list rows share this geometry.
 const int REPORT_SECOND_TAB_OFFSET = 28;
-bool report_two_tab_rows() { return report_width < 1025; }
-bool tab_uses_second_row(BaseListView view) {
-    if (report_width < 685) return view >= VIEW_ATTENTION;
-    if (report_two_tab_rows()) return view >= VIEW_GROWTH;
-    return false;
-}
-int report_tab_x(BaseListView view, int default_x) {
-    if (report_width < 685) {
-        switch (view) {
-        case VIEW_ATTENTION: return 20;
-        case VIEW_GROWTH: return 136;
-        case VIEW_ECONOMY: return 232;
-        case VIEW_DEFENSES: return 352;
-        default: break;
+int report_tab_position(BaseListView view, int* out_y) {
+    int x = 20;
+    int y = REPORT_TAB_Y;
+    for (const ReportTab& tab : REPORT_TABS) {
+        if (x > 20 && x + tab.width > report_width - 10) {
+            x = 20;
+            y += REPORT_SECOND_TAB_OFFSET;
         }
-    } else if (report_two_tab_rows()) {
-        switch (view) {
-        case VIEW_GROWTH: return 20;
-        case VIEW_ECONOMY: return 116;
-        case VIEW_DEFENSES: return 236;
-        default: break;
+        if (tab.view == view) {
+            if (out_y) *out_y = y;
+            return x;
         }
+        x += tab.width + 8;
     }
-    return default_x;
+    if (out_y) *out_y = REPORT_TAB_Y;
+    return 20;
 }
 int report_tab_y(BaseListView view) {
-    return REPORT_TAB_Y + (tab_uses_second_row(view) ? REPORT_SECOND_TAB_OFFSET : 0);
+    int y = REPORT_TAB_Y;
+    report_tab_position(view, &y);
+    return y;
+}
+int report_tab_rows() {
+    const BaseListView last = REPORT_TABS[
+        sizeof(REPORT_TABS) / sizeof(REPORT_TABS[0]) - 1].view;
+    return 1 + (report_tab_y(last) - REPORT_TAB_Y) / REPORT_SECOND_TAB_OFFSET;
 }
 int report_column_y() {
-    return REPORT_COLUMN_Y + (report_two_tab_rows() ? REPORT_SECOND_TAB_OFFSET : 0);
+    return REPORT_COLUMN_Y + (report_tab_rows() - 1) * REPORT_SECOND_TAB_OFFSET;
 }
 int report_first_row_y() {
-    return BASE_FIRST_ROW_Y + (report_two_tab_rows() ? REPORT_SECOND_TAB_OFFSET : 0);
+    return BASE_FIRST_ROW_Y + (report_tab_rows() - 1) * REPORT_SECOND_TAB_OFFSET;
+}
+
+enum UnitFilter { UNIT_ALL, UNIT_LAND, UNIT_SEA, UNIT_AIR, UNIT_DAMAGED, UNIT_NO_ORDER };
+UnitFilter unit_filter = UNIT_ALL;
+const char* const UNIT_FILTER_NAMES[] = {
+    "All", "Land", "Sea", "Air", "Damaged", "No order"
+};
+const int UNIT_FILTER_COUNT = 6;
+bool unit_filter_match(VEH& veh, int faction_id) {
+    if (veh.faction_id != faction_id
+        || veh.unit_id < 0 || veh.unit_id >= MaxProtoNum) return false;
+    switch (unit_filter) {
+    case UNIT_LAND: return veh.triad() == TRIAD_LAND;
+    case UNIT_SEA: return veh.triad() == TRIAD_SEA;
+    case UNIT_AIR: return veh.triad() == TRIAD_AIR;
+    case UNIT_DAMAGED: return veh.damage_taken > 0;
+    case UNIT_NO_ORDER: return veh.order == ORDER_NONE;
+    default: return true;
+    }
+}
+int unit_count(int faction_id) {
+    int count = 0;
+    for (int i = 0; i < *VehCount; ++i) {
+        if (unit_filter_match(Vehs[i], faction_id)) ++count;
+    }
+    return count;
+}
+int unit_at(int faction_id, int ordinal) {
+    for (int i = 0; i < *VehCount; ++i) {
+        if (unit_filter_match(Vehs[i], faction_id) && ordinal-- == 0) return i;
+    }
+    return -1;
 }
 
 // Like F4's Best Bases readout, each entry is the single leading base
@@ -280,7 +313,8 @@ int report_row_count(int faction_id) {
     const int bases = count_bases(faction_id);
     if (base_view == VIEW_BEST) return bases ? BEST_COUNT : 0;
     if (base_view == VIEW_ATTENTION) return count_attention_bases(faction_id);
-    return bases;
+    if (base_view == VIEW_UNITS) return unit_count(faction_id);
+    return base_view == VIEW_MESSAGES ? 0 : bases;
 }
 
 int max_base_scroll() {
@@ -543,7 +577,10 @@ void draw_base_list(int faction_id) {
     base_scroll = clamp(base_scroll, 0, max(0, count - rows));
 
     char line[256];
-    if (base_view == VIEW_ATTENTION) {
+    if (base_view == VIEW_UNITS) {
+        snprintf(line, sizeof(line), "UNIT REGISTER    %d units    showing %d-%d",
+            count, count ? base_scroll + 1 : 0, min(count, base_scroll + rows));
+    } else if (base_view == VIEW_ATTENTION) {
         snprintf(line, sizeof(line), "ATTENTION    %d flagged bases    showing %d-%d",
             count, count ? base_scroll + 1 : 0, min(count, base_scroll + rows));
     } else if (base_view == VIEW_BEST) {
@@ -606,9 +643,66 @@ void draw_base_list(int faction_id) {
         } else {
             snprintf(caption, sizeof(caption), "%s", tab.label);
         }
-        const int tab_x = report_tab_x(tab.view, tab.x);
+        const int tab_x = report_tab_position(tab.view, nullptr);
         write_text(caption, tab_x, report_tab_y(tab.view),
             base_view == tab.view ? ColorYellow : ColorCyan);
+    }
+
+    if (base_view == VIEW_UNITS) {
+        const int name_x = 20;
+        const int triad_x = report_width * 33 / 100;
+        const int loc_x = report_width * 42 / 100;
+        const int home_x = report_width * 53 / 100;
+        const int hp_x = report_width * 72 / 100;
+        const int morale_x = report_width * 81 / 100;
+        const int order_x = report_width * 91 / 100;
+        snprintf(line, sizeof(line), "Filter: %s  (click to cycle)",
+            UNIT_FILTER_NAMES[unit_filter]);
+        write_fitted_text(line, report_width * 66 / 100, 242,
+            report_width * 34 / 100 - 15, ColorCyan);
+        write_text("Unit / design", name_x, report_column_y(), ColorYellow);
+        write_text("Domain", triad_x, report_column_y(), ColorYellow);
+        write_text("Position", loc_x, report_column_y(), ColorYellow);
+        write_text("Home", home_x, report_column_y(), ColorYellow);
+        write_text("HP", hp_x, report_column_y(), ColorYellow);
+        write_text("Morale", morale_x, report_column_y(), ColorYellow);
+        write_text("Order", order_x, report_column_y(), ColorYellow);
+        for (int row = 0; row < rows && base_scroll + row < count; ++row) {
+            const int id = unit_at(faction_id, base_scroll + row);
+            if (id < 0) continue;
+            VEH& unit = Vehs[id];
+            const int y = report_first_row_y() + BASE_ROW_HEIGHT * row;
+            write_fitted_text(unit.name(), name_x, y, triad_x - name_x - 12);
+            write_text(unit.triad() == TRIAD_LAND ? "Land"
+                : unit.triad() == TRIAD_SEA ? "Sea" : "Air", triad_x, y);
+            snprintf(line, sizeof(line), "%d,%d", unit.x, unit.y);
+            write_text(line, loc_x, y);
+            if (unit.home_base_id >= 0 && unit.home_base_id < *BaseCount
+                && Bases[unit.home_base_id].faction_id == faction_id) {
+                write_fitted_text(Bases[unit.home_base_id].name,
+                    home_x, y, hp_x - home_x - 12);
+            } else {
+                write_text("--", home_x, y);
+            }
+            snprintf(line, sizeof(line), "%d/%d",
+                unit.cur_hitpoints(), unit.max_hitpoints());
+            write_text(line, hp_x, y, unit.damage_taken ? ColorYellow : ColorWhite);
+            if (unit.morale <= MORALE_ELITE && Morale[unit.morale].name) {
+                write_fitted_text(Morale[unit.morale].name, morale_x, y,
+                    order_x - morale_x - 7);
+            } else {
+                snprintf(line, sizeof(line), "%d", unit.morale);
+                write_text(line, morale_x, y);
+            }
+            const int order = unit.order & ~VehOrderResetFlag;
+            const char* label = order <= ORDER_MAGTUBE_TO && Order[order].order
+                ? Order[order].order : "?";
+            write_fitted_text(label, order_x, y,
+                report_width - order_x - 10);
+        }
+        write_text("Live owned units. Cycle filter above; no orders are issued.",
+            20, report_height - 40, ColorCyan);
+        return;
     }
 
     if (base_view == VIEW_ATTENTION) {
@@ -1019,9 +1113,16 @@ void __cdecl on_report_left_button_up(int x, int y) {
     if (faction_id < 0 || !empire_report_visible()) {
         return;
     }
-    // Keep both displayed tab rows interactive on a narrow screen.
+    if (base_view == VIEW_UNITS && y >= 238 && y < REPORT_TAB_TOP
+        && x >= report_width * 66 / 100 && x < report_width - 10) {
+        unit_filter = (UnitFilter)((unit_filter + 1) % UNIT_FILTER_COUNT);
+        base_scroll = 0;
+        GraphicWin_redraw(&report_window);
+        return;
+    }
+    // Resolve tab hitboxes using the same flow geometry as drawing.
     for (const ReportTab& tab : REPORT_TABS) {
-        const int tab_x = report_tab_x(tab.view, tab.x);
+        const int tab_x = report_tab_position(tab.view, nullptr);
         const int tab_top = report_tab_y(tab.view) - 4;
         if (y >= tab_top && y < tab_top + (REPORT_TAB_BOTTOM - REPORT_TAB_TOP)
             && x >= tab_x && x < tab_x + tab.width) {
@@ -1033,7 +1134,8 @@ void __cdecl on_report_left_button_up(int x, int y) {
         }
     }
     if (y >= REPORT_TAB_TOP && y < REPORT_TAB_BOTTOM +
-        (report_two_tab_rows() ? REPORT_SECOND_TAB_OFFSET : 0)) return;
+        (report_tab_rows() - 1) * REPORT_SECOND_TAB_OFFSET) return;
+    if (base_view == VIEW_UNITS) return;  // Read-only register.
     const int name_right = (base_view == VIEW_PRODUCTION
         ? report_width * 26 / 100 // Stop before the new icon column.
         : base_view == VIEW_GARRISON || base_view == VIEW_STATUS
