@@ -2,6 +2,7 @@
 #include "empire_report.h"
 #include "basewin.h"
 #include "tech.h"
+#include <string>
 
 namespace {
 
@@ -187,8 +188,8 @@ int base_attention_flags(int base_id) {
     int flags = 0;
     if (base.state_flags & BSTATE_DRONE_RIOTS_ACTIVE) flags |= ATT_RIOT;
     if (base.nutrient_surplus < 0) flags |= ATT_STARVING;
-    if (base.item() != -FAC_STOCKPILE_ENERGY && base.mineral_surplus <= 0
-        && base.minerals_accumulated < mineral_cost(base_id, base.item())) {
+    if (base.queue_items[0] != -FAC_STOCKPILE_ENERGY && base.mineral_surplus <= 0
+        && base.minerals_accumulated < mineral_cost(base_id, base.queue_items[0])) {
         flags |= ATT_STALLED;
     }
     if (base.eco_damage > 0) flags |= ATT_ECO;
@@ -534,11 +535,6 @@ void draw_base_list(int faction_id) {
     const int x_turns = report_width * 78 / 100;
     const int x_hurry = report_width * 89 / 100;
     const int x_pop = report_width * 34 / 100;
-    const int x_n = report_width * 40 / 100;
-    const int x_m = report_width * 46 / 100;
-    const int x_e = report_width * 52 / 100;
-    const int x_ec = report_width * 60 / 100;
-    const int x_labs = report_width * 68 / 100;
     const int x_stat_pop = report_width * 29 / 100;
     const int x_stat_n = report_width * 35 / 100;
     const int x_stat_m = report_width * 41 / 100;
