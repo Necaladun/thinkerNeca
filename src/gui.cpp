@@ -617,9 +617,26 @@ LRESULT WINAPI ModWinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     MAP* sq;
 
     // Experimental, deliberately independent of production/upkeep processing.
-    if (msg == WM_KEYDOWN && empire_report_visible()
-    && (wParam == VK_ESCAPE || wParam == VK_OEM_3)) {
-        empire_report_hide();
+    if (msg == WM_KEYDOWN && empire_report_visible()) {
+        if (wParam == VK_ESCAPE || wParam == VK_OEM_3) {
+            empire_report_hide();
+            return 0;
+        }
+        if (wParam == VK_UP || wParam == VK_DOWN) {
+            empire_report_scroll(wParam == VK_UP ? -1 : 1);
+            return 0;
+        }
+        if (wParam == VK_PRIOR || wParam == VK_NEXT) {
+            empire_report_scroll_page(wParam == VK_PRIOR ? -1 : 1);
+            return 0;
+        }
+        if (wParam == VK_HOME || wParam == VK_END) {
+            empire_report_scroll(wParam == VK_HOME ? -MaxBaseNum : MaxBaseNum);
+            return 0;
+        }
+    }
+    if (msg == WM_MOUSEWHEEL && empire_report_visible()) {
+        empire_report_scroll_wheel(GET_WHEEL_DELTA_WPARAM(wParam));
         return 0;
     }
     if (msg == WM_KEYDOWN && wParam == VK_OEM_3 && !*GameHalted
