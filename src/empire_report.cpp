@@ -22,18 +22,20 @@ int wheel_remainder = 0;
 const int BASE_FIRST_ROW_Y = 315;
 const int BASE_ROW_HEIGHT = 22;
 const int BASE_BOTTOM_RESERVE = 70; // Only the scroll footer remains below the base rows.
-enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS };
+enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS, VIEW_GARRISON };
 const int REPORT_TAB_Y = 264;
 const int REPORT_TAB_TOP = 260;
 const int REPORT_TAB_BOTTOM = 287;
 const int REPORT_COLUMN_Y = 292;
 struct ReportTab { BaseListView view; const char* label; int x; int width; };
 const ReportTab REPORT_TABS[] = {
-    { VIEW_STATUS, "Status", 20, 88 },
-    { VIEW_PRODUCTION, "Production", 118, 134 },
-    { VIEW_CITIZENS, "Citizens", 264, 102 },
-    { VIEW_BEST, "Best", 378, 76 },
-    { VIEW_GOVERNORS, "Gov", 466, 75 },
+    // All six labels fit inside the report's 560px minimum width.
+    { VIEW_STATUS, "Status", 20, 78 },
+    { VIEW_PRODUCTION, "Production", 100, 118 },
+    { VIEW_CITIZENS, "Citizens", 225, 95 },
+    { VIEW_BEST, "Best", 325, 65 },
+    { VIEW_GOVERNORS, "Gov", 395, 52 },
+    { VIEW_GARRISON, "Garrison", 453, 100 },
 };
 BaseListView base_view = VIEW_PRODUCTION;
 
@@ -55,15 +57,46 @@ const char* BEST_METRIC_NAMES[BEST_COUNT] = {
     "Population", "Garrison", "Infrastructure"
 };
 
-int garrison_on_base(const BASE& base, int faction_id) {
-    int count = 0;
-    // Occupying units, NOT all units supported by this base.
+struct GarrisonStats {
+    int here = 0;       // All own units physically on the base square
+    int land = 0;
+    int sea = 0;
+    int air = 0;
+    int combat = 0;     // Uses the native prototype combat classification
+    int police = 0;     // Eligible unit types; not actual police-limit contribution
+    int home = 0;       // Units assigned this base as their home, anywhere
+    int away = 0;       // Home-assigned units not presently stationed here
+};
+
+GarrisonStats collect_garrison(const BASE& base, int base_id, int faction_id) {
+    GarrisonStats stats;
     for (int i = 0; i < *VehCount; ++i) {
-        const VEH& veh = Vehs[i];
-        count += veh.faction_id == faction_id
-            && veh.x == base.x && veh.y == base.y;
+        VEH& veh = Vehs[i];
+        if (veh.faction_id != faction_id) {
+            continue;
+        }
+        const bool stationed = veh.x == base.x && veh.y == base.y;
+        if (base_id >= 0 && veh.home_base_id == base_id) {
+            ++stats.home;
+            stats.away += !stationed;
+        }
+        if (!stationed) {
+            continue;
+        }
+        ++stats.here;
+        switch (veh.triad()) {
+        case TRIAD_LAND: ++stats.land; break;
+        case TRIAD_SEA:  ++stats.sea;  break;
+        case TRIAD_AIR:  ++stats.air;  break;
+        }
+        stats.combat += veh.is_combat_unit();
+        stats.police += veh.is_police_unit();
     }
-    return count;
+    return stats;
+}
+
+int garrison_on_base(const BASE& base, int faction_id) {
+    return collect_garrison(base, -1, faction_id).here;
 }
 
 int built_facilities(int base_id) {
@@ -336,6 +369,14 @@ void draw_base_list(int faction_id) {
     const int x_gov_citizens = report_width * 48 / 100;
     const int x_gov_production = report_width * 66 / 100;
     const int x_gov_priority = report_width * 79 / 100;
+    const int x_here = report_width * 29 / 100;
+    const int x_land = report_width * 37 / 100;
+    const int x_sea = report_width * 45 / 100;
+    const int x_air = report_width * 53 / 100;
+    const int x_combat = report_width * 61 / 100;
+    const int x_police = report_width * 72 / 100;
+    const int x_home = report_width * 82 / 100;
+    const int x_away = report_width * 91 / 100;
 
     // A separate tab line leaves the base-count heading unobscured on narrow screens.
     for (const ReportTab& tab : REPORT_TABS) {
@@ -374,7 +415,16 @@ void draw_base_list(int faction_id) {
     }
 
     write_text("Base", 20, REPORT_COLUMN_Y, ColorYellow);
-    if (base_view == VIEW_GOVERNORS) {
+    if (base_view == VIEW_GARRISON) {
+        write_text("Here", x_here, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Land", x_land, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Sea", x_sea, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Air", x_air, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Combat", x_combat, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Police", x_police, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Home", x_home, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Away", x_away, REPORT_COLUMN_Y, ColorYellow);
+    } else if (base_view == VIEW_GOVERNORS) {
         write_text("Governor", x_pop, REPORT_COLUMN_Y, ColorYellow);
         write_text("Citizens", x_gov_citizens, REPORT_COLUMN_Y, ColorYellow);
         write_text("Builds", x_gov_production, REPORT_COLUMN_Y, ColorYellow);
@@ -414,9 +464,30 @@ void draw_base_list(int faction_id) {
         }
         const int y = BASE_FIRST_ROW_Y + BASE_ROW_HEIGHT * drawn++;
         // Cyan names are clickable; resolve by current array index after scrolling.
-        write_fitted_text(base.name, 20, y,
-            (base_view == VIEW_PRODUCTION ? x_prod : x_pop) - 30, ColorCyan);
+        const int base_name_end = base_view == VIEW_PRODUCTION ? x_prod
+            : base_view == VIEW_GARRISON ? x_here : x_pop;
+        write_fitted_text(base.name, 20, y, base_name_end - 30, ColorCyan);
 
+        if (base_view == VIEW_GARRISON) {
+            const GarrisonStats g = collect_garrison(base, i, faction_id);
+            snprintf(line, sizeof(line), "%d", g.here);
+            write_text(line, x_here, y, g.here ? ColorWhite : ColorYellow);
+            snprintf(line, sizeof(line), "%d", g.land);
+            write_text(line, x_land, y);
+            snprintf(line, sizeof(line), "%d", g.sea);
+            write_text(line, x_sea, y);
+            snprintf(line, sizeof(line), "%d", g.air);
+            write_text(line, x_air, y);
+            snprintf(line, sizeof(line), "%d", g.combat);
+            write_text(line, x_combat, y);
+            snprintf(line, sizeof(line), "%d", g.police);
+            write_text(line, x_police, y);
+            snprintf(line, sizeof(line), "%d", g.home);
+            write_text(line, x_home, y);
+            snprintf(line, sizeof(line), "%d", g.away);
+            write_text(line, x_away, y);
+            continue;
+        }
         if (base_view == VIEW_PRODUCTION) {
             const int item = base.item();
             const bool stockpile = item == -FAC_STOCKPILE_ENERGY;
@@ -516,8 +587,13 @@ void draw_base_list(int faction_id) {
         write_text(status, x_status, y, status_color);
     }
 
-    write_text("Scroll: wheel / Up / Down / PgUp / PgDn / Home / End",
-        20, report_height - 40, ColorCyan);
+    if (base_view == VIEW_GARRISON) {
+        write_text("Here = on base tile; Home/Away = assigned home base, not support cost",
+            20, report_height - 40, ColorCyan);
+    } else {
+        write_text("Scroll: wheel / Up / Down / PgUp / PgDn / Home / End",
+            20, report_height - 40, ColorCyan);
+    }
 }
 
 // Native GraphicWin mouse callback; coordinates are relative to the report.
@@ -541,7 +617,9 @@ void __cdecl on_report_left_button_up(int x, int y) {
         return;
     }
     const int name_right = (base_view == VIEW_PRODUCTION
-        ? report_width * 26 / 100 : report_width * 34 / 100) - 8;
+        ? report_width * 26 / 100
+        : base_view == VIEW_GARRISON ? report_width * 29 / 100
+        : report_width * 34 / 100) - 8;
     const int hurry_left = report_width * 89 / 100;
     const int gov_left = report_width * 89 / 100;
     const bool is_name_click = x >= 20 && x < name_right;
