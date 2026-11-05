@@ -12,7 +12,7 @@
 
 ## Experimental UI (separate draft PR #5)
 
-- [UI-001](WORK-QUEUE.md): native Empire Report in [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) is **user-verified** for open/close/reopen, scrollable base table, treasury/output/base status and research figures, and save/reload. User found text size changes with map zoom; source now uses a dedicated fixed-size UI font, pending Windows runtime confirmation. Loading a different game with the window left open is accepted as nonblocking.
+- [UI-001](WORK-QUEUE.md): Native Empire Report [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) is **user-verified** for live statistics/research, fixed-size font, scrollable bases, correct clickable names and reopen, and fully visible last row. A new **Status/Production** toggle now shows build target, stored/required minerals and ETA, with a native Hurry action; source/CI only until Windows testing. F4 graphics/context menu and upkeep event tracking remain later scope. Leaving the report open during new-game loading remains user-accepted.
 
 ## Active test configuration
 
