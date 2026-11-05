@@ -10,6 +10,10 @@
 - New-map geology, native Jungle and Uranium art have positive user reports. Great Dunes look good; Sunny Mesa centre-only +1E confirmed. Raised Mesa experiment was rejected and reverted (MAP-006).
 - **CI passed on `4809cb7` (5 November):** separate Windows 32-bit Develop and Release cross-builds; Develop synthetic save/atlas/configuration/source contracts all passed. **Neither build executes SMAC/X.** Source changes add Jungle patch preflight, avoid redundant overlay scans, trace successful native Inspector appends and independently log variant-1 sprite geometry; their Windows runtime effects remain unverified.
 
+## Experimental UI (separate draft PR #5)
+
+- [UI-001](WORK-QUEUE.md): independent native Empire Report prototype is **user-verified** for window creation, backtick/Escape close/reopen, input/focus and F4 isolation; base count and treasury were correct. PR #5 (stacked on PR #4) now extends the window with live empire/research figures and a scrollable per-base table. **Expanded screen still needs Windows runtime testing**. User does not require the report to auto-close when a different game loads.
+
 ## Active test configuration
 
 Distributed [test INI](../docs/thinker.ini): `minor_native_titanium=1` and `minor_titanium_sprite_mode=3`, matching the user's successful local art test. Compiled absent-option default is mode 0 (native Uranium). Mode 3 needs a separately prepared 1024×1024 indexed `neca_sprites.pcx` next to the executable; neither Git nor public CI provides that art. Missing art falls back to native Uranium. `thinker_user.ini` may override the distributed profile, and the complete user's installed INI is not independently inspected.
