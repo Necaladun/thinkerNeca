@@ -237,7 +237,7 @@ void draw_base_list(int faction_id) {
     int seen = 0;
     int drawn = 0;
     for (int i = 0; i < *BaseCount && drawn < rows; ++i) {
-        const BASE& base = Bases[i];
+        BASE& base = Bases[i];
         if (base.faction_id != faction_id) {
             continue;
         }
@@ -356,7 +356,7 @@ void __cdecl on_report_left_button_up(int x, int y) {
             // Native hurry handling should always be initiated from the
             // base-management window, which owns its existing hurry dialog.
             if (is_hurry_click) {
-                const BASE& base = Bases[base_id];
+                BASE& base = Bases[base_id];
                 if (base.item() == -FAC_STOCKPILE_ENERGY
                     || !base.can_hurry_item()
                     || base.minerals_accumulated >= mineral_cost(base_id, base.item())) {
