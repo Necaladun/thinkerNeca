@@ -110,3 +110,14 @@ Further candidates: energy inefficiency, stalled production, satellite totals, s
 - Consider a dedicated Orbital view for existing satellite totals and associated effects.
 - A Problems/Attention view could filter starving, rioting, stalled and eco-damaged bases, with optional severity sorting; it should not replace the ordinary base list.
 - Personal empire trends are desired, but population/income/labs/minerals trend lines need turn-by-turn snapshots unless existing history can be verified. FactionTurnMight exists, but does not establish the availability of these other series. Future design must specify post-upkeep sampling, bounded retention and same-build save/reload persistence; do not implement history yet.
+
+### Further report and interaction ideas (5 November)
+
+**Ideas only. No code work or new actionable work item yet.**
+
+- **Empire trends: very low priority / maybe.** Recording population, income, research and other values over multiple turns would require reliable turn-by-turn data and an explicit save/reload persistence design. Current live-state readouts take precedence. Do not implement a session-only history as if it were a durable trend.
+- **Problems / Attention: positive candidate.** A filterable exception view for starving, rioting, stalled-production, eco-damage, habitation-cap and other bases needing review. Consider a **nearby enemies** warning if cheap and reliable. Enemy markers must respect the player's **current map visibility and contact/hostility information** rather than scanning hidden positions as if known; choose a sensible radius and distinguish simple proximity from a genuine combat-threat calculation.
+- **Full Unit Register:** consider a dedicated tab comparable to the game's existing unit listing. Potential columns: unit design/name, triad, location, assigned home base, movement left, damage, morale, orders and support burden. Filters/sorting for idle, damaged, combat/noncombat, away-from-home and land/sea/air. Validate unit selection/navigation against changing vehicle indices after deaths and captures.
+- **Contextual right-click menus:** use on base rows and potentially unit entries for appropriate actions: visit/centre, Change Production, Hurry, governor settings, queue review or unit selection as supported. The engine's native window has right-button callbacks, but each action still needs verified target identity, relevant base/unit context, availability rules and safe focus/modal return. Do not make every row trigger actions or silently modify orders on right-click.
+- A right-click context menu and direct click-to-Change Production are related but not identical ideas; retain both as possibilities until actual interaction semantics are selected.
+
