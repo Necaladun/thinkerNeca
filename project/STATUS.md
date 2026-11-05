@@ -12,7 +12,7 @@
 
 ## Experimental UI (separate draft PR #5)
 
-- [UI-001](WORK-QUEUE.md): Native Empire Report [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) is user-verified for status/research, navigation, Citizens, direct Hurry, governor settings, and Garrison land/sea/air plus Away counts. Police is eligible unit types, not applied suppression. Best metrics differ from F4 in some cases and this is accepted. **Source test pending:** enlarge target to 1350×990 (50% per dimension, screen-clamped) and add generic Production category pictograms. Exact native item art, Messages and post-upkeep integration remain future scope.
+- [UI-001](WORK-QUEUE.md): Native Empire Report [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) is user-verified for status/research, navigation, Citizens, direct Hurry, governor settings and Garrison land/sea/air plus Away counts. Police counts eligible units, not applied suppression; Best metrics differ somewhat from F4 and are accepted. **5 Nov Windows user test:** the 150% target window size is satisfactory, Production category pictograms are visible and useful, and existing controls appear to work. Low-resolution layout, other runtime variants, and save/reload remain separate test gaps. Actual native item art, Messages and post-upkeep integration remain future work; direct Change Production access and Next-in-Queue display are explicitly [deferred ideas](IDEAS.md), not implemented.
 
 ## Active test configuration
 

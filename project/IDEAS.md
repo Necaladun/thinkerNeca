@@ -30,6 +30,15 @@
 
 Old-save/scenario compatibility is not a target. Strong Solar output by itself is not a bug. Changing `tile_output_limit` to 3/3/3 is **already an active trial** (BAL-001), not merely a hypothetical.
 
+## Empire Report — deferred Production actions
+
+These are user-requested possibilities for a **later** UI iteration, not approved for implementation in the current artwork/appearance pass. The existing native base-name navigation, Hurry dialog and queue rules must continue to work.
+
+- **Direct Change Production:** clicking the current build name, its pictogram/artwork, or a separate action could open the game's native Change Production picker **for the correct base without first entering the colony screen**. Decide the click target and verify native base context, modal return/focus and production queue effects before implementing. The icon need not become an implicit button unless that is later selected.
+- **Next in Queue preview:** show the base's next queued production item alongside the current build, including a clear empty-queue state. Investigate the game's actual production-queue ordering and special cases (for example Stockpile Energy, queued projects, automation and queue updates) rather than assuming array index semantics. A preview alone must not alter the queue.
+
+Promote either proposal to a concrete [UI-001 follow-up](WORK-QUEUE.md) or new work ID only when selected for implementation.
+
 ## Native ecology and fungal forests — future exploration
 
 **Ideas only; not approved implementation work.** This records the November 2026 *Landmark Ideas Comparison* discussion for later design. It does **not** add tasks to the work queue, change gameplay, or assert that the following systems exist. The intended **Fungal Forest** is a living native-ecology region, **not a major landmark**, not the independent Jungle minor terrain, and not the ordinary human-built Forest improvement. It should not consume a landmark slot.
