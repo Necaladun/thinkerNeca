@@ -590,6 +590,12 @@ void draw_base_list(int faction_id) {
     const int x_police = report_width * 72 / 100;
     const int x_home = report_width * 82 / 100;
     const int x_away = report_width * 91 / 100;
+    const int x_growth_cap = report_width * 38 / 100;
+    const int x_growth_stored = report_width * 49 / 100;
+    const int x_growth_surplus = report_width * 62 / 100;
+    const int x_growth_eta = report_width * 72 / 100;
+    const int x_growth_mode = report_width * 82 / 100;
+    const int x_growth_ga = report_width * 93 / 100;
 
     // A separate tab line leaves the base-count heading unobscured on narrow screens.
     for (const ReportTab& tab : REPORT_TABS) {
@@ -673,6 +679,14 @@ void draw_base_list(int faction_id) {
         write_text("Police", x_police, report_column_y(), ColorYellow);
         write_text("Home", x_home, report_column_y(), ColorYellow);
         write_text("Away", x_away, report_column_y(), ColorYellow);
+    } else if (base_view == VIEW_GROWTH) {
+        write_text("Pop", x_here, report_column_y(), ColorYellow);
+        write_text("Cap", x_growth_cap, report_column_y(), ColorYellow);
+        write_text("Stored", x_growth_stored, report_column_y(), ColorYellow);
+        write_text("N/turn", x_growth_surplus, report_column_y(), ColorYellow);
+        write_text("ETA", x_growth_eta, report_column_y(), ColorYellow);
+        write_text("Growth", x_growth_mode, report_column_y(), ColorYellow);
+        write_text("GA", x_growth_ga, report_column_y(), ColorYellow);
     } else if (base_view == VIEW_GOVERNORS) {
         write_text("Governor", x_pop, report_column_y(), ColorYellow);
         write_text("Citizens", x_gov_citizens, report_column_y(), ColorYellow);
@@ -723,6 +737,66 @@ void draw_base_list(int faction_id) {
             : base_view == VIEW_STATUS ? x_stat_pop : x_pop;
         write_fitted_text(base.name, 20, y, base_name_end - 30, ColorCyan);
 
+        if (base_view == VIEW_GROWTH) {
+            const bool has_dome = has_fac_built(FAC_HABITATION_DOME, i);
+            const int modifier = (has_project(FAC_ASCETIC_VIRTUES, faction_id) ? 2 : 0)
+                - MFactions[faction_id].rule_population;
+            const int cap = (has_fac_built(FAC_HAB_COMPLEX, i)
+                ? Rules->pop_limit_wo_hab_dome : Rules->pop_limit_wo_hab_complex) + modifier;
+            const bool capped = base.pop_size >= MaxBasePopSize
+                || (!has_dome && base.pop_size >= cap);
+            const int nutrient_cost = (base.pop_size + 1)
+                * mod_cost_factor(faction_id, RSC_NUTRIENT, i);
+            snprintf(line, sizeof(line), "%d", base.pop_size);
+            write_text(line, x_here, y);
+            if (has_dome) {
+                write_text("Dome", x_growth_cap, y, ColorGreen);
+            } else {
+                snprintf(line, sizeof(line), "%d", cap);
+                write_text(line, x_growth_cap, y,
+                    capped ? ColorYellow : ColorWhite);
+            }
+            snprintf(line, sizeof(line), "%d/%d",
+                max(0, base.nutrients_accumulated), nutrient_cost);
+            write_fitted_text(line, x_growth_stored, y,
+                x_growth_surplus - x_growth_stored - 7);
+            snprintf(line, sizeof(line), "%+d", base.nutrient_surplus);
+            write_text(line, x_growth_surplus, y,
+                base.nutrient_surplus < 0 ? ColorRed : ColorWhite);
+            const char* mode = "Normal";
+            const char* eta = "--";
+            int color = ColorWhite;
+            char eta_buffer[32];
+            if (base.nutrient_surplus < 0) {
+                mode = "Starve";
+                color = ColorRed;
+            } else if (capped) {
+                mode = "Capped";
+                color = ColorYellow;
+            } else if (base_pop_boom(i) && base.nutrients_accumulated >= 0) {
+                mode = "Boom";
+                eta = "1";
+                color = ColorGreen;
+            } else if (base.SE_growth(SE_Pending) <= -3) {
+                mode = "Blocked";
+                color = ColorYellow;
+            } else if (base.nutrient_surplus > 0) {
+                const int needed = max(0, nutrient_cost - base.nutrients_accumulated);
+                // Approximate; native growth checks accumulation before the
+                // current turn's nutrient surplus, so do not imply an exact ETA.
+                snprintf(eta_buffer, sizeof(eta_buffer), "~%d",
+                    1 + (needed + base.nutrient_surplus - 1) / base.nutrient_surplus);
+                eta = eta_buffer;
+            } else {
+                mode = "Stalled";
+            }
+            write_text(eta, x_growth_eta, y, color);
+            write_fitted_text(mode, x_growth_mode, y,
+                x_growth_ga - x_growth_mode - 5, color);
+            write_text(base.golden_age_active() ? "GA" : "--", x_growth_ga, y,
+                base.golden_age_active() ? ColorGreen : ColorWhite);
+            continue;
+        }
         if (base_view == VIEW_GARRISON) {
             const GarrisonStats g = collect_garrison(base, i, faction_id);
             snprintf(line, sizeof(line), "%d", g.here);
@@ -858,7 +932,10 @@ void draw_base_list(int faction_id) {
             report_width - x_stat_status - 10, status_color);
     }
 
-    if (base_view == VIEW_GARRISON) {
+    if (base_view == VIEW_GROWTH) {
+        write_text("ETA is approximate; Dome removes the normal habitation limit.",
+            20, report_height - 40, ColorCyan);
+    } else if (base_view == VIEW_GARRISON) {
         write_text("Here = on base tile; Home/Away = assigned home base, not support cost",
             20, report_height - 40, ColorCyan);
     } else {
