@@ -20,7 +20,9 @@ int wheel_remainder = 0;
 
 const int BASE_FIRST_ROW_Y = 286;
 const int BASE_ROW_HEIGHT = 22;
-const int BASE_BOTTOM_RESERVE = 100; // Window chrome and footer; avoid clipping the last row.
+const int BASE_BOTTOM_RESERVE = 70; // Only the scroll footer remains below the base rows.
+enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION };
+BaseListView base_view = VIEW_PRODUCTION;
 
 int visible_base_rows() {
     return max(1, (report_height - BASE_FIRST_ROW_Y - BASE_BOTTOM_RESERVE) / BASE_ROW_HEIGHT);
@@ -56,6 +58,23 @@ void write_text(const char* text, int x, int y, int color = ColorWhite) {
     snprintf(line, sizeof(line), "%s", text);
     Buffer_set_text_color(&report_window.oCanvas, color, 0, 1, 1);
     Buffer_write_l_3(&report_window.oCanvas, line, x, y, (int)strlen(line));
+}
+
+void write_fitted_text(const char* value, int x, int y, int available_width,
+                       int color = ColorWhite) {
+    char text[128];
+    snprintf(text, sizeof(text), "%s", value);
+    if (Font_width(report_text_font, text) > available_width) {
+        const int length = (int)strlen(text);
+        for (int n = length - 1; n >= 1; --n) {
+            snprintf(text, sizeof(text), "%.*s...", n, value);
+            if (Font_width(report_text_font, text) <= available_width) {
+                break;
+            }
+            text[0] = '\0';
+        }
+    }
+    write_text(text, x, y, color);
 }
 
 struct EmpireStats {
@@ -182,6 +201,10 @@ void draw_base_list(int faction_id) {
         total, total ? base_scroll + 1 : 0, min(total, base_scroll + rows));
     write_text(line, 20, 242, ColorCyan);
 
+    const int x_prod = report_width * 26 / 100;
+    const int x_mins = report_width * 62 / 100;
+    const int x_turns = report_width * 78 / 100;
+    const int x_hurry = report_width * 89 / 100;
     const int x_pop = report_width * 34 / 100;
     const int x_n = report_width * 40 / 100;
     const int x_m = report_width * 46 / 100;
@@ -189,7 +212,19 @@ void draw_base_list(int faction_id) {
     const int x_ec = report_width * 60 / 100;
     const int x_labs = report_width * 68 / 100;
     const int x_status = report_width * 76 / 100;
+    const int tab_y = 242;
+    write_text(base_view == VIEW_STATUS ? "[Status]" : "Status",
+        report_width - 240, tab_y, base_view == VIEW_STATUS ? ColorYellow : ColorCyan);
+    write_text(base_view == VIEW_PRODUCTION ? "[Production]" : "Production",
+        report_width - 144, tab_y, base_view == VIEW_PRODUCTION ? ColorYellow : ColorCyan);
+
     write_text("Base", 20, 262, ColorYellow);
+    if (base_view == VIEW_PRODUCTION) {
+        write_text("Building", x_prod, 262, ColorYellow);
+        write_text("Minerals", x_mins, 262, ColorYellow);
+        write_text("Turns", x_turns, 262, ColorYellow);
+        write_text("Action", x_hurry, 262, ColorYellow);
+    } else {
     write_text("Pop", x_pop, 262, ColorYellow);
     write_text("N", x_n, 262, ColorYellow);
     write_text("M", x_m, 262, ColorYellow);
@@ -197,6 +232,7 @@ void draw_base_list(int faction_id) {
     write_text("EC", x_ec, 262, ColorYellow);
     write_text("Labs", x_labs, 262, ColorYellow);
     write_text("Status", x_status, 262, ColorYellow);
+    }
 
     int seen = 0;
     int drawn = 0;
@@ -210,7 +246,37 @@ void draw_base_list(int faction_id) {
         }
         const int y = BASE_FIRST_ROW_Y + BASE_ROW_HEIGHT * drawn++;
         // Cyan names are clickable; resolve by current array index after scrolling.
-        write_text(base.name, 20, y, ColorCyan);
+        write_fitted_text(base.name, 20, y,
+            (base_view == VIEW_PRODUCTION ? x_prod : x_pop) - 30, ColorCyan);
+
+        if (base_view == VIEW_PRODUCTION) {
+            const int item = base.item();
+            const bool stockpile = item == -FAC_STOCKPILE_ENERGY;
+            write_fitted_text(prod_name(item), x_prod, y, x_mins - x_prod - 10);
+            if (!stockpile) {
+                const int total_minerals = mineral_cost(i, item);
+                const int needed = max(0, total_minerals - base.minerals_accumulated);
+                snprintf(line, sizeof(line), "%d/%d (+%d)",
+                    base.minerals_accumulated, total_minerals, base.mineral_surplus);
+                write_fitted_text(line, x_mins, y, x_turns - x_mins - 8);
+                if (needed == 0) {
+                    write_text("Ready", x_turns, y, ColorGreen);
+                } else if (base.mineral_surplus > 0) {
+                    snprintf(line, sizeof(line), "~%d",
+                        (needed + base.mineral_surplus - 1) / base.mineral_surplus);
+                    write_text(line, x_turns, y);
+                } else {
+                    write_text("--", x_turns, y);
+                }
+                if (needed > 0 && base.can_hurry_item()) {
+                    write_text("Hurry", x_hurry, y, ColorCyan);
+                }
+            } else {
+                write_text("--", x_mins, y);
+                write_text("--", x_turns, y);
+            }
+            continue;
+        }
         snprintf(line, sizeof(line), "%d", base.pop_size);
         write_text(line, x_pop, y);
         snprintf(line, sizeof(line), "%+d", base.nutrient_surplus);
@@ -242,10 +308,8 @@ void draw_base_list(int faction_id) {
         write_text(status, x_status, y, status_color);
     }
 
-    write_text("Click a cyan base name to open that base.",
-        20, report_height - 83, ColorYellow);
     write_text("Scroll: wheel / Up / Down / PgUp / PgDn / Home / End",
-        20, report_height - 61, ColorCyan);
+        20, report_height - 40, ColorCyan);
 }
 
 // Native GraphicWin mouse callback; coordinates are relative to the report.
@@ -255,8 +319,24 @@ void __cdecl on_report_left_button_up(int x, int y) {
     if (faction_id < 0 || !empire_report_visible()) {
         return;
     }
-    const int name_right = report_width * 34 / 100 - 8;
-    if (x < 20 || x >= name_right || y < BASE_FIRST_ROW_Y - 3) {
+    // The two text tabs operate as small native clickable controls.
+    if (y >= 238 && y < 262) {
+        if (x >= report_width - 240 && x < report_width - 154) {
+            base_view = VIEW_STATUS;
+            GraphicWin_redraw(&report_window);
+        } else if (x >= report_width - 144 && x < report_width - 10) {
+            base_view = VIEW_PRODUCTION;
+            GraphicWin_redraw(&report_window);
+        }
+        return;
+    }
+    const int name_right = (base_view == VIEW_PRODUCTION
+        ? report_width * 26 / 100 : report_width * 34 / 100) - 8;
+    const int hurry_left = report_width * 89 / 100;
+    const bool is_name_click = x >= 20 && x < name_right;
+    const bool is_hurry_click = base_view == VIEW_PRODUCTION
+        && x >= hurry_left && x < report_width - 10;
+    if ((!is_name_click && !is_hurry_click) || y < BASE_FIRST_ROW_Y - 3) {
         return;
     }
     const int row = (y - (BASE_FIRST_ROW_Y - 3)) / BASE_ROW_HEIGHT;
@@ -273,9 +353,21 @@ void __cdecl on_report_left_button_up(int x, int y) {
     int seen = 0;
     for (int base_id = 0; base_id < *BaseCount; ++base_id) {
         if (Bases[base_id].faction_id == faction_id && seen++ == ordinal) {
+            // Native hurry handling should always be initiated from the
+            // base-management window, which owns its existing hurry dialog.
+            if (is_hurry_click) {
+                const BASE& base = Bases[base_id];
+                if (base.item() == -FAC_STOCKPILE_ENERGY
+                    || !base.can_hurry_item()
+                    || base.minerals_accumulated >= mineral_cost(base_id, base.item())) {
+                    return;
+                }
+            }
             empire_report_hide();
-            // Use the existing base-window entry point.
             BaseWin_zoom(BaseWin, base_id, 1);
+            if (is_hurry_click) {
+                BaseWin_hurry(BaseWin);
+            }
             return;
         }
     }
