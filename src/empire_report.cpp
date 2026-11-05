@@ -118,6 +118,42 @@ int unit_at(int faction_id, int ordinal) {
     return -1;
 }
 
+// Read native MessageWindow content without installing a message interception
+// hook or inventing a historical log. Only entries retained by the game's
+// present message UI can appear. The list may be empty before initialization,
+// after a turn change, or after the native interface clears its messages.
+StringStruct* native_message_source() {
+    StringStruct* list = &MessageWin->listBox.dialog.strings;
+    if (list->count > 0 && list->count <= 1024 && list->head) return list;
+    list = &MessageWin->stringBox.strings;
+    if (list->count > 0 && list->count <= 1024 && list->head) return list;
+    return nullptr;
+}
+int native_message_count() {
+    StringStruct* list = native_message_source();
+    return list ? min(list->count, 512) : 0;
+}
+// Seek using the game's StringStruct API, then restore its entire cursor state
+// to avoid disturbing the native list selection/scroll position. There is no
+// ownership or persistent pointer retained between redraws.
+bool native_message_text(int index, char* out, size_t capacity) {
+    if (!capacity) return false;
+    out[0] = 0;
+    StringStruct* list = native_message_source();
+    if (!list || index < 0 || index >= native_message_count()) return false;
+    const StringStruct saved = *list;
+    StringStruct_seek_pos(list, index);
+    StringStructNode* node = StringStruct_current_entry(list);
+    bool found = node && node->data && node->data->text;
+    if (found) snprintf(out, capacity, "%s", node->data->text);
+    *list = saved;
+    return found;
+}
+const int MESSAGE_ROW_HEIGHT = 46;
+int report_row_height() {
+    return base_view == VIEW_MESSAGES ? MESSAGE_ROW_HEIGHT : BASE_ROW_HEIGHT;
+}
+
 // Like F4's Best Bases readout, each entry is the single leading base
 // in its category, not a sortable ranking of all bases.
 enum BestMetric {
@@ -288,7 +324,8 @@ int attention_base_at(int faction_id, int ordinal) {
 }
 
 int visible_base_rows() {
-    return max(1, (report_height - report_first_row_y() - BASE_BOTTOM_RESERVE) / BASE_ROW_HEIGHT);
+    return max(1, (report_height - report_first_row_y() - BASE_BOTTOM_RESERVE)
+        / report_row_height());
 }
 
 int report_faction() {
@@ -314,7 +351,7 @@ int report_row_count(int faction_id) {
     if (base_view == VIEW_BEST) return bases ? BEST_COUNT : 0;
     if (base_view == VIEW_ATTENTION) return count_attention_bases(faction_id);
     if (base_view == VIEW_UNITS) return unit_count(faction_id);
-    return base_view == VIEW_MESSAGES ? 0 : bases;
+    return base_view == VIEW_MESSAGES ? native_message_count() : bases;
 }
 
 int max_base_scroll() {
@@ -577,7 +614,10 @@ void draw_base_list(int faction_id) {
     base_scroll = clamp(base_scroll, 0, max(0, count - rows));
 
     char line[256];
-    if (base_view == VIEW_UNITS) {
+    if (base_view == VIEW_MESSAGES) {
+        snprintf(line, sizeof(line), "NATIVE MESSAGES    %d retained    showing %d-%d",
+            count, count ? base_scroll + 1 : 0, min(count, base_scroll + rows));
+    } else if (base_view == VIEW_UNITS) {
         snprintf(line, sizeof(line), "UNIT REGISTER    %d units    showing %d-%d",
             count, count ? base_scroll + 1 : 0, min(count, base_scroll + rows));
     } else if (base_view == VIEW_ATTENTION) {
@@ -646,6 +686,57 @@ void draw_base_list(int faction_id) {
         const int tab_x = report_tab_position(tab.view, nullptr);
         write_text(caption, tab_x, report_tab_y(tab.view),
             base_view == tab.view ? ColorYellow : ColorCyan);
+    }
+
+    if (base_view == VIEW_MESSAGES) {
+        write_text("Messages currently retained in the game's native UI",
+            20, report_column_y(), ColorYellow);
+        if (!count) {
+            write_text("No native messages currently available.",
+                20, report_first_row_y(), ColorYellow);
+            write_text("The game may clear these messages between turns.",
+                20, report_first_row_y() + 24, ColorCyan);
+        }
+        for (int row = 0; row < rows && base_scroll + row < count; ++row) {
+            char raw[1024] = {};
+            if (!native_message_text(base_scroll + row, raw, sizeof(raw))) {
+                snprintf(raw, sizeof(raw), "(native entry %d has no text)",
+                    base_scroll + row + 1);
+            }
+            // Preserve the text, but normalize embedded newlines/tabs so
+            // the report can display an entry across two 17px font rows.
+            std::string message(raw);
+            for (char& ch : message) {
+                if (ch == '\r' || ch == '\n' || ch == '\t') ch = ' ';
+            }
+            const int y = report_first_row_y() + MESSAGE_ROW_HEIGHT * row;
+            snprintf(line, sizeof(line), "%d.", base_scroll + row + 1);
+            write_text(line, 20, y, ColorCyan);
+            const int x = 55;
+            const int width = report_width - x - 16;
+            size_t split = 0;
+            size_t last_space = 0;
+            while (split < message.size()) {
+                if (message[split] == ' ') last_space = split;
+                const std::string test = message.substr(0, split + 1);
+                if (Font_width(report_text_font, test.c_str()) > width) break;
+                ++split;
+            }
+            if (split < message.size() && last_space > 0) split = last_space;
+            if (!split && !message.empty()) split = 1;
+            const std::string top = message.substr(0, split);
+            const std::string remaining = message.substr(split);
+            write_fitted_text(top.c_str(), x, y, width);
+            if (!remaining.empty()) {
+                const size_t first = remaining.find_first_not_of(' ');
+                const std::string next = first == std::string::npos
+                    ? "" : remaining.substr(first);
+                write_fitted_text(next.c_str(), x, y + 19, width, ColorWhite);
+            }
+        }
+        write_text("Native UI snapshot only; not an archive or a complete event log.",
+            20, report_height - 40, ColorCyan);
+        return;
     }
 
     if (base_view == VIEW_UNITS) {
@@ -1135,7 +1226,7 @@ void __cdecl on_report_left_button_up(int x, int y) {
     }
     if (y >= REPORT_TAB_TOP && y < REPORT_TAB_BOTTOM +
         (report_tab_rows() - 1) * REPORT_SECOND_TAB_OFFSET) return;
-    if (base_view == VIEW_UNITS) return;  // Read-only register.
+    if (base_view == VIEW_UNITS || base_view == VIEW_MESSAGES) return;  // Read-only views.
     const int name_right = (base_view == VIEW_PRODUCTION
         ? report_width * 26 / 100 // Stop before the new icon column.
         : base_view == VIEW_GARRISON || base_view == VIEW_STATUS
