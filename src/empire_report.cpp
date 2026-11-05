@@ -25,7 +25,7 @@ const int REPORT_SCREEN_MARGIN = 64;
 const int BASE_FIRST_ROW_Y = 315;
 const int BASE_ROW_HEIGHT = 22;
 const int BASE_BOTTOM_RESERVE = 70; // Only the scroll footer remains below the base rows.
-enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS, VIEW_GARRISON };
+enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS, VIEW_GARRISON, VIEW_ATTENTION };
 const int REPORT_TAB_Y = 264;
 const int REPORT_TAB_TOP = 260;
 const int REPORT_TAB_BOTTOM = 287;
@@ -39,8 +39,24 @@ const ReportTab REPORT_TABS[] = {
     { VIEW_BEST, "Best", 325, 65 },
     { VIEW_GOVERNORS, "Gov", 395, 52 },
     { VIEW_GARRISON, "Garrison", 453, 100 },
+    { VIEW_ATTENTION, "Attention", 565, 106 },
 };
 BaseListView base_view = VIEW_PRODUCTION;
+
+// The seventh tab fits on one line at normal sizes. On narrow screens,
+// move only Attention to a second tab line and shift the list below it.
+const int REPORT_SECOND_TAB_OFFSET = 28;
+bool report_two_tab_rows() { return report_width < 685; }
+int report_tab_y(BaseListView view) {
+    return REPORT_TAB_Y + (view == VIEW_ATTENTION && report_two_tab_rows()
+        ? REPORT_SECOND_TAB_OFFSET : 0);
+}
+int report_column_y() {
+    return REPORT_COLUMN_Y + (report_two_tab_rows() ? REPORT_SECOND_TAB_OFFSET : 0);
+}
+int report_first_row_y() {
+    return BASE_FIRST_ROW_Y + (report_two_tab_rows() ? REPORT_SECOND_TAB_OFFSET : 0);
+}
 
 // Like F4's Best Bases readout, each entry is the single leading base
 // in its category, not a sortable ranking of all bases.
@@ -161,8 +177,58 @@ void open_governor_options(int base_id) {
     }
 }
 
+// Pure, live-state warnings. No event recording or hidden unit scanning.
+enum AttentionFlags {
+    ATT_RIOT = 1, ATT_STARVING = 2, ATT_STALLED = 4,
+    ATT_ECO = 8, ATT_HAB_CAP = 16,
+};
+int base_attention_flags(int base_id) {
+    const BASE& base = Bases[base_id];
+    int flags = 0;
+    if (base.state_flags & BSTATE_DRONE_RIOTS_ACTIVE) flags |= ATT_RIOT;
+    if (base.nutrient_surplus < 0) flags |= ATT_STARVING;
+    if (base.item() != -FAC_STOCKPILE_ENERGY && base.mineral_surplus <= 0
+        && base.minerals_accumulated < mineral_cost(base_id, base.item())) {
+        flags |= ATT_STALLED;
+    }
+    if (base.eco_damage > 0) flags |= ATT_ECO;
+    if (base.nutrient_surplus > 0 && !has_fac_built(FAC_HABITATION_DOME, base_id)) {
+        const int modifier = (has_project(FAC_ASCETIC_VIRTUES, base.faction_id) ? 2 : 0)
+            - MFactions[base.faction_id].rule_population;
+        const int limit = (has_fac_built(FAC_HAB_COMPLEX, base_id)
+            ? Rules->pop_limit_wo_hab_dome : Rules->pop_limit_wo_hab_complex) + modifier;
+        if (base.pop_size >= limit) flags |= ATT_HAB_CAP;
+    }
+    return flags;
+}
+int attention_severity(int flags) {
+    if (flags & (ATT_RIOT | ATT_STARVING)) return 3;
+    if (flags & (ATT_STALLED | ATT_HAB_CAP)) return 2;
+    return (flags & ATT_ECO) ? 1 : 0;
+}
+int count_attention_bases(int faction_id) {
+    int count = 0;
+    for (int i = 0; i < *BaseCount; ++i) {
+        if (Bases[i].faction_id == faction_id && base_attention_flags(i)) ++count;
+    }
+    return count;
+}
+// Resolve again on each click. Base IDs can shift after captures or losses.
+// Critical cases come first, then warnings, then ecological advisories.
+int attention_base_at(int faction_id, int ordinal) {
+    for (int severity = 3; severity >= 1; --severity) {
+        for (int i = 0; i < *BaseCount; ++i) {
+            if (Bases[i].faction_id == faction_id
+                && attention_severity(base_attention_flags(i)) == severity) {
+                if (ordinal-- == 0) return i;
+            }
+        }
+    }
+    return -1;
+}
+
 int visible_base_rows() {
-    return max(1, (report_height - BASE_FIRST_ROW_Y - BASE_BOTTOM_RESERVE) / BASE_ROW_HEIGHT);
+    return max(1, (report_height - report_first_row_y() - BASE_BOTTOM_RESERVE) / BASE_ROW_HEIGHT);
 }
 
 int report_faction() {
@@ -185,7 +251,9 @@ int count_bases(int faction_id) {
 
 int report_row_count(int faction_id) {
     const int bases = count_bases(faction_id);
-    return base_view == VIEW_BEST && bases ? BEST_COUNT : bases;
+    if (base_view == VIEW_BEST) return bases ? BEST_COUNT : 0;
+    if (base_view == VIEW_ATTENTION) return count_attention_bases(faction_id);
+    return bases;
 }
 
 int max_base_scroll() {
@@ -447,7 +515,10 @@ void draw_base_list(int faction_id) {
     base_scroll = clamp(base_scroll, 0, max(0, count - rows));
 
     char line[256];
-    if (base_view == VIEW_BEST) {
+    if (base_view == VIEW_ATTENTION) {
+        snprintf(line, sizeof(line), "ATTENTION    %d flagged bases    showing %d-%d",
+            count, count ? base_scroll + 1 : 0, min(count, base_scroll + rows));
+    } else if (base_view == VIEW_BEST) {
         snprintf(line, sizeof(line), "BEST BASES    %d categories    showing %d-%d",
             count, count ? base_scroll + 1 : 0, min(count, base_scroll + rows));
     } else {
@@ -506,22 +577,59 @@ void draw_base_list(int faction_id) {
         } else {
             snprintf(caption, sizeof(caption), "%s", tab.label);
         }
-        write_text(caption, tab.x, REPORT_TAB_Y,
+        const int tab_x = tab.view == VIEW_ATTENTION && report_two_tab_rows()
+            ? 20 : tab.x;
+        write_text(caption, tab_x, report_tab_y(tab.view),
             base_view == tab.view ? ColorYellow : ColorCyan);
     }
 
+    if (base_view == VIEW_ATTENTION) {
+        const int x_reason = report_width * 37 / 100;
+        const int x_severity = report_width * 86 / 100;
+        write_text("Base", 20, report_column_y(), ColorYellow);
+        write_text("Current warnings", x_reason, report_column_y(), ColorYellow);
+        write_text("Level", x_severity, report_column_y(), ColorYellow);
+        if (!count) write_text("No bases currently flagged.", 20, report_first_row_y(), ColorGreen);
+        for (int row = 0; row < rows && base_scroll + row < count; ++row) {
+            const int base_id = attention_base_at(faction_id, base_scroll + row);
+            if (base_id < 0) continue;
+            const BASE& base = Bases[base_id];
+            const int flags = base_attention_flags(base_id);
+            const int severity = attention_severity(flags);
+            const int y = report_first_row_y() + BASE_ROW_HEIGHT * row;
+            write_fitted_text(base.name, 20, y, x_reason - 30, ColorCyan);
+            std::string issues;
+            if (flags & ATT_RIOT) issues += "Riot  ";
+            if (flags & ATT_STARVING) issues += "Starving  ";
+            if (flags & ATT_STALLED) issues += "Production stalled  ";
+            if (flags & ATT_HAB_CAP) issues += "Hab cap  ";
+            if (flags & ATT_ECO) {
+                snprintf(line, sizeof(line), "Eco: %d", base.eco_damage);
+                issues += line;
+            }
+            write_fitted_text(issues.c_str(), x_reason, y,
+                x_severity - x_reason - 12, severity == 3 ? ColorRed : ColorYellow);
+            write_text(severity == 3 ? "Critical" : severity == 2 ? "Warning" : "Advisory",
+                x_severity, y, severity == 3 ? ColorRed
+                : severity == 2 ? ColorYellow : ColorCyan);
+        }
+        write_text("Current-state warnings only; click a base to open it.",
+            20, report_height - 40, ColorCyan);
+        return;
+    }
+
     if (base_view == VIEW_BEST) {
-        write_text("Category", 20, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Best Base", x_best_base, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Value", x_best_value, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Action", x_gov_options, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Category", 20, report_column_y(), ColorYellow);
+        write_text("Best Base", x_best_base, report_column_y(), ColorYellow);
+        write_text("Value", x_best_value, report_column_y(), ColorYellow);
+        write_text("Action", x_gov_options, report_column_y(), ColorYellow);
         for (int row = 0; row < rows && base_scroll + row < count; ++row) {
             const BestMetric metric = (BestMetric)(base_scroll + row);
             const BestBase best = best_base_for(faction_id, metric);
             if (best.base_id < 0) {
                 continue;
             }
-            const int y = BASE_FIRST_ROW_Y + BASE_ROW_HEIGHT * row;
+            const int y = report_first_row_y() + BASE_ROW_HEIGHT * row;
             write_text(BEST_METRIC_NAMES[metric], 20, y, ColorYellow);
             write_fitted_text(Bases[best.base_id].name, x_best_base, y,
                 x_best_value - x_best_base - 14, ColorCyan);
@@ -534,46 +642,46 @@ void draw_base_list(int faction_id) {
         return;
     }
 
-    write_text("Base", 20, REPORT_COLUMN_Y, ColorYellow);
+    write_text("Base", 20, report_column_y(), ColorYellow);
     if (base_view == VIEW_GARRISON) {
-        write_text("Here", x_here, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Land", x_land, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Sea", x_sea, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Air", x_air, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Combat", x_combat, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Police", x_police, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Home", x_home, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Away", x_away, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Here", x_here, report_column_y(), ColorYellow);
+        write_text("Land", x_land, report_column_y(), ColorYellow);
+        write_text("Sea", x_sea, report_column_y(), ColorYellow);
+        write_text("Air", x_air, report_column_y(), ColorYellow);
+        write_text("Combat", x_combat, report_column_y(), ColorYellow);
+        write_text("Police", x_police, report_column_y(), ColorYellow);
+        write_text("Home", x_home, report_column_y(), ColorYellow);
+        write_text("Away", x_away, report_column_y(), ColorYellow);
     } else if (base_view == VIEW_GOVERNORS) {
-        write_text("Governor", x_pop, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Citizens", x_gov_citizens, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Builds", x_gov_production, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Priority", x_gov_priority, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Action", x_gov_options, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Governor", x_pop, report_column_y(), ColorYellow);
+        write_text("Citizens", x_gov_citizens, report_column_y(), ColorYellow);
+        write_text("Builds", x_gov_production, report_column_y(), ColorYellow);
+        write_text("Priority", x_gov_priority, report_column_y(), ColorYellow);
+        write_text("Action", x_gov_options, report_column_y(), ColorYellow);
     } else if (base_view == VIEW_PRODUCTION) {
-        write_text("Icon", x_icon, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Building", x_prod, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Minerals", x_mins, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Turns", x_turns, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Action", x_hurry, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Icon", x_icon, report_column_y(), ColorYellow);
+        write_text("Building", x_prod, report_column_y(), ColorYellow);
+        write_text("Minerals", x_mins, report_column_y(), ColorYellow);
+        write_text("Turns", x_turns, report_column_y(), ColorYellow);
+        write_text("Action", x_hurry, report_column_y(), ColorYellow);
     } else if (base_view == VIEW_CITIZENS) {
-        write_text("Pop", x_pop, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Workers", x_workers, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Talents", x_talents, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Drones", x_drones, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Specs", x_specialists, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Riot", x_riot, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Pop", x_pop, report_column_y(), ColorYellow);
+        write_text("Workers", x_workers, report_column_y(), ColorYellow);
+        write_text("Talents", x_talents, report_column_y(), ColorYellow);
+        write_text("Drones", x_drones, report_column_y(), ColorYellow);
+        write_text("Specs", x_specialists, report_column_y(), ColorYellow);
+        write_text("Riot", x_riot, report_column_y(), ColorYellow);
     } else {
-        write_text("Pop", x_stat_pop, REPORT_COLUMN_Y, ColorYellow);
-        write_text("N", x_stat_n, REPORT_COLUMN_Y, ColorYellow);
-        write_text("M", x_stat_m, REPORT_COLUMN_Y, ColorYellow);
-        write_text("E", x_stat_e, REPORT_COLUMN_Y, ColorYellow);
-        write_text("EC", x_stat_ec, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Labs", x_stat_labs, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Loss", x_stat_loss, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Eco", x_stat_eco, REPORT_COLUMN_Y, ColorYellow);
-        write_text("GA", x_stat_ga, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Status", x_stat_status, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Pop", x_stat_pop, report_column_y(), ColorYellow);
+        write_text("N", x_stat_n, report_column_y(), ColorYellow);
+        write_text("M", x_stat_m, report_column_y(), ColorYellow);
+        write_text("E", x_stat_e, report_column_y(), ColorYellow);
+        write_text("EC", x_stat_ec, report_column_y(), ColorYellow);
+        write_text("Labs", x_stat_labs, report_column_y(), ColorYellow);
+        write_text("Loss", x_stat_loss, report_column_y(), ColorYellow);
+        write_text("Eco", x_stat_eco, report_column_y(), ColorYellow);
+        write_text("GA", x_stat_ga, report_column_y(), ColorYellow);
+        write_text("Status", x_stat_status, report_column_y(), ColorYellow);
     }
 
     int seen = 0;
@@ -586,7 +694,7 @@ void draw_base_list(int faction_id) {
         if (seen++ < base_scroll) {
             continue;
         }
-        const int y = BASE_FIRST_ROW_Y + BASE_ROW_HEIGHT * drawn++;
+        const int y = report_first_row_y() + BASE_ROW_HEIGHT * drawn++;
         // Cyan names are clickable; resolve by current array index after scrolling.
         const int base_name_end = base_view == VIEW_PRODUCTION ? x_icon
             : base_view == VIEW_GARRISON ? x_here
@@ -741,23 +849,27 @@ void __cdecl on_report_left_button_up(int x, int y) {
     if (faction_id < 0 || !empire_report_visible()) {
         return;
     }
-    // Tabs are purely report navigation; the same base scroll position is shared.
-    if (y >= REPORT_TAB_TOP && y < REPORT_TAB_BOTTOM) {
-        for (const ReportTab& tab : REPORT_TABS) {
-            if (x >= tab.x && x < tab.x + tab.width) {
-                if (base_view != tab.view) {
-                    base_view = tab.view;
-                    GraphicWin_redraw(&report_window);
-                }
-                return;
+    // Keep both displayed tab rows interactive on a narrow screen.
+    for (const ReportTab& tab : REPORT_TABS) {
+        const int tab_x = tab.view == VIEW_ATTENTION && report_two_tab_rows()
+            ? 20 : tab.x;
+        const int tab_top = report_tab_y(tab.view) - 4;
+        if (y >= tab_top && y < tab_top + (REPORT_TAB_BOTTOM - REPORT_TAB_TOP)
+            && x >= tab_x && x < tab_x + tab.width) {
+            if (base_view != tab.view) {
+                base_view = tab.view;
+                GraphicWin_redraw(&report_window);
             }
+            return;
         }
-        return;
     }
+    if (y >= REPORT_TAB_TOP && y < REPORT_TAB_BOTTOM +
+        (report_two_tab_rows() ? REPORT_SECOND_TAB_OFFSET : 0)) return;
     const int name_right = (base_view == VIEW_PRODUCTION
         ? report_width * 26 / 100 // Stop before the new icon column.
         : base_view == VIEW_GARRISON || base_view == VIEW_STATUS
             ? report_width * 29 / 100
+        : base_view == VIEW_ATTENTION ? report_width * 37 / 100
         : report_width * 34 / 100) - 8;
     const int hurry_left = report_width * 89 / 100;
     const int gov_left = report_width * 89 / 100;
@@ -769,10 +881,10 @@ void __cdecl on_report_left_button_up(int x, int y) {
     const bool is_best_base_click = base_view == VIEW_BEST
         && x >= 20 && x < gov_left;
     if ((!is_name_click && !is_hurry_click && !is_gov_click && !is_best_base_click)
-        || y < BASE_FIRST_ROW_Y - 3) {
+        || y < report_first_row_y() - 3) {
         return;
     }
-    const int row = (y - (BASE_FIRST_ROW_Y - 3)) / BASE_ROW_HEIGHT;
+    const int row = (y - (report_first_row_y() - 3)) / BASE_ROW_HEIGHT;
     const int count = report_row_count(faction_id);
     const int rows = visible_base_rows();
     if (row < 0 || row >= rows) {
@@ -785,6 +897,8 @@ void __cdecl on_report_left_button_up(int x, int y) {
     int base_id = -1;
     if (base_view == VIEW_BEST) {
         base_id = best_base_for(faction_id, (BestMetric)ordinal).base_id;
+    } else if (base_view == VIEW_ATTENTION) {
+        base_id = attention_base_at(faction_id, ordinal);
     } else {
         // Resolve live IDs on demand because base arrays shift after captures.
         int seen = 0;
