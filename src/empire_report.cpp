@@ -539,6 +539,7 @@ void draw_base_list(int faction_id) {
     const int total = count_bases(faction_id);
     const int rows = visible_base_rows();
     const int count = report_row_count(faction_id);
+    const EmpireStats totals = collect_empire_stats(faction_id);
     base_scroll = clamp(base_scroll, 0, max(0, count - rows));
 
     char line[256];
@@ -687,6 +688,24 @@ void draw_base_list(int faction_id) {
         write_text("ETA", x_growth_eta, report_column_y(), ColorYellow);
         write_text("Growth", x_growth_mode, report_column_y(), ColorYellow);
         write_text("GA", x_growth_ga, report_column_y(), ColorYellow);
+    } else if (base_view == VIEW_ECONOMY) {
+        write_text("EC", x_here, report_column_y(), ColorYellow);
+        write_text("EC%", x_land, report_column_y(), ColorYellow);
+        write_text("Labs", x_sea, report_column_y(), ColorYellow);
+        write_text("Lab%", x_air, report_column_y(), ColorYellow);
+        write_text("Psych", x_combat, report_column_y(), ColorYellow);
+        write_text("Psy%", x_police, report_column_y(), ColorYellow);
+        write_text("Loss", x_home, report_column_y(), ColorYellow);
+        write_text("E surplus", x_away, report_column_y(), ColorYellow);
+    } else if (base_view == VIEW_DEFENSES) {
+        write_text("Perim", x_here, report_column_y(), ColorYellow);
+        write_text("Tach", x_land, report_column_y(), ColorYellow);
+        write_text("Cmd", x_sea, report_column_y(), ColorYellow);
+        write_text("Naval", x_air, report_column_y(), ColorYellow);
+        write_text("Aero", x_combat, report_column_y(), ColorYellow);
+        write_text("Bio", x_police, report_column_y(), ColorYellow);
+        write_text("GSP", x_home, report_column_y(), ColorYellow);
+        write_text("Active", x_away, report_column_y(), ColorYellow);
     } else if (base_view == VIEW_GOVERNORS) {
         write_text("Governor", x_pop, report_column_y(), ColorYellow);
         write_text("Citizens", x_gov_citizens, report_column_y(), ColorYellow);
@@ -795,6 +814,49 @@ void draw_base_list(int faction_id) {
                 x_growth_ga - x_growth_mode - 5, color);
             write_text(base.golden_age_active() ? "GA" : "--", x_growth_ga, y,
                 base.golden_age_active() ? ColorGreen : ColorWhite);
+            continue;
+        }
+        if (base_view == VIEW_ECONOMY) {
+            const int values[3] = { base.economy_total, base.labs_total, base.psych_total };
+            const int sums[3] = { totals.economy, totals.labs, totals.psych };
+            const int value_x[3] = { x_here, x_sea, x_combat };
+            const int share_x[3] = { x_land, x_air, x_police };
+            for (int k = 0; k < 3; ++k) {
+                snprintf(line, sizeof(line), "%d", values[k]);
+                write_text(line, value_x[k], y);
+                const int pct = sums[k] > 0
+                    ? (int)(int64_t(values[k]) * 100 / sums[k]) : 0;
+                snprintf(line, sizeof(line), "%d%%", pct);
+                write_text(line, share_x[k], y);
+            }
+            snprintf(line, sizeof(line), "%d", base.energy_inefficiency);
+            write_text(line, x_home, y,
+                base.energy_inefficiency > 0 ? ColorRed : ColorWhite);
+            snprintf(line, sizeof(line), "%+d", base.energy_surplus);
+            write_text(line, x_away, y,
+                base.energy_surplus < 0 ? ColorRed : ColorWhite);
+            continue;
+        }
+        if (base_view == VIEW_DEFENSES) {
+            // B = physical facility, * = available via an empire-wide effect.
+            // Do not claim an identical combat bonus in every type of battle.
+            const FacilityId facilities[] = { FAC_PERIMETER_DEFENSE,
+                FAC_TACHYON_FIELD, FAC_COMMAND_CENTER, FAC_NAVAL_YARD,
+                FAC_AEROSPACE_COMPLEX, FAC_BIOENHANCEMENT_CENTER,
+                FAC_GEOSYNC_SURVEY_POD };
+            const int columns[] = { x_here, x_land, x_sea, x_air,
+                x_combat, x_police, x_home };
+            int active = 0;
+            for (int k = 0; k < 7; ++k) {
+                const bool built = !!has_fac_built(facilities[k], i);
+                const bool available = built || has_facility(facilities[k], i);
+                active += available;
+                write_text(built ? "B" : available ? "*" : "--",
+                    columns[k], y, built ? ColorGreen
+                    : available ? ColorCyan : ColorWhite);
+            }
+            snprintf(line, sizeof(line), "%d/7", active);
+            write_text(line, x_away, y);
             continue;
         }
         if (base_view == VIEW_GARRISON) {
@@ -934,6 +996,12 @@ void draw_base_list(int faction_id) {
 
     if (base_view == VIEW_GROWTH) {
         write_text("ETA is approximate; Dome removes the normal habitation limit.",
+            20, report_height - 40, ColorCyan);
+    } else if (base_view == VIEW_ECONOMY) {
+        write_text("Each percentage is the base's share of current empire output.",
+            20, report_height - 40, ColorCyan);
+    } else if (base_view == VIEW_DEFENSES) {
+        write_text("B = built here; * = available via another effect; -- = unavailable.",
             20, report_height - 40, ColorCyan);
     } else if (base_view == VIEW_GARRISON) {
         write_text("Here = on base tile; Home/Away = assigned home base, not support cost",
