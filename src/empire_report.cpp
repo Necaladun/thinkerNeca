@@ -20,9 +20,10 @@ int wheel_remainder = 0;
 
 const int BASE_FIRST_ROW_Y = 286;
 const int BASE_ROW_HEIGHT = 22;
+const int BASE_BOTTOM_RESERVE = 100; // Window chrome and footer; avoid clipping the last row.
 
 int visible_base_rows() {
-    return max(1, (report_height - BASE_FIRST_ROW_Y - 36) / BASE_ROW_HEIGHT);
+    return max(1, (report_height - BASE_FIRST_ROW_Y - BASE_BOTTOM_RESERVE) / BASE_ROW_HEIGHT);
 }
 
 int report_faction() {
@@ -208,7 +209,8 @@ void draw_base_list(int faction_id) {
             continue;
         }
         const int y = BASE_FIRST_ROW_Y + BASE_ROW_HEIGHT * drawn++;
-        write_text(base.name, 20, y);
+        // Cyan names are clickable; resolve by current array index after scrolling.
+        write_text(base.name, 20, y, ColorCyan);
         snprintf(line, sizeof(line), "%d", base.pop_size);
         write_text(line, x_pop, y);
         snprintf(line, sizeof(line), "%+d", base.nutrient_surplus);
@@ -240,8 +242,43 @@ void draw_base_list(int faction_id) {
         write_text(status, x_status, y, status_color);
     }
 
-    write_text("Scroll: mouse wheel / Up / Down / PgUp / PgDn / Home / End",
-        20, report_height - 29, ColorCyan);
+    write_text("Click a cyan base name to open that base.",
+        20, report_height - 83, ColorYellow);
+    write_text("Scroll: wheel / Up / Down / PgUp / PgDn / Home / End",
+        20, report_height - 61, ColorCyan);
+}
+
+// Native GraphicWin mouse callback; coordinates are relative to the report.
+// Only the base-name column responds, not the rest of the row.
+void __cdecl on_report_left_button_up(int x, int y) {
+    const int faction_id = report_faction();
+    if (faction_id < 0 || !empire_report_visible()) {
+        return;
+    }
+    const int name_right = report_width * 34 / 100 - 8;
+    if (x < 20 || x >= name_right || y < BASE_FIRST_ROW_Y - 3) {
+        return;
+    }
+    const int row = (y - (BASE_FIRST_ROW_Y - 3)) / BASE_ROW_HEIGHT;
+    const int count = count_bases(faction_id);
+    const int rows = visible_base_rows();
+    if (row < 0 || row >= rows) {
+        return;
+    }
+    const int ordinal = clamp(base_scroll, 0, max(0, count - rows)) + row;
+    if (ordinal >= count) {
+        return;
+    }
+    // Resolve the current base ID on demand: IDs shift when bases die.
+    int seen = 0;
+    for (int base_id = 0; base_id < *BaseCount; ++base_id) {
+        if (Bases[base_id].faction_id == faction_id && seen++ == ordinal) {
+            empire_report_hide();
+            // Use the existing base-window entry point.
+            BaseWin_zoom(BaseWin, base_id, 1);
+            return;
+        }
+    }
 }
 
 void __cdecl draw_report_window() {
@@ -308,6 +345,7 @@ void empire_report_show() {
         GraphicWin_init(&report_window, x, y, report_width, report_height,
             report_caption, 0, &MapWin->oMainWin, nullptr, nullptr);
         report_window.cb_win_redraw = draw_report_window;
+        report_window.cb_win_l_button_up = on_report_left_button_up;
         // The original prototype used the map font, which changes size
         // with the world-map zoom. Use a separate 17-pixel UI font instead.
         Font_ctor(&report_font);
