@@ -232,23 +232,38 @@ void __thiscall BaseWin_draw_support(BaseWindow* This) {
     Buffer_set_clip(&This->oCanvas, &This->oCanvas.clipRect);
 }
 
+// The detailed colony-screen Eco-Damage value measures pressure against
+// the clean-minerals threshold below 100%. BASE::eco_damage itself records
+// only actual positive damage above that threshold and can be zero while
+// the colony screen displays a nonzero percentage.
+// Keep the report and colony screen on the same calculation. This helper
+// reads another base directly; it does not change CurrentBase or upkeep.
+int base_eco_display_percent(int base_id) {
+    if (base_id < 0 || base_id >= *BaseCount) {
+        return 0;
+    }
+    const BASE& base = Bases[base_id];
+    if (!conf.render_base_info || !strlen(label_eco_damage)) {
+        // Without the extended display, retain the native raw figure.
+        return base.eco_damage;
+    }
+    const Faction& f = Factions[base.faction_id];
+    const int clean_mins = conf.clean_minerals + f.clean_minerals_modifier
+        + clamp(f.satellites_mineral, 0, (int)base.pop_size);
+    const int damage = terraform_eco_damage(base_id);
+    const int mins = base.mineral_intake_2 + damage / 8;
+    if (base.eco_damage > 0) {
+        return 100 + base.eco_damage;
+    }
+    return clean_mins > 0 ? 100 * clamp(mins, 0, clean_mins) / clean_mins : 0;
+}
+
 void __thiscall BaseWin_draw_misc_eco_damage(Buffer* This, char* buf, int x, int y, int len) {
-    BASE* base = *CurrentBase;
-    Faction* f = &Factions[base->faction_id];
     if (!conf.render_base_info || !strlen(label_eco_damage)) {
         Buffer_write_l_3(This, buf, x, y, len);
     } else {
-        int clean_mins = conf.clean_minerals + f->clean_minerals_modifier
-            + clamp(f->satellites_mineral, 0, (int)base->pop_size);
-        int damage = terraform_eco_damage(*CurrentBaseID);
-        int mins = base->mineral_intake_2 + damage/8;
-        int pct;
-        if (base->eco_damage > 0) {
-            pct = 100 + base->eco_damage;
-        } else {
-            pct = (clean_mins > 0 ? 100 * clamp(mins, 0, clean_mins) / clean_mins : 0);
-        }
-        snprintf(buf, StrBufLen, label_eco_damage, pct);
+        snprintf(buf, StrBufLen, label_eco_damage,
+            base_eco_display_percent(*CurrentBaseID));
         Buffer_write_l_3(This, buf, x, y, strlen(buf));
     }
 }

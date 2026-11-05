@@ -11,6 +11,8 @@ int __thiscall BaseWin_hurry_popup_start(
 int __cdecl BaseWin_hurry_ask_number(const char* label, int value, fp_none fn);
 void __thiscall BaseWin_hurry_unlock_base(NetDaemon* This, int base_id);
 void __thiscall BaseWin_draw_support(BaseWindow* This);
+// Mirrors the colony screen's Eco-Damage display, not just raw eco_damage.
+int base_eco_display_percent(int base_id);
 void __thiscall BaseWin_draw_misc_eco_damage(Buffer* This, char* buf, int x, int y, int len);
 void __thiscall BaseWin_draw_farm_set_font(Buffer* This, Font* a2, Font* a3, Font* a4, Font* a5);
 void __thiscall BaseWin_draw_energy_set_text_color(Buffer* This, int a2, int a3, int a4, int a5);

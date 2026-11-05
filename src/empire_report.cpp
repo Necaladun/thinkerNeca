@@ -600,7 +600,7 @@ void draw_base_list(int faction_id) {
             if (flags & ATT_STALLED) issues += "Production stalled  ";
             if (flags & ATT_HAB_CAP) issues += "Hab cap  ";
             if (flags & ATT_ECO) {
-                snprintf(line, sizeof(line), "Eco: %d", base.eco_damage);
+                snprintf(line, sizeof(line), "Eco: %d%%", base_eco_display_percent(base_id));
                 issues += line;
             }
             write_fitted_text(issues.c_str(), x_reason, y,
@@ -675,7 +675,7 @@ void draw_base_list(int faction_id) {
         write_text("EC", x_stat_ec, report_column_y(), ColorYellow);
         write_text("Labs", x_stat_labs, report_column_y(), ColorYellow);
         write_text("Loss", x_stat_loss, report_column_y(), ColorYellow);
-        write_text("Eco", x_stat_eco, report_column_y(), ColorYellow);
+        write_text("Eco%", x_stat_eco, report_column_y(), ColorYellow);
         write_text("GA", x_stat_ga, report_column_y(), ColorYellow);
         write_text("Status", x_stat_status, report_column_y(), ColorYellow);
     }
@@ -802,8 +802,11 @@ void draw_base_list(int faction_id) {
         snprintf(line, sizeof(line), "%d", base.energy_inefficiency);
         write_text(line, x_stat_loss, y,
             base.energy_inefficiency > 0 ? ColorRed : ColorWhite);
-        snprintf(line, sizeof(line), "%d", base.eco_damage);
-        write_text(line, x_stat_eco, y, base.eco_damage > 0 ? ColorYellow : ColorWhite);
+        // Match the colony screen: below 100% is clean-mineral pressure,
+        // while the raw eco_damage field can still be zero.
+        snprintf(line, sizeof(line), "%d%%", base_eco_display_percent(i));
+        write_text(line, x_stat_eco, y,
+            base.eco_damage > 0 ? ColorYellow : ColorWhite);
         write_text((base.state_flags & BSTATE_GOLDEN_AGE_ACTIVE) ? "GA" : "--",
             x_stat_ga, y,
             (base.state_flags & BSTATE_GOLDEN_AGE_ACTIVE) ? ColorGreen : ColorWhite);
