@@ -1,5 +1,6 @@
 #include "gui.h"
 #include "empire_report.h"
+#include "basewin.h"
 #include "tech.h"
 
 namespace {
@@ -21,7 +22,7 @@ int wheel_remainder = 0;
 const int BASE_FIRST_ROW_Y = 315;
 const int BASE_ROW_HEIGHT = 22;
 const int BASE_BOTTOM_RESERVE = 70; // Only the scroll footer remains below the base rows.
-enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS };
+enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS };
 const int REPORT_TAB_Y = 264;
 const int REPORT_TAB_TOP = 260;
 const int REPORT_TAB_BOTTOM = 287;
@@ -31,8 +32,98 @@ const ReportTab REPORT_TABS[] = {
     { VIEW_STATUS, "Status", 20, 88 },
     { VIEW_PRODUCTION, "Production", 118, 134 },
     { VIEW_CITIZENS, "Citizens", 264, 102 },
+    { VIEW_BEST, "Best", 378, 76 },
+    { VIEW_GOVERNORS, "Gov", 466, 75 },
 };
 BaseListView base_view = VIEW_PRODUCTION;
+
+// Like F4's Best Bases readout, each entry is the single leading base
+// in its category, not a sortable ranking of all bases.
+enum BestMetric {
+    BEST_MINERALS,
+    BEST_NUTRIENTS,
+    BEST_ENERGY,
+    BEST_LABS,
+    BEST_PSYCH,
+    BEST_POPULATION,
+    BEST_GARRISON,
+    BEST_INFRASTRUCTURE,
+    BEST_COUNT
+};
+const char* BEST_METRIC_NAMES[BEST_COUNT] = {
+    "Minerals", "Nutrients", "Energy", "Labs", "Psych",
+    "Population", "Garrison", "Infrastructure"
+};
+
+int garrison_on_base(const BASE& base, int faction_id) {
+    int count = 0;
+    // Occupying units, NOT all units supported by this base.
+    for (int i = 0; i < *VehCount; ++i) {
+        const VEH& veh = Vehs[i];
+        count += veh.faction_id == faction_id
+            && veh.x == base.x && veh.y == base.y;
+    }
+    return count;
+}
+
+int built_facilities(int base_id) {
+    int count = 0;
+    // Secret Projects and orbital units are not base facilities.
+    for (int i = Fac_ID_First; i <= Fac_ID_Last; ++i) {
+        count += !!has_fac_built((FacilityId)i, base_id);
+    }
+    return count;
+}
+
+int best_metric_value(int base_id, BestMetric metric) {
+    const BASE& base = Bases[base_id];
+    switch (metric) {
+    case BEST_MINERALS:       return base.mineral_intake_2;  // after bonuses, before unit support
+    case BEST_NUTRIENTS:      return base.nutrient_intake_2; // before consumption
+    case BEST_ENERGY:         return base.economy_total;     // credits produced
+    case BEST_LABS:           return base.labs_total;
+    case BEST_PSYCH:          return base.psych_total;
+    case BEST_POPULATION:     return base.pop_size;
+    case BEST_GARRISON:       return garrison_on_base(base, base.faction_id);
+    case BEST_INFRASTRUCTURE: return built_facilities(base_id);
+    default:                  return 0;
+    }
+}
+
+struct BestBase {
+    int base_id;
+    int value;
+};
+BestBase best_base_for(int faction_id, BestMetric metric) {
+    BestBase result = { -1, 0 };
+    for (int i = 0; i < *BaseCount; ++i) {
+        if (Bases[i].faction_id != faction_id) {
+            continue;
+        }
+        const int value = best_metric_value(i, metric);
+        // Preserve a deterministic tie-breaker: earliest matching base ID.
+        if (result.base_id < 0 || value > result.value) {
+            result.base_id = i;
+            result.value = value;
+        }
+    }
+    return result;
+}
+
+// Available for all bases via the Gov tab. Use existing native validation,
+// locking, dialog and side-effect logic; do not duplicate governor flags.
+void open_governor_options(int base_id) {
+    empire_report_hide();
+    BaseWin_soft_zoom(BaseWin, base_id);
+    if (*CurrentBaseID == base_id
+        && *CurrentBase == &Bases[base_id]
+        && BaseWin->cur_base_id == base_id) {
+        BaseWin_gov_options(BaseWin, 0);
+    } else {
+        // An unsupported base context must not operate on a different colony.
+        empire_report_show();
+    }
+}
 
 int visible_base_rows() {
     return max(1, (report_height - BASE_FIRST_ROW_Y - BASE_BOTTOM_RESERVE) / BASE_ROW_HEIGHT);
@@ -56,10 +147,15 @@ int count_bases(int faction_id) {
     return count;
 }
 
+int report_row_count(int faction_id) {
+    const int bases = count_bases(faction_id);
+    return base_view == VIEW_BEST && bases ? BEST_COUNT : bases;
+}
+
 int max_base_scroll() {
     const int faction_id = report_faction();
     return faction_id >= 0
-        ? max(0, count_bases(faction_id) - visible_base_rows()) : 0;
+        ? max(0, report_row_count(faction_id) - visible_base_rows()) : 0;
 }
 
 // The game text drawing entry point takes a writable char buffer.
@@ -204,11 +300,17 @@ void draw_research(int faction_id) {
 void draw_base_list(int faction_id) {
     const int total = count_bases(faction_id);
     const int rows = visible_base_rows();
-    base_scroll = clamp(base_scroll, 0, max(0, total - rows));
+    const int count = report_row_count(faction_id);
+    base_scroll = clamp(base_scroll, 0, max(0, count - rows));
 
     char line[256];
-    snprintf(line, sizeof(line), "BASE OVERVIEW    %d bases    showing %d-%d",
-        total, total ? base_scroll + 1 : 0, min(total, base_scroll + rows));
+    if (base_view == VIEW_BEST) {
+        snprintf(line, sizeof(line), "BEST BASES    %d categories    showing %d-%d",
+            count, count ? base_scroll + 1 : 0, min(count, base_scroll + rows));
+    } else {
+        snprintf(line, sizeof(line), "BASE OVERVIEW    %d bases    showing %d-%d",
+            total, total ? base_scroll + 1 : 0, min(total, base_scroll + rows));
+    }
     write_text(line, 20, 242, ColorCyan);
 
 
@@ -228,6 +330,12 @@ void draw_base_list(int faction_id) {
     const int x_drones = report_width * 69 / 100;
     const int x_specialists = report_width * 80 / 100;
     const int x_riot = report_width * 91 / 100;
+    const int x_best_base = report_width * 30 / 100;
+    const int x_best_value = report_width * 70 / 100;
+    const int x_gov_options = report_width * 89 / 100;
+    const int x_gov_citizens = report_width * 48 / 100;
+    const int x_gov_production = report_width * 66 / 100;
+    const int x_gov_priority = report_width * 79 / 100;
 
     // A separate tab line leaves the base-count heading unobscured on narrow screens.
     for (const ReportTab& tab : REPORT_TABS) {
@@ -241,8 +349,38 @@ void draw_base_list(int faction_id) {
             base_view == tab.view ? ColorYellow : ColorCyan);
     }
 
+    if (base_view == VIEW_BEST) {
+        write_text("Category", 20, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Best Base", x_best_base, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Value", x_best_value, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Action", x_gov_options, REPORT_COLUMN_Y, ColorYellow);
+        for (int row = 0; row < rows && base_scroll + row < count; ++row) {
+            const BestMetric metric = (BestMetric)(base_scroll + row);
+            const BestBase best = best_base_for(faction_id, metric);
+            if (best.base_id < 0) {
+                continue;
+            }
+            const int y = BASE_FIRST_ROW_Y + BASE_ROW_HEIGHT * row;
+            write_text(BEST_METRIC_NAMES[metric], 20, y, ColorYellow);
+            write_fitted_text(Bases[best.base_id].name, x_best_base, y,
+                x_best_value - x_best_base - 14, ColorCyan);
+            snprintf(line, sizeof(line), "%d", best.value);
+            write_text(line, x_best_value, y);
+            write_text("Gov", x_gov_options, y, ColorCyan);
+        }
+        write_text("Click a leader to visit the base; Gov opens its native settings",
+            20, report_height - 40, ColorCyan);
+        return;
+    }
+
     write_text("Base", 20, REPORT_COLUMN_Y, ColorYellow);
-    if (base_view == VIEW_PRODUCTION) {
+    if (base_view == VIEW_GOVERNORS) {
+        write_text("Governor", x_pop, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Citizens", x_gov_citizens, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Builds", x_gov_production, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Priority", x_gov_priority, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Action", x_gov_options, REPORT_COLUMN_Y, ColorYellow);
+    } else if (base_view == VIEW_PRODUCTION) {
         write_text("Building", x_prod, REPORT_COLUMN_Y, ColorYellow);
         write_text("Minerals", x_mins, REPORT_COLUMN_Y, ColorYellow);
         write_text("Turns", x_turns, REPORT_COLUMN_Y, ColorYellow);
@@ -305,6 +443,26 @@ void draw_base_list(int faction_id) {
                 write_text("--", x_mins, y);
                 write_text("--", x_turns, y);
             }
+            continue;
+        }
+        if (base_view == VIEW_GOVERNORS) {
+            const uint32_t flags = base.governor_flags;
+            write_text((flags & GOV_ACTIVE) ? "On" : "Off", x_pop, y,
+                (flags & GOV_ACTIVE) ? ColorGreen : ColorYellow);
+            write_text((flags & GOV_MANAGE_CITIZENS) ? "Auto" : "Manual",
+                x_gov_citizens, y);
+            write_text((flags & GOV_MANAGE_PRODUCTION) ? "Auto" : "Manual",
+                x_gov_production, y);
+
+            // Four independent priorities may be combined in Thinker.
+            char priorities[12];
+            snprintf(priorities, sizeof(priorities), "%c%c%c%c",
+                (flags & GOV_PRIORITY_EXPLORE) ? 'E' : '-',
+                (flags & GOV_PRIORITY_DISCOVER) ? 'D' : '-',
+                (flags & GOV_PRIORITY_BUILD) ? 'B' : '-',
+                (flags & GOV_PRIORITY_CONQUER) ? 'C' : '-');
+            write_text(priorities, x_gov_priority, y);
+            write_text("Edit", x_gov_options, y, ColorCyan);
             continue;
         }
         if (base_view == VIEW_CITIZENS) {
@@ -385,14 +543,20 @@ void __cdecl on_report_left_button_up(int x, int y) {
     const int name_right = (base_view == VIEW_PRODUCTION
         ? report_width * 26 / 100 : report_width * 34 / 100) - 8;
     const int hurry_left = report_width * 89 / 100;
+    const int gov_left = report_width * 89 / 100;
     const bool is_name_click = x >= 20 && x < name_right;
     const bool is_hurry_click = base_view == VIEW_PRODUCTION
         && x >= hurry_left && x < report_width - 10;
-    if ((!is_name_click && !is_hurry_click) || y < BASE_FIRST_ROW_Y - 3) {
+    const bool is_gov_click = (base_view == VIEW_GOVERNORS || base_view == VIEW_BEST)
+        && x >= gov_left && x < report_width - 10;
+    const bool is_best_base_click = base_view == VIEW_BEST
+        && x >= 20 && x < gov_left;
+    if ((!is_name_click && !is_hurry_click && !is_gov_click && !is_best_base_click)
+        || y < BASE_FIRST_ROW_Y - 3) {
         return;
     }
     const int row = (y - (BASE_FIRST_ROW_Y - 3)) / BASE_ROW_HEIGHT;
-    const int count = count_bases(faction_id);
+    const int count = report_row_count(faction_id);
     const int rows = visible_base_rows();
     if (row < 0 || row >= rows) {
         return;
@@ -401,38 +565,46 @@ void __cdecl on_report_left_button_up(int x, int y) {
     if (ordinal >= count) {
         return;
     }
-    // Resolve the current base ID on demand: IDs shift when bases die.
-    int seen = 0;
-    for (int base_id = 0; base_id < *BaseCount; ++base_id) {
-        if (Bases[base_id].faction_id == faction_id && seen++ == ordinal) {
-            // Reuse the game's base-context setup rather than opening the
-            // full colony screen first. The normal zoom is modal and delays
-            // BaseWin_hurry() until the colony screen has been closed.
-            // This native soft-zoom route is a Windows runtime test candidate.
-            if (is_hurry_click) {
-                BASE& base = Bases[base_id];
-                if (base.item() == -FAC_STOCKPILE_ENERGY
-                    || !base.can_hurry_item()
-                    || base.minerals_accumulated >= mineral_cost(base_id, base.item())) {
-                    return;
-                }
+    int base_id = -1;
+    if (base_view == VIEW_BEST) {
+        base_id = best_base_for(faction_id, (BestMetric)ordinal).base_id;
+    } else {
+        // Resolve live IDs on demand because base arrays shift after captures.
+        int seen = 0;
+        for (int i = 0; i < *BaseCount; ++i) {
+            if (Bases[i].faction_id == faction_id && seen++ == ordinal) {
+                base_id = i;
+                break;
             }
-            empire_report_hide();
-            if (is_hurry_click) {
-                // F4/map base actions establish context without the blocking
-                // BaseWin_zoom() path. Keep native Hurry's modal and cost rules.
-                BaseWin_soft_zoom(BaseWin, base_id);
-                // Fail closed rather than hurrying an unrelated selected base
-                // if the native context setup did not select this colony.
-                if (*CurrentBaseID == base_id && *CurrentBase == &Bases[base_id]) {
-                    BaseWin_hurry(BaseWin);
-                }
-            } else {
-                BaseWin_zoom(BaseWin, base_id, 1);
-            }
-            return;
         }
     }
+    if (base_id < 0 || base_id >= *BaseCount
+        || Bases[base_id].faction_id != faction_id) {
+        return;
+    }
+    if (is_gov_click) {
+        open_governor_options(base_id);
+        return;
+    }
+    if (is_hurry_click) {
+        BASE& base = Bases[base_id];
+        if (base.item() == -FAC_STOCKPILE_ENERGY
+            || !base.can_hurry_item()
+            || base.minerals_accumulated >= mineral_cost(base_id, base.item())) {
+            return;
+        }
+        empire_report_hide();
+        BaseWin_soft_zoom(BaseWin, base_id);
+        if (*CurrentBaseID == base_id && *CurrentBase == &Bases[base_id]) {
+            BaseWin_hurry(BaseWin);
+        }
+        return;
+    }
+    // Keep established base-name navigation; Best also allows the category
+    // label to select its leader.
+    empire_report_hide();
+    BaseWin_zoom(BaseWin, base_id, 1);
+    return;
 }
 
 void __cdecl draw_report_window() {
