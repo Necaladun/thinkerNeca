@@ -369,6 +369,37 @@ void draw_empire_summary(int faction_id) {
         "Golden Ages: %d    Drone riots: %d    Starving: %d    Eco-damage bases: %d",
         s.golden_ages, s.riots, s.starving, s.eco_bases);
     write_text(line, 20, 145, s.riots || s.starving ? ColorYellow : ColorWhite);
+
+    // These are live faction values. Keep the existing five-line summary
+    // intact on narrower screens instead of overlapping its labels.
+    if (report_width >= 1200) {
+        const int x = report_width * 60 / 100;
+        snprintf(line, sizeof(line), "Allocation: Econ %d%%  Labs %d%%  Psych %d%%",
+            100 - 10 * faction.SE_alloc_labs - 10 * faction.SE_alloc_psych,
+            10 * faction.SE_alloc_labs, 10 * faction.SE_alloc_psych);
+        write_fitted_text(line, x, 57, report_width - x - 20, ColorCyan);
+
+        snprintf(line, sizeof(line), "Sanctions: %d turns   Orbit N/M/E/D: %d/%d/%d/%d",
+            faction.sanction_turns, faction.satellites_nutrient,
+            faction.satellites_mineral, faction.satellites_energy, faction.satellites_ODP);
+        write_fitted_text(line, x, 79, report_width - x - 20,
+            faction.sanction_turns ? ColorYellow : ColorWhite);
+
+        const int models[4] = { faction.SE_Politics, faction.SE_Economics,
+            faction.SE_Values, faction.SE_Future };
+        const char* names[4] = { "?", "?", "?", "?" };
+        for (int i = 0; i < 4; ++i) {
+            if (models[i] >= 0 && models[i] < 4 && SocialField[i].soc_name[models[i]]) {
+                names[i] = SocialField[i].soc_name[models[i]];
+            }
+        }
+        snprintf(line, sizeof(line), "SE: %s / %s / %s / %s",
+            names[0], names[1], names[2], names[3]);
+        write_fitted_text(line, x, 123, report_width - x - 20);
+        snprintf(line, sizeof(line), "SE ratings: Eff %+d  Growth %+d  Police %+d",
+            faction.SE_effic, faction.SE_growth, faction.SE_police);
+        write_fitted_text(line, x, 145, report_width - x - 20);
+    }
 }
 
 void draw_research(int faction_id) {
@@ -437,7 +468,16 @@ void draw_base_list(int faction_id) {
     const int x_e = report_width * 52 / 100;
     const int x_ec = report_width * 60 / 100;
     const int x_labs = report_width * 68 / 100;
-    const int x_status = report_width * 76 / 100;
+    const int x_stat_pop = report_width * 29 / 100;
+    const int x_stat_n = report_width * 35 / 100;
+    const int x_stat_m = report_width * 41 / 100;
+    const int x_stat_e = report_width * 47 / 100;
+    const int x_stat_ec = report_width * 53 / 100;
+    const int x_stat_labs = report_width * 60 / 100;
+    const int x_stat_loss = report_width * 68 / 100;
+    const int x_stat_eco = report_width * 76 / 100;
+    const int x_stat_ga = report_width * 84 / 100;
+    const int x_stat_status = report_width * 89 / 100;
     const int x_workers = report_width * 45 / 100;
     const int x_talents = report_width * 57 / 100;
     const int x_drones = report_width * 69 / 100;
@@ -524,13 +564,16 @@ void draw_base_list(int faction_id) {
         write_text("Specs", x_specialists, REPORT_COLUMN_Y, ColorYellow);
         write_text("Riot", x_riot, REPORT_COLUMN_Y, ColorYellow);
     } else {
-        write_text("Pop", x_pop, REPORT_COLUMN_Y, ColorYellow);
-        write_text("N", x_n, REPORT_COLUMN_Y, ColorYellow);
-        write_text("M", x_m, REPORT_COLUMN_Y, ColorYellow);
-        write_text("E", x_e, REPORT_COLUMN_Y, ColorYellow);
-        write_text("EC", x_ec, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Labs", x_labs, REPORT_COLUMN_Y, ColorYellow);
-        write_text("Status", x_status, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Pop", x_stat_pop, REPORT_COLUMN_Y, ColorYellow);
+        write_text("N", x_stat_n, REPORT_COLUMN_Y, ColorYellow);
+        write_text("M", x_stat_m, REPORT_COLUMN_Y, ColorYellow);
+        write_text("E", x_stat_e, REPORT_COLUMN_Y, ColorYellow);
+        write_text("EC", x_stat_ec, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Labs", x_stat_labs, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Loss", x_stat_loss, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Eco", x_stat_eco, REPORT_COLUMN_Y, ColorYellow);
+        write_text("GA", x_stat_ga, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Status", x_stat_status, REPORT_COLUMN_Y, ColorYellow);
     }
 
     int seen = 0;
@@ -546,7 +589,8 @@ void draw_base_list(int faction_id) {
         const int y = BASE_FIRST_ROW_Y + BASE_ROW_HEIGHT * drawn++;
         // Cyan names are clickable; resolve by current array index after scrolling.
         const int base_name_end = base_view == VIEW_PRODUCTION ? x_icon
-            : base_view == VIEW_GARRISON ? x_here : x_pop;
+            : base_view == VIEW_GARRISON ? x_here
+            : base_view == VIEW_STATUS ? x_stat_pop : x_pop;
         write_fitted_text(base.name, 20, y, base_name_end - 30, ColorCyan);
 
         if (base_view == VIEW_GARRISON) {
@@ -587,7 +631,7 @@ void draw_base_list(int faction_id) {
                         (needed + base.mineral_surplus - 1) / base.mineral_surplus);
                     write_text(line, x_turns, y);
                 } else {
-                    write_text("--", x_turns, y);
+                    write_text("Stalled", x_turns, y, ColorRed);
                 }
                 if (needed > 0 && base.can_hurry_item()) {
                     write_text("Hurry", x_hurry, y, ColorCyan);
@@ -639,34 +683,46 @@ void draw_base_list(int faction_id) {
             continue;
         }
         snprintf(line, sizeof(line), "%d", base.pop_size);
-        write_text(line, x_pop, y);
+        write_text(line, x_stat_pop, y);
         snprintf(line, sizeof(line), "%+d", base.nutrient_surplus);
-        write_text(line, x_n, y, base.nutrient_surplus < 0 ? ColorRed : ColorWhite);
+        write_text(line, x_stat_n, y, base.nutrient_surplus < 0 ? ColorRed : ColorWhite);
         snprintf(line, sizeof(line), "%+d", base.mineral_surplus);
-        write_text(line, x_m, y, base.mineral_surplus < 0 ? ColorRed : ColorWhite);
+        write_text(line, x_stat_m, y, base.mineral_surplus < 0 ? ColorRed : ColorWhite);
         snprintf(line, sizeof(line), "%+d", base.energy_surplus);
-        write_text(line, x_e, y);
+        write_text(line, x_stat_e, y, base.energy_surplus < 0 ? ColorRed : ColorWhite);
         snprintf(line, sizeof(line), "%d", base.economy_total);
-        write_text(line, x_ec, y);
+        write_text(line, x_stat_ec, y);
         snprintf(line, sizeof(line), "%d", base.labs_total);
-        write_text(line, x_labs, y);
+        write_text(line, x_stat_labs, y);
+        // Positive inefficiency represents energy lost, not a beneficial gain.
+        snprintf(line, sizeof(line), "%d", base.energy_inefficiency);
+        write_text(line, x_stat_loss, y,
+            base.energy_inefficiency > 0 ? ColorRed : ColorWhite);
+        snprintf(line, sizeof(line), "%d", base.eco_damage);
+        write_text(line, x_stat_eco, y, base.eco_damage > 0 ? ColorYellow : ColorWhite);
+        write_text((base.state_flags & BSTATE_GOLDEN_AGE_ACTIVE) ? "GA" : "--",
+            x_stat_ga, y,
+            (base.state_flags & BSTATE_GOLDEN_AGE_ACTIVE) ? ColorGreen : ColorWhite);
 
         const char* status = "Normal";
         int status_color = ColorWhite;
         if (base.state_flags & BSTATE_DRONE_RIOTS_ACTIVE) {
-            status = "Drone riot";
+            status = "Riot";
             status_color = ColorRed;
         } else if (base.nutrient_surplus < 0) {
             status = "Starving";
             status_color = ColorRed;
-        } else if (base.state_flags & BSTATE_GOLDEN_AGE_ACTIVE) {
-            status = "Golden Age";
-            status_color = ColorGreen;
+        } else if (base.item() != -FAC_STOCKPILE_ENERGY
+            && base.mineral_surplus <= 0
+            && base.minerals_accumulated < mineral_cost(i, base.item())) {
+            status = "Stalled";
+            status_color = ColorRed;
         } else if (base.eco_damage > 0) {
             status = "Eco-damage";
             status_color = ColorYellow;
         }
-        write_text(status, x_status, y, status_color);
+        write_fitted_text(status, x_stat_status, y,
+            report_width - x_stat_status - 10, status_color);
     }
 
     if (base_view == VIEW_GARRISON) {
@@ -700,7 +756,8 @@ void __cdecl on_report_left_button_up(int x, int y) {
     }
     const int name_right = (base_view == VIEW_PRODUCTION
         ? report_width * 26 / 100 // Stop before the new icon column.
-        : base_view == VIEW_GARRISON ? report_width * 29 / 100
+        : base_view == VIEW_GARRISON || base_view == VIEW_STATUS
+            ? report_width * 29 / 100
         : report_width * 34 / 100) - 8;
     const int hurry_left = report_width * 89 / 100;
     const int gov_left = report_width * 89 / 100;
@@ -771,6 +828,15 @@ void __cdecl draw_report_window() {
     GraphicWin_fill(&report_window, 0);
     Buffer_set_font(&report_window.oCanvas, report_text_font, 0, 0, 0);
     write_text("EMPIRE REPORT  -  live status", 20, 23, ColorCyan);
+    if (report_width >= 900) {
+        char heading[128];
+        snprintf(heading, sizeof(heading), "Year %d    Perihelion: %s",
+            game_year(*CurrentTurn),
+            (*GameState & STATE_PERIHELION_ACTIVE) ? "ACTIVE" : "inactive");
+        write_fitted_text(heading, report_width * 58 / 100, 23,
+            report_width * 42 / 100 - 20,
+            (*GameState & STATE_PERIHELION_ACTIVE) ? ColorYellow : ColorCyan);
+    }
 
     const int faction_id = report_faction();
     if (faction_id < 0) {
