@@ -19,6 +19,9 @@ int report_height = 0;
 int base_scroll = 0;
 int wheel_remainder = 0;
 
+const int REPORT_DESIRED_WIDTH = 1350;  // 150% of the previous 900-pixel target
+const int REPORT_DESIRED_HEIGHT = 990;  // 150% of the previous 660-pixel target
+const int REPORT_SCREEN_MARGIN = 64;
 const int BASE_FIRST_ROW_Y = 315;
 const int BASE_ROW_HEIGHT = 22;
 const int BASE_BOTTOM_RESERVE = 70; // Only the scroll footer remains below the base rows.
@@ -199,6 +202,82 @@ void write_text(const char* text, int x, int y, int color = ColorWhite) {
     Buffer_write_l_3(&report_window.oCanvas, line, x, y, (int)strlen(line));
 }
 
+// Small vector/category pictograms drawn into the report buffer.
+// These are deliberately NOT claimed to be native production-item artwork:
+// the native ProdPicker rendering path has state that is not yet understood.
+void marker_stroke(int x1, int y1, int x2, int y2, int color) {
+    Buffer_line_2(&report_window.oCanvas, x1, y1, x2, y2, color);
+}
+
+void draw_production_marker(int item, int x, int y) {
+    enum MarkerKind { MARKER_LAND, MARKER_SEA, MARKER_AIR,
+        MARKER_FACILITY, MARKER_PROJECT, MARKER_STOCKPILE, MARKER_UNKNOWN };
+    MarkerKind kind = MARKER_UNKNOWN;
+    int color = ColorWhite;
+    if (item >= 0 && item < MaxProtoNum) {
+        const int triad = Units[item].triad();
+        kind = triad == TRIAD_SEA ? MARKER_SEA
+            : triad == TRIAD_AIR ? MARKER_AIR : MARKER_LAND;
+        color = ColorCyan;
+    } else if (item == -FAC_STOCKPILE_ENERGY) {
+        kind = MARKER_STOCKPILE;
+        color = ColorEnergy;
+    } else if (item <= -SP_ID_First && item >= -SP_ID_Last) {
+        kind = MARKER_PROJECT;
+        color = ColorYellow;
+    } else if (item <= -Fac_ID_First && item >= -FAC_ORBITAL_DEFENSE_POD) {
+        kind = MARKER_FACILITY;
+        color = ColorGreen;
+    }
+
+    RECT outline = { x, y, x + 20, y + 20 };
+    Buffer_box_2(&report_window.oCanvas, &outline, color, color);
+    switch (kind) {
+    case MARKER_LAND: // Tank hull, turret and tracks.
+        marker_stroke(x + 4, y + 13, x + 16, y + 13, color);
+        marker_stroke(x + 5, y + 10, x + 15, y + 10, color);
+        marker_stroke(x + 8, y + 7, x + 12, y + 7, color);
+        marker_stroke(x + 11, y + 7, x + 16, y + 7, color);
+        marker_stroke(x + 5, y + 15, x + 15, y + 15, color);
+        break;
+    case MARKER_SEA: // Ship hull and mast.
+        marker_stroke(x + 4, y + 11, x + 16, y + 11, color);
+        marker_stroke(x + 4, y + 11, x + 8, y + 15, color);
+        marker_stroke(x + 8, y + 15, x + 13, y + 15, color);
+        marker_stroke(x + 13, y + 15, x + 16, y + 11, color);
+        marker_stroke(x + 10, y + 5, x + 10, y + 11, color);
+        break;
+    case MARKER_AIR: // Aircraft fuselage, wings and tail.
+        marker_stroke(x + 10, y + 4, x + 10, y + 16, color);
+        marker_stroke(x + 4, y + 10, x + 16, y + 10, color);
+        marker_stroke(x + 7, y + 15, x + 13, y + 15, color);
+        break;
+    case MARKER_FACILITY: // Building outline and windows.
+        marker_stroke(x + 5, y + 6, x + 15, y + 6, color);
+        marker_stroke(x + 5, y + 6, x + 5, y + 16, color);
+        marker_stroke(x + 15, y + 6, x + 15, y + 16, color);
+        marker_stroke(x + 5, y + 16, x + 15, y + 16, color);
+        marker_stroke(x + 8, y + 9, x + 8, y + 11, color);
+        marker_stroke(x + 12, y + 9, x + 12, y + 11, color);
+        break;
+    case MARKER_PROJECT: // Star for a Secret Project.
+        marker_stroke(x + 10, y + 4, x + 13, y + 15, color);
+        marker_stroke(x + 13, y + 15, x + 4, y + 8, color);
+        marker_stroke(x + 4, y + 8, x + 16, y + 8, color);
+        marker_stroke(x + 16, y + 8, x + 7, y + 15, color);
+        marker_stroke(x + 7, y + 15, x + 10, y + 4, color);
+        break;
+    case MARKER_STOCKPILE: // Energy bolt.
+        marker_stroke(x + 12, y + 4, x + 7, y + 11, color);
+        marker_stroke(x + 7, y + 11, x + 13, y + 11, color);
+        marker_stroke(x + 13, y + 11, x + 8, y + 17, color);
+        break;
+    default:
+        write_text("?", x + 5, y + 1, color);
+        break;
+    }
+}
+
 void write_fitted_text(const char* value, int x, int y, int available_width,
                        int color = ColorWhite) {
     char text[128];
@@ -347,7 +426,8 @@ void draw_base_list(int faction_id) {
     write_text(line, 20, 242, ColorCyan);
 
 
-    const int x_prod = report_width * 26 / 100;
+    const int x_icon = report_width * 26 / 100;
+    const int x_prod = report_width * 32 / 100;
     const int x_mins = report_width * 62 / 100;
     const int x_turns = report_width * 78 / 100;
     const int x_hurry = report_width * 89 / 100;
@@ -431,6 +511,7 @@ void draw_base_list(int faction_id) {
         write_text("Priority", x_gov_priority, REPORT_COLUMN_Y, ColorYellow);
         write_text("Action", x_gov_options, REPORT_COLUMN_Y, ColorYellow);
     } else if (base_view == VIEW_PRODUCTION) {
+        write_text("Icon", x_icon, REPORT_COLUMN_Y, ColorYellow);
         write_text("Building", x_prod, REPORT_COLUMN_Y, ColorYellow);
         write_text("Minerals", x_mins, REPORT_COLUMN_Y, ColorYellow);
         write_text("Turns", x_turns, REPORT_COLUMN_Y, ColorYellow);
@@ -464,7 +545,7 @@ void draw_base_list(int faction_id) {
         }
         const int y = BASE_FIRST_ROW_Y + BASE_ROW_HEIGHT * drawn++;
         // Cyan names are clickable; resolve by current array index after scrolling.
-        const int base_name_end = base_view == VIEW_PRODUCTION ? x_prod
+        const int base_name_end = base_view == VIEW_PRODUCTION ? x_icon
             : base_view == VIEW_GARRISON ? x_here : x_pop;
         write_fitted_text(base.name, 20, y, base_name_end - 30, ColorCyan);
 
@@ -491,6 +572,7 @@ void draw_base_list(int faction_id) {
         if (base_view == VIEW_PRODUCTION) {
             const int item = base.item();
             const bool stockpile = item == -FAC_STOCKPILE_ENERGY;
+            draw_production_marker(item, x_icon, y - 1);
             write_fitted_text(prod_name(item), x_prod, y, x_mins - x_prod - 10);
             if (!stockpile) {
                 const int total_minerals = mineral_cost(i, item);
@@ -617,7 +699,7 @@ void __cdecl on_report_left_button_up(int x, int y) {
         return;
     }
     const int name_right = (base_view == VIEW_PRODUCTION
-        ? report_width * 26 / 100
+        ? report_width * 26 / 100 // Stop before the new icon column.
         : base_view == VIEW_GARRISON ? report_width * 29 / 100
         : report_width * 34 / 100) - 8;
     const int hurry_left = report_width * 89 / 100;
@@ -740,8 +822,13 @@ void empire_report_show() {
         return;
     }
     if (!report_window_initialized) {
-        report_width = min(900, max(560, *ScreenWidth - 64));
-        report_height = min(660, max(440, *ScreenHeight - 64));
+        // Larger 150% target, but preserve the game's desktop margins.
+        // Small displays retain the previous size constraints; never
+        // overflow a screen when its usable dimensions fall below the minima.
+        const int available_width = max(1, *ScreenWidth - REPORT_SCREEN_MARGIN);
+        const int available_height = max(1, *ScreenHeight - REPORT_SCREEN_MARGIN);
+        report_width = min(REPORT_DESIRED_WIDTH, available_width);
+        report_height = min(REPORT_DESIRED_HEIGHT, available_height);
         const int x = max(0, (*ScreenWidth - report_width) / 2);
         const int y = max(0, (*ScreenHeight - report_height) / 2);
 

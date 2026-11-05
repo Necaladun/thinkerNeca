@@ -12,7 +12,7 @@
 
 ## Experimental UI (separate draft PR #5)
 
-- [UI-001](WORK-QUEUE.md): Native Empire Report [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) is **user-verified** for basic stats, research, scroll, base navigation/reopen, production Hurry (one-click native dialog, no prepayment/cancellable), Citizens readout, and per-base Gov dialog (correct base, persistent settings including scrolled entries). F4 Best leaders sometimes differ due to output metric interpretation; user accepts this. New **Garrison** summary is source-only pending Windows tests. Messages, native icons and eventual post-upkeep consolidated report remain future scope.
+- [UI-001](WORK-QUEUE.md): Native Empire Report [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) is user-verified for status/research, navigation, Citizens, direct Hurry, governor settings, and Garrison land/sea/air plus Away counts. Police is eligible unit types, not applied suppression. Best metrics differ from F4 in some cases and this is accepted. **Source test pending:** enlarge target to 1350×990 (50% per dimension, screen-clamped) and add generic Production category pictograms. Exact native item art, Messages and post-upkeep integration remain future scope.
 
 ## Active test configuration
 
