@@ -25,6 +25,15 @@ The older major-landmark options `jungle=0` and `uranium=0` **are distinct** fro
 
 `modified_landmarks=1` and `new_world_builder=1` are required for all three independent minor types. Uranium and Titanium each retain an on/off switch but share alternating late generation. See [minor terrain](minor-terrain.md) and [CFG-001](../WORK-QUEUE.md).
 
+
+## Combat-policy settings and known mismatch
+
+- **`ignore_reactor_power=1`** is the established intended policy (DEC-012): reactor research retains cost advantages but must **not** increase effective unit endurance. The engine still stores `10 × reactor` HP; direct combat and artillery duels correctly scale damage. Ordinary bombardment fails to do so (BUG-004), pending a separate fix and Windows validation. This is a source behaviour defect, **not** a reason to change the setting to `0`.
+- **`long_range_artillery=2`** grants additional artillery range to qualifying ships equipped with Heavy Artillery. Conventional positive-weapon ships can already perform artillery under `can_arty()`. It does not grant artillery ability to them in the first place. Naval direct attacks, ranged weapon-only duels and ordinary bombardment differ.
+- **`sensor_defense_ocean=1`** enables qualifying sensor defence at sea under the distributed profile, but ships still lack land forest/rocky and anti-mobile-land ECM defence. AAA against aircraft and port facilities remain conditional exceptions.
+
+See [unit combat and costs](unit-combat-and-costs.md) for current code paths and [BUG-004/BAL-004](../WORK-QUEUE.md) for correctness versus balance design. This section explains *existing* settings; no parser, compiled-default or distribution-profile changes are proposed.
+
 ## Config maintenance
 
 - Comments in `docs/thinker.ini` explain each supported setting; **avoid maintaining a second 170-option catalogue here**.

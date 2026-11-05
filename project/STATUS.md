@@ -23,4 +23,9 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 - [BUG-002](WORK-QUEUE.md): intermittent Inspector label. [BUG-003](WORK-QUEUE.md): naturally seeded resource icons were hidden by geology though yields stacked; resource-priority source fix now needs Windows retest. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
 - More map seeds/climates and landmark regressions remain open. PR #4 stays **draft**.
 
+
+## Separate combat review
+
+Source inspection identified an existing ordinary-artillery-bombardment reactor-normalization mismatch under `ignore_reactor_power=1` ([BUG-004](WORK-QUEUE.md)); a reported late-game Spore Launcher weakness is consistent but lacks isolated Windows reproduction. Broader chassis, armour cost and artillery-duel changes are **unapproved exploration** ([BAL-004](WORK-QUEUE.md)). Neither changes the active terrain PR's merge criteria; [technical reference](technical/unit-combat-and-costs.md).
+
 **Next:** same-build save/reload, fog/unit/Inspector checks with the working mode-3 atlas; verify the new all-site Jungle preflight, then variant 1 and Release parity. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).

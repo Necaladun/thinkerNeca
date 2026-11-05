@@ -11,7 +11,7 @@ This repository is **Necaladun's fork of Thinker Mod for Sid Meier's Alpha Centa
 5. [Ideas](project/IDEAS.md) — proposals that are **not** commitments.
 6. [Testing](project/TESTING.md) — evidence, untested cases and regression criteria.
 
-Technical references: [minor terrain](project/technical/minor-terrain.md), [native rendering](project/technical/rendering.md), [sprite atlas](project/technical/sprite-atlas.md), [map generation](project/technical/map-generation.md), [configuration](project/technical/configuration.md). The inherited Thinker references remain [Details.md](Details.md), [Technical.md](Technical.md) and [Changelog.md](Changelog.md).
+Technical references: [minor terrain](project/technical/minor-terrain.md), [native rendering](project/technical/rendering.md), [sprite atlas](project/technical/sprite-atlas.md), [map generation](project/technical/map-generation.md), [configuration](project/technical/configuration.md), [unit combat and costs](project/technical/unit-combat-and-costs.md). The inherited Thinker references remain [Details.md](Details.md), [Technical.md](Technical.md) and [Changelog.md](Changelog.md).
 
 ## Rules of the repository
 

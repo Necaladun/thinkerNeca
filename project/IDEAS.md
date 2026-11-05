@@ -30,6 +30,68 @@
 
 Old-save/scenario compatibility is not a target. Strong Solar output by itself is not a bug. Changing `tile_output_limit` to 3/3/3 is **already an active trial** (BAL-001), not merely a hypothetical.
 
+
+## Military chassis, artillery and unit economics — exploratory (BAL-004)
+
+**Status: ideas only.** The existing mechanics are documented in [unit combat and costs](technical/unit-combat-and-costs.md). None of the following chassis bonuses, technology progression, artillery rules or cost formulas are implemented or agreed balance values. BUG-004 is a *separate existing correctness defect*, not an argument for a reactor-based HP bonus.
+
+### Economic problem and intended roles
+
+Current construction costs strongly reward high-weapon/low-armour units, particularly Impact and Missile Rovers. An armoured mobile unit can cost as much as two naked attackers, while a surviving durable unit can save replacement minerals, preserve experience and continue an offensive campaign. Analyse **single-battle mineral efficiency** separately from **campaign endurance and repair**.
+
+| Chassis | Proposed specialisation |
+| --- | --- |
+| Infantry | Economical positional defence, garrisons and base assaults |
+| Rover | Fast, replaceable mobile attacker, exploitation and raiding |
+| Tank | Costly durable land unit designed to survive counterattacks and sustained offensives |
+| Foil | Light patrol/interception/attack vessel |
+| Cruiser | More expensive durable fleet unit, escort and transport support |
+
+This does not assume the current Tank or Cruiser has extra HP. Existing mobile open-ground attack bonuses are **speed-based** and can apply to Tanks; making them Rover-only would require an explicit combat change.
+
+### Possible land mobility progression
+
+- Early Rover speed 2 (existing baseline).
+- Unlock a conventional Tank earlier than the current Hovertank, possibly speed 2 with normal terrain movement.
+- Later allow Rover speed 3, without granting early access to greatly increased Unity Pod exploration.
+- Later allow Tank speed 2 **all-terrain** movement rather than simply giving it superior top speed.
+- Determine technology prerequisites, coexistence with current chassis, pathfinding and AI valuation **before** any rule changes.
+
+### Chassis endurance versus armour economics
+
+Test **+1 and +2 effective HP** for Tanks and perhaps Cruisers **independently** of any cost reduction. In an idealised equal-strength 10-HP-versus-10-HP round-by-round battle, moving one participant to 11 HP changes its win chance from 50% to about 58.8%; 12 HP gives about 66.8%. Those are analytic illustrations, not runtime measurements.
+
+The bonus supports repeated engagements and survival of expensive experienced units, but also improves **unarmoured** offensive Tanks. A naked 6-1 Tank should not simply replace a cheaper Rover. Test costs, movement, exposed counterattacks, repairs and AI design decisions, not win probability alone.
+
+An **alternative**, not an automatic additional bonus, is removing/reducing the mobile combined weapon-and-armour cost surcharges for Tanks. Under the current Fission formula a 4-2 Impact Tank costs 70 minerals; a hypothetical removal of both surcharge increments would give 50. Compare this with a +HP Tank before stacking benefits.
+
+Another **lower-priority alternative** is an armour-derived offensive Tank bonus (for example +5% per armour point above 1). This risks making armour a cheap surrogate for weapons at higher reactors, and introduces another specialist modifier. No coefficient is approved.
+
+### Land and naval artillery-duel armour
+
+Current artillery duels use weapon versus weapon, ignoring installed armour as the defender's ordinary resistance. This particularly undermines armoured Cruisers fighting cheap armed Foils at range, but also affects **land counterbattery artillery**.
+
+Possible *symmetric* duel changes to investigate:
+- Add a **fraction of armour above 1** to each participant's effective duel strength, with a cap or diminishing returns if needed.
+- Make armour reduce incoming duel damage rather than modify per-round win probability.
+- Consider a bounded counterbattery-protection bonus for armour-equipped artillery.
+
+A possible mathematical **example only**, not a settled design: `duel strength = weapon + 0.5 × (armour - 1)`. Under it, 6-1 uses 6, 6-3 uses 7, and 6-8 uses 9.5 (before any chosen integer/fixed-point implementation). Test both combatants symmetrically, compare morale/altitude, and avoid changing ordinary direct attacks or air intercepts accidentally.
+
+Naval armour is already cheaper in the existing cost formula, but ships lack forest/rocky or anti-Rover ECM defences. Qualifying sensors, AAA and port defences remain relevant; **these do not protect an ordinary open-sea weapon-only artillery duel through the standard armour path**. Before altering Cruiser HP or price, compare direct naval attacks, ship artillery duels, bombardment against transports and air threats. Extra HP can help duels without making armour itself useful, so it does not solve the whole problem.
+
+### Other related construction ideas
+
+- Investigate finer-than-ten-mineral unit price granularity only if the game and AI can consistently support it.
+- Measure rounding plateaus and nominally free equipment upgrades across Fission/Fusion/Quantum/Singularity.
+- Compare component-based costing models such as WTP's for inspiration, **without** importing their entire balance assumptions.
+- Separately evaluate limited mineral overflow carryover or multi-unit production where cheap-unit spam causes production inefficiencies.
+- Avoid altering these unrelated systems in the first chassis experiment.
+
+### Investigation and test requirements
+
+BAL-004 first needs a cost and win-rate comparison spanning weapon/armour combinations, reactors, terrain, artillery, ship/land roles and repair opportunities. Then select one minimal experimental rule set and verify actual gameplay, AI behaviour, same-build save/reload and adverse edge cases. See [WORK-QUEUE](WORK-QUEUE.md) for the single actionable entry.
+
 ## Native ecology and fungal forests — future exploration
 
 **Ideas only; not approved implementation work.** This records the November 2026 *Landmark Ideas Comparison* discussion for later design. It does **not** add tasks to the work queue, change gameplay, or assert that the following systems exist. The intended **Fungal Forest** is a living native-ecology region, **not a major landmark**, not the independent Jungle minor terrain, and not the ordinary human-built Forest improvement. It should not consume a landmark slot.
