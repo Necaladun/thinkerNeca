@@ -102,3 +102,11 @@ Requested: colour-coded values; Garrison facility indicators; eco damage, growth
 Garrison facility indicators proposed: Perimeter Defense, Tachyon Field, Command Center, Naval Yard (sea training), Aerospace Complex, Bioenhancement Center and Geosynchronous Survey Pod (GSP). Growth display should distinguish normal growth, population boom, stagnation, starvation and Hab Complex/Dome caps.
 
 Further candidates: energy inefficiency, stalled production, satellite totals, sanctions remaining, missing-facility filters and unit support. Historical trends require retained event history.
+
+### Empire Report candidates confirmed for later evaluation (5 Nov)
+
+- Prioritise visible energy inefficiency, stalled base production, sanctions remaining, home-base unit support burden, and each base's percentage contribution to faction economy, labs and psych. These are readouts/calculations over existing state, with costs and upkeep timing to be checked.
+- Consider a missing-facility checklist/filter, without committing to its layout.
+- Consider a dedicated Orbital view for existing satellite totals and associated effects.
+- A Problems/Attention view could filter starving, rioting, stalled and eco-damaged bases, with optional severity sorting; it should not replace the ordinary base list.
+- Personal empire trends are desired, but population/income/labs/minerals trend lines need turn-by-turn snapshots unless existing history can be verified. FactionTurnMight exists, but does not establish the availability of these other series. Future design must specify post-upkeep sampling, bounded retention and same-build save/reload persistence; do not implement history yet.
