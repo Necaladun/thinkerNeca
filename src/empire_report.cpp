@@ -405,8 +405,10 @@ void __cdecl on_report_left_button_up(int x, int y) {
     int seen = 0;
     for (int base_id = 0; base_id < *BaseCount; ++base_id) {
         if (Bases[base_id].faction_id == faction_id && seen++ == ordinal) {
-            // Native hurry handling should always be initiated from the
-            // base-management window, which owns its existing hurry dialog.
+            // Reuse the game's base-context setup rather than opening the
+            // full colony screen first. The normal zoom is modal and delays
+            // BaseWin_hurry() until the colony screen has been closed.
+            // This native soft-zoom route is a Windows runtime test candidate.
             if (is_hurry_click) {
                 BASE& base = Bases[base_id];
                 if (base.item() == -FAC_STOCKPILE_ENERGY
@@ -416,9 +418,17 @@ void __cdecl on_report_left_button_up(int x, int y) {
                 }
             }
             empire_report_hide();
-            BaseWin_zoom(BaseWin, base_id, 1);
             if (is_hurry_click) {
-                BaseWin_hurry(BaseWin);
+                // F4/map base actions establish context without the blocking
+                // BaseWin_zoom() path. Keep native Hurry's modal and cost rules.
+                BaseWin_soft_zoom(BaseWin, base_id);
+                // Fail closed rather than hurrying an unrelated selected base
+                // if the native context setup did not select this colony.
+                if (*CurrentBaseID == base_id && *CurrentBase == &Bases[base_id]) {
+                    BaseWin_hurry(BaseWin);
+                }
+            } else {
+                BaseWin_zoom(BaseWin, base_id, 1);
             }
             return;
         }
