@@ -100,3 +100,5 @@ State should be **local to an ecological network/region**, not a single global â
 Requested: colour-coded values; Garrison facility indicators; eco damage, growth ETA/boom, habitation cap, maintenance and Golden Age; empire integrity/might, commerce, council votes, energy sliders, game year/perihelion and current Social Engineering; eventual Diplomacy standings, relationships, mood, votes and category leaders. Do not implement these yet.
 
 Garrison facility indicators proposed: Perimeter Defense, Tachyon Field, Command Center, Naval Yard (sea training), Aerospace Complex, Bioenhancement Center and Geosynchronous Survey Pod (GSP). Growth display should distinguish normal growth, population boom, stagnation, starvation and Hab Complex/Dome caps.
+
+Further candidates: energy inefficiency, stalled production, satellite totals, sanctions remaining, missing-facility filters and unit support. Historical trends require retained event history.
