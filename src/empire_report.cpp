@@ -9,13 +9,17 @@ namespace {
 GraphicWin report_window = {};
 bool report_window_initialized = false;
 char report_caption[] = "Empire Report";
+// Keep report typography independent of MapWin zoom-dependent fonts.
+Font report_font = {};
+bool report_font_initialized = false;
+const int REPORT_FONT_HEIGHT = 17;
 int report_width = 0;
 int report_height = 0;
 int base_scroll = 0;
 int wheel_remainder = 0;
 
 const int BASE_FIRST_ROW_Y = 286;
-const int BASE_ROW_HEIGHT = 18;
+const int BASE_ROW_HEIGHT = 22;
 
 int visible_base_rows() {
     return max(1, (report_height - BASE_FIRST_ROW_Y - 36) / BASE_ROW_HEIGHT);
@@ -242,7 +246,7 @@ void draw_base_list(int faction_id) {
 
 void __cdecl draw_report_window() {
     GraphicWin_fill(&report_window, 0);
-    Buffer_set_font(&report_window.oCanvas, &MapWin->oFont1, 0, 0, 0);
+    Buffer_set_font(&report_window.oCanvas, &report_font, 0, 0, 0);
     write_text("EMPIRE REPORT  -  live status", 20, 23, ColorCyan);
 
     const int faction_id = report_faction();
@@ -304,6 +308,16 @@ void empire_report_show() {
         GraphicWin_init(&report_window, x, y, report_width, report_height,
             report_caption, 0, &MapWin->oMainWin, nullptr, nullptr);
         report_window.cb_win_redraw = draw_report_window;
+        // The original prototype used the map font, which changes size
+        // with the world-map zoom. Use a separate 17-pixel UI font instead.
+        Font_ctor(&report_font);
+        report_font_initialized = !!Font_init(&report_font, "Arial", REPORT_FONT_HEIGHT, 0);
+        if (!report_font_initialized) {
+            // Keep the native window usable if the font could not initialize.
+            // StatusWindow's text font is not tied to world-map tile zoom.
+            Font_close(&report_font);
+            report_font = StatusWin->oFontNorm;
+        }
         report_window_initialized = true;
     }
 
