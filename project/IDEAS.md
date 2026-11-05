@@ -94,3 +94,7 @@ State should be **local to an ecological network/region**, not a single global â
 - **Validation if adopted later:** same-build save/reload, deterministic seed and budget tests, long-run ecological stability, speed on huge maps, balance across native-life settings, Perihelion and different faction playstyles. Preserve a way to disable experimental ecology for A/B comparison.
 
 **Scope boundary:** Keep this as exploratory design until explicitly selected for a later project phase. Do not blend it into the ongoing PR #4 terrain-rendering acceptance work or put speculative subtasks in `WORK-QUEUE.md`.
+
+## Future Empire Report information (proposals only)
+
+Requested: colour-coded values; Garrison facility indicators; eco damage, growth ETA/boom, habitation cap, maintenance and Golden Age; empire integrity/might, commerce, council votes, energy sliders, game year/perihelion and current Social Engineering; eventual Diplomacy standings, relationships, mood, votes and category leaders. Do not implement these yet.
