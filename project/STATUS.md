@@ -12,7 +12,7 @@
 
 ## Experimental UI (separate draft PR #5)
 
-- [UI-001](WORK-QUEUE.md): independent native Empire Report prototype is **user-verified** for window creation, backtick/Escape close/reopen, input/focus and F4 isolation; base count and treasury were correct. PR #5 (stacked on PR #4) now extends the window with live empire/research figures and a scrollable per-base table. **Expanded screen still needs Windows runtime testing**. User does not require the report to auto-close when a different game loads.
+- [UI-001](WORK-QUEUE.md): native Empire Report in [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) is **user-verified** for open/close/reopen, scrollable base table, treasury/output/base status and research figures, and save/reload. User found text size changes with map zoom; source now uses a dedicated fixed-size UI font, pending Windows runtime confirmation. Loading a different game with the window left open is accepted as nonblocking.
 
 ## Active test configuration
 
