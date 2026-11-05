@@ -26,7 +26,7 @@ const int REPORT_SCREEN_MARGIN = 64;
 const int BASE_FIRST_ROW_Y = 315;
 const int BASE_ROW_HEIGHT = 22;
 const int BASE_BOTTOM_RESERVE = 70; // Only the scroll footer remains below the base rows.
-enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS, VIEW_GARRISON, VIEW_ATTENTION };
+enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS, VIEW_GARRISON, VIEW_ATTENTION, VIEW_GROWTH, VIEW_ECONOMY, VIEW_DEFENSES };
 const int REPORT_TAB_Y = 264;
 const int REPORT_TAB_TOP = 260;
 const int REPORT_TAB_BOTTOM = 287;
@@ -41,16 +41,42 @@ const ReportTab REPORT_TABS[] = {
     { VIEW_GOVERNORS, "Gov", 395, 52 },
     { VIEW_GARRISON, "Garrison", 453, 100 },
     { VIEW_ATTENTION, "Attention", 565, 106 },
+    { VIEW_GROWTH, "Growth", 683, 82 },
+    { VIEW_ECONOMY, "Economy", 777, 102 },
+    { VIEW_DEFENSES, "Defenses", 891, 112 },
 };
 BaseListView base_view = VIEW_PRODUCTION;
 
-// The seventh tab fits on one line at normal sizes. On narrow screens,
-// move only Attention to a second tab line and shift the list below it.
+// The existing seven tabs stay on one line on a wide report. Later tabs
+// wrap to one second row on smaller screens, without overlapping base rows.
 const int REPORT_SECOND_TAB_OFFSET = 28;
-bool report_two_tab_rows() { return report_width < 685; }
+bool report_two_tab_rows() { return report_width < 1025; }
+bool tab_uses_second_row(BaseListView view) {
+    if (report_width < 685) return view >= VIEW_ATTENTION;
+    if (report_two_tab_rows()) return view >= VIEW_GROWTH;
+    return false;
+}
+int report_tab_x(BaseListView view, int default_x) {
+    if (report_width < 685) {
+        switch (view) {
+        case VIEW_ATTENTION: return 20;
+        case VIEW_GROWTH: return 136;
+        case VIEW_ECONOMY: return 232;
+        case VIEW_DEFENSES: return 352;
+        default: break;
+        }
+    } else if (report_two_tab_rows()) {
+        switch (view) {
+        case VIEW_GROWTH: return 20;
+        case VIEW_ECONOMY: return 116;
+        case VIEW_DEFENSES: return 236;
+        default: break;
+        }
+    }
+    return default_x;
+}
 int report_tab_y(BaseListView view) {
-    return REPORT_TAB_Y + (view == VIEW_ATTENTION && report_two_tab_rows()
-        ? REPORT_SECOND_TAB_OFFSET : 0);
+    return REPORT_TAB_Y + (tab_uses_second_row(view) ? REPORT_SECOND_TAB_OFFSET : 0);
 }
 int report_column_y() {
     return REPORT_COLUMN_Y + (report_two_tab_rows() ? REPORT_SECOND_TAB_OFFSET : 0);
@@ -573,8 +599,7 @@ void draw_base_list(int faction_id) {
         } else {
             snprintf(caption, sizeof(caption), "%s", tab.label);
         }
-        const int tab_x = tab.view == VIEW_ATTENTION && report_two_tab_rows()
-            ? 20 : tab.x;
+        const int tab_x = report_tab_x(tab.view, tab.x);
         write_text(caption, tab_x, report_tab_y(tab.view),
             base_view == tab.view ? ColorYellow : ColorCyan);
     }
@@ -693,7 +718,8 @@ void draw_base_list(int faction_id) {
         const int y = report_first_row_y() + BASE_ROW_HEIGHT * drawn++;
         // Cyan names are clickable; resolve by current array index after scrolling.
         const int base_name_end = base_view == VIEW_PRODUCTION ? x_icon
-            : base_view == VIEW_GARRISON ? x_here
+            : (base_view == VIEW_GARRISON || base_view == VIEW_GROWTH
+                || base_view == VIEW_ECONOMY || base_view == VIEW_DEFENSES) ? x_here
             : base_view == VIEW_STATUS ? x_stat_pop : x_pop;
         write_fitted_text(base.name, 20, y, base_name_end - 30, ColorCyan);
 
@@ -850,8 +876,7 @@ void __cdecl on_report_left_button_up(int x, int y) {
     }
     // Keep both displayed tab rows interactive on a narrow screen.
     for (const ReportTab& tab : REPORT_TABS) {
-        const int tab_x = tab.view == VIEW_ATTENTION && report_two_tab_rows()
-            ? 20 : tab.x;
+        const int tab_x = report_tab_x(tab.view, tab.x);
         const int tab_top = report_tab_y(tab.view) - 4;
         if (y >= tab_top && y < tab_top + (REPORT_TAB_BOTTOM - REPORT_TAB_TOP)
             && x >= tab_x && x < tab_x + tab.width) {
@@ -867,7 +892,8 @@ void __cdecl on_report_left_button_up(int x, int y) {
     const int name_right = (base_view == VIEW_PRODUCTION
         ? report_width * 26 / 100 // Stop before the new icon column.
         : base_view == VIEW_GARRISON || base_view == VIEW_STATUS
-            ? report_width * 29 / 100
+            || base_view == VIEW_GROWTH || base_view == VIEW_ECONOMY
+            || base_view == VIEW_DEFENSES ? report_width * 29 / 100
         : base_view == VIEW_ATTENTION ? report_width * 37 / 100
         : report_width * 34 / 100) - 8;
     const int hurry_left = report_width * 89 / 100;
