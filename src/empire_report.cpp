@@ -18,10 +18,20 @@ int report_height = 0;
 int base_scroll = 0;
 int wheel_remainder = 0;
 
-const int BASE_FIRST_ROW_Y = 286;
+const int BASE_FIRST_ROW_Y = 315;
 const int BASE_ROW_HEIGHT = 22;
 const int BASE_BOTTOM_RESERVE = 70; // Only the scroll footer remains below the base rows.
-enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION };
+enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS };
+const int REPORT_TAB_Y = 264;
+const int REPORT_TAB_TOP = 260;
+const int REPORT_TAB_BOTTOM = 287;
+const int REPORT_COLUMN_Y = 292;
+struct ReportTab { BaseListView view; const char* label; int x; int width; };
+const ReportTab REPORT_TABS[] = {
+    { VIEW_STATUS, "Status", 20, 88 },
+    { VIEW_PRODUCTION, "Production", 118, 134 },
+    { VIEW_CITIZENS, "Citizens", 264, 102 },
+};
 BaseListView base_view = VIEW_PRODUCTION;
 
 int visible_base_rows() {
@@ -201,6 +211,7 @@ void draw_base_list(int faction_id) {
         total, total ? base_scroll + 1 : 0, min(total, base_scroll + rows));
     write_text(line, 20, 242, ColorCyan);
 
+
     const int x_prod = report_width * 26 / 100;
     const int x_mins = report_width * 62 / 100;
     const int x_turns = report_width * 78 / 100;
@@ -212,26 +223,45 @@ void draw_base_list(int faction_id) {
     const int x_ec = report_width * 60 / 100;
     const int x_labs = report_width * 68 / 100;
     const int x_status = report_width * 76 / 100;
-    const int tab_y = 242;
-    write_text(base_view == VIEW_STATUS ? "[Status]" : "Status",
-        report_width - 240, tab_y, base_view == VIEW_STATUS ? ColorYellow : ColorCyan);
-    write_text(base_view == VIEW_PRODUCTION ? "[Production]" : "Production",
-        report_width - 144, tab_y, base_view == VIEW_PRODUCTION ? ColorYellow : ColorCyan);
+    const int x_workers = report_width * 45 / 100;
+    const int x_talents = report_width * 57 / 100;
+    const int x_drones = report_width * 69 / 100;
+    const int x_specialists = report_width * 80 / 100;
+    const int x_riot = report_width * 91 / 100;
 
-    write_text("Base", 20, 262, ColorYellow);
+    // A separate tab line leaves the base-count heading unobscured on narrow screens.
+    for (const ReportTab& tab : REPORT_TABS) {
+        char caption[32];
+        if (base_view == tab.view) {
+            snprintf(caption, sizeof(caption), "[%s]", tab.label);
+        } else {
+            snprintf(caption, sizeof(caption), "%s", tab.label);
+        }
+        write_text(caption, tab.x, REPORT_TAB_Y,
+            base_view == tab.view ? ColorYellow : ColorCyan);
+    }
+
+    write_text("Base", 20, REPORT_COLUMN_Y, ColorYellow);
     if (base_view == VIEW_PRODUCTION) {
-        write_text("Building", x_prod, 262, ColorYellow);
-        write_text("Minerals", x_mins, 262, ColorYellow);
-        write_text("Turns", x_turns, 262, ColorYellow);
-        write_text("Action", x_hurry, 262, ColorYellow);
+        write_text("Building", x_prod, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Minerals", x_mins, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Turns", x_turns, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Action", x_hurry, REPORT_COLUMN_Y, ColorYellow);
+    } else if (base_view == VIEW_CITIZENS) {
+        write_text("Pop", x_pop, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Workers", x_workers, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Talents", x_talents, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Drones", x_drones, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Specs", x_specialists, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Riot", x_riot, REPORT_COLUMN_Y, ColorYellow);
     } else {
-    write_text("Pop", x_pop, 262, ColorYellow);
-    write_text("N", x_n, 262, ColorYellow);
-    write_text("M", x_m, 262, ColorYellow);
-    write_text("E", x_e, 262, ColorYellow);
-    write_text("EC", x_ec, 262, ColorYellow);
-    write_text("Labs", x_labs, 262, ColorYellow);
-    write_text("Status", x_status, 262, ColorYellow);
+        write_text("Pop", x_pop, REPORT_COLUMN_Y, ColorYellow);
+        write_text("N", x_n, REPORT_COLUMN_Y, ColorYellow);
+        write_text("M", x_m, REPORT_COLUMN_Y, ColorYellow);
+        write_text("E", x_e, REPORT_COLUMN_Y, ColorYellow);
+        write_text("EC", x_ec, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Labs", x_labs, REPORT_COLUMN_Y, ColorYellow);
+        write_text("Status", x_status, REPORT_COLUMN_Y, ColorYellow);
     }
 
     int seen = 0;
@@ -277,6 +307,26 @@ void draw_base_list(int faction_id) {
             }
             continue;
         }
+        if (base_view == VIEW_CITIZENS) {
+            // Matches the breakdown used by the native base-screen economy display.
+            // These are live counts only; citizen assignment stays in BaseWin.
+            const int workers = base.pop_size
+                - base.talent_total - base.drone_total - base.specialist_total;
+            snprintf(line, sizeof(line), "%d", base.pop_size);
+            write_text(line, x_pop, y);
+            snprintf(line, sizeof(line), "%d", workers);
+            write_text(line, x_workers, y, workers < 0 ? ColorRed : ColorWhite);
+            snprintf(line, sizeof(line), "%d", base.talent_total);
+            write_text(line, x_talents, y);
+            snprintf(line, sizeof(line), "%d", base.drone_total);
+            write_text(line, x_drones, y, base.drone_total > 0 ? ColorYellow : ColorWhite);
+            snprintf(line, sizeof(line), "%d", base.specialist_total);
+            write_text(line, x_specialists, y);
+            if (base.state_flags & BSTATE_DRONE_RIOTS_ACTIVE) {
+                write_text("Riot", x_riot, y, ColorRed);
+            }
+            continue;
+        }
         snprintf(line, sizeof(line), "%d", base.pop_size);
         write_text(line, x_pop, y);
         snprintf(line, sizeof(line), "%+d", base.nutrient_surplus);
@@ -319,14 +369,16 @@ void __cdecl on_report_left_button_up(int x, int y) {
     if (faction_id < 0 || !empire_report_visible()) {
         return;
     }
-    // The two text tabs operate as small native clickable controls.
-    if (y >= 238 && y < 262) {
-        if (x >= report_width - 240 && x < report_width - 154) {
-            base_view = VIEW_STATUS;
-            GraphicWin_redraw(&report_window);
-        } else if (x >= report_width - 144 && x < report_width - 10) {
-            base_view = VIEW_PRODUCTION;
-            GraphicWin_redraw(&report_window);
+    // Tabs are purely report navigation; the same base scroll position is shared.
+    if (y >= REPORT_TAB_TOP && y < REPORT_TAB_BOTTOM) {
+        for (const ReportTab& tab : REPORT_TABS) {
+            if (x >= tab.x && x < tab.x + tab.width) {
+                if (base_view != tab.view) {
+                    base_view = tab.view;
+                    GraphicWin_redraw(&report_window);
+                }
+                return;
+            }
         }
         return;
     }
