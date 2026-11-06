@@ -32,7 +32,7 @@ Old-save/scenario compatibility is not a target. Strong Solar output by itself i
 
 ## Empire Report — production access and future queue interaction
 
-**Implemented on draft PR #5:** Current-build icon/name opens native Change Production for the selected base. The next queued item is displayed read-only; Windows testing confirmed the existing picker, cancel, change and preview. Commit `bd334ba` additionally opens the full native colony screen first, then invokes the same picker; this newer presentation sequence awaits Windows validation.
+**Implemented on draft PR #5:** Current-build icon/name opens native Change Production for the selected base. The next queued item is displayed read-only; Windows testing confirmed the existing picker, cancel, change and preview. A straightforward sequential full-colony open in `bd334ba` failed in-game: `BaseWin_zoom` is modal, so the picker opened only after the colony closed. The new source-only `96e0eba`/`5a671ca` defers the picker into that modal event loop via a one-shot registered message; Windows testing remains pending.
 
 **Potential later enhancement, not currently implemented:** a dedicated full-queue view/edit action from the Empire Report. Queue editing, ordering and automation must use native game behaviour rather than independently changing the queued items. The colony-first shortcut aims to let the player inspect the queue and colony details in the original base window after closing the native picker.
 
