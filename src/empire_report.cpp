@@ -341,9 +341,10 @@ void open_governor_options(int base_id) {
 // Use the same native base context setup as the verified Hurry/Gov actions.
 // Do NOT call mod_base_change: it would bypass the game's production picker,
 // native cancellation, queue handling, retooling confirmation and net locks.
-// BaseWin_production's two native arguments are not yet semantically mapped;
-// zero values select the ordinary, unmodified entry path for initial runtime
-// validation. Never change a base's current item before entering this handler.
+// BaseWin_production's two native arguments are not yet semantically mapped.
+// The provisional (0, 0) call MUST be validated against the game's own
+// Change button before this action can be considered correct. No direct
+// production mutation occurs in our callback.
 void open_change_production(int base_id) {
     if (base_id < 0 || base_id >= *BaseCount) return;
     empire_report_hide();
