@@ -111,6 +111,18 @@ def main() -> None:
             and 'E += minor.energy;' in yields,
             'Thinker AI yield estimator must include all three types')
 
+    move = source('src/move.cpp')
+    require('minor_landmark_at(' not in move
+            and 'minor_landmark_at(' not in patches
+            and 'minor_landmark_any_at(' in move
+            and 'minor_landmark_has(x, y, MINOR_JUNGLE)' in move
+            and 'minor_landmark_has(x, y, MINOR_JUNGLE)' in patches,
+            'AI and Jungle native hook must use explicit multi-minor membership')
+    require('minor_landmark_at(' not in mapgen and
+            'minor_landmark_at(' not in yields and
+            'minor_landmark_at(' not in renderer,
+            'Do not revive single-valued minor feature access')
+
     require('write_jump(0x4688E0, (int)MapWin_gen_overlays);' in patches,
             'Alternative rendering must use the existing verified callback')
     require('draw_minor_terrain_tile(This, x, y);' in renderer,

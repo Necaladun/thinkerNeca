@@ -98,7 +98,7 @@ the original AND and returns with exactly the same stack shape.
 #if defined(__GNUC__) && defined(__i386__)
 extern "C" int __cdecl minor_render_jungle_xy(int x, int y)
 {
-    return minor_landmark_at(x, y) == MINOR_JUNGLE;
+    return minor_landmark_has(x, y, MINOR_JUNGLE);
 }
 
 extern "C" int __cdecl minor_render_jungle_map(const MAP* sq)
@@ -119,7 +119,7 @@ extern "C" int __cdecl minor_render_jungle_map(const MAP* sq)
     const size_t id = offset / sizeof(MAP);
     const int y = static_cast<int>(id / *MapHalfX);
     const int x = static_cast<int>(2 * (id % *MapHalfX) + (y & 1));
-    return minor_landmark_at(x, y) == MINOR_JUNGLE;
+    return minor_landmark_has(x, y, MINOR_JUNGLE);
 }
 
 extern "C" __attribute__((naked, used))
