@@ -1473,6 +1473,65 @@ void __cdecl draw_report_window() {
     draw_base_list(faction_id);
 }
 
+// Locate the actual native QUEUE flat-button rather than guessing a click
+// position in the drawn queue title. BaseWindow's rcQueueTitle is only an
+// artwork/layout rectangle; clicking it did not activate Queue in Windows
+// testing. Use the native BaseButton callback already registered by the game.
+bool native_button_has_queue_label(const char* text) {
+    std::string value;
+    if (!copy_native_message_text(text, value)) return false;
+    for (char& c : value) {
+        if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+    }
+    return value.find("queue") != std::string::npos;
+}
+
+FlatButton* native_queue_button() {
+    FlatButton* candidate = nullptr;
+    auto consider = [&](FlatButton* button) {
+        if (!button || !button->cb_left_click || button->disabled
+            || button->button_id < 0 || !Win_is_visible(button)) return;
+        if (native_button_has_queue_label(button->name)) {
+            candidate = button;
+        } else if (!candidate && native_button_has_queue_label(button->bubbleText)) {
+            candidate = button;
+        }
+    };
+    consider(&BaseWin->flatButton1);
+    for (FlatButton& button : BaseWin->flatButtons2) {
+        consider(&button);
+    }
+    return candidate;
+}
+
+void invoke_native_queue_button() {
+    FlatButton* button = native_queue_button();
+    if (button && button->cb_left_click) {
+#ifndef BUILD_REL
+        debug("Empire Report: native Queue button callback id=%d\n",
+            button->button_id);
+#endif
+        button->cb_left_click(button->button_id);
+        return;
+    }
+#ifndef BUILD_REL
+    debug("Empire Report: native Queue button not located; available buttons:\n");
+    auto dump = [&](const FlatButton& button, int index) {
+        std::string name;
+        std::string bubble;
+        copy_native_message_text(button.name, name);
+        copy_native_message_text(button.bubbleText, bubble);
+        debug("  base button[%d] id=%d disabled=%d name='%s' tooltip='%s'\n",
+            index, button.button_id, button.disabled,
+            name.c_str(), bubble.c_str());
+    };
+    dump(BaseWin->flatButton1, -1);
+    for (int i = 0; i < 22; ++i) {
+        dump(BaseWin->flatButtons2[i], i);
+    }
+#endif
+}
+
 } // namespace
 
 // A registered window message avoids colliding with the game's WM_USER
@@ -1503,18 +1562,9 @@ void empire_report_dispatch_production(int base_id, uint32_t ticket) {
     if (action == COLONY_CHANGE_BUILD) {
         BaseWin_production(BaseWin, 0, 0);
     } else {
-        // Invoke the colony's own queue-title click path. Queue and Change
-        // launch different modes of the Production Readout; calling the
-        // Change picker with guessed native arguments is not equivalent.
-        // The native rect is discovered at runtime, after the colony opens.
-        const RECT& rect = BaseWin->rcQueueTitle;
-        if (rect.right > rect.left && rect.bottom > rect.top
-            && rect.left >= 0 && rect.top >= 0
-            && rect.right <= *ScreenWidth && rect.bottom <= *ScreenHeight) {
-            BaseWin_on_left_click(BaseWin,
-                rect.left + (rect.right - rect.left) / 2,
-                rect.top + (rect.bottom - rect.top) / 2);
-        }
+        // Invoke the real QUEUE button's installed native callback. The prior
+        // rcQueueTitle coordinate was not an interactive Queue control.
+        invoke_native_queue_button();
     }
 }
 
