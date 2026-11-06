@@ -1052,8 +1052,8 @@ No native LM bits, Natural[] entries or MAP fields are ever modified.
 static std::string minor_inspector_feature_line(const char* native, int x, int y)
 {
     std::string line = native ? native : "";
-    const char* minor = minor_terrain_name_at(x, y);
-    if (minor && minor[0]) {
+    const std::string minor = minor_terrain_names_at(x, y);
+    if (!minor.empty()) {
         if (!line.empty()) {
             line += ", ";
         }
@@ -1103,11 +1103,11 @@ extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x,
         || (*GameState & STATE_OMNISCIENT_VIEW))) {
         return static_cast<int>(length);
     }
-    const char* name = minor_terrain_name_at(x, tile_y);
-    if (!name || !name[0]) {
+    const std::string name = minor_terrain_names_at(x, tile_y);
+    if (name.empty()) {
         return static_cast<int>(length);
     }
-    const size_t name_len = strlen(name);
+    const size_t name_len = name.size();
     const size_t separator_len = length ? 2 : 0;
     if (length + separator_len >= capacity
         || name_len >= capacity - length - separator_len) {
@@ -1118,7 +1118,7 @@ extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x,
         *end++ = ',';
         *end++ = ' ';
     }
-    memcpy(end, name, name_len + 1);
+    memcpy(end, name.c_str(), name_len + 1);
     // Unlike hover-only diagnostics, this verifies the native Inspector
     // hook actually appended the label. Limit writes on frequent redraws.
     static int append_reports = 0;
@@ -1127,7 +1127,7 @@ extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x,
         FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
         if (fp) {
             fprintf(fp, "INSPECTOR APPEND x=%d y=%d minor=%s native_len=%u\n",
-                x, tile_y, name, (unsigned)length);
+                x, tile_y, name.c_str(), (unsigned)length);
             fclose(fp);
         }
     }
@@ -1166,8 +1166,8 @@ static void minor_inspector_trace_hover(int x, int y)
             || (*GameState & STATE_OMNISCIENT_VIEW))) {
         return;
     }
-    const char* name = minor_terrain_name_at(x, y);
-    if (!name || !*name) {
+    const std::string name = minor_terrain_names_at(x, y);
+    if (name.empty()) {
         return;
     }
     previous_x = x;
@@ -1178,7 +1178,7 @@ static void minor_inspector_trace_hover(int x, int y)
     FILE* fp = fopen(path.c_str(), "a");
     if (fp) {
         fprintf(fp, "INSPECTOR HOVER x=%d y=%d minor=%s sample_feature_line=%s\n",
-            x, y, name, expected.c_str());
+            x, y, name.c_str(), expected.c_str());
         fclose(fp);
     }
 }
@@ -1218,16 +1218,16 @@ void __thiscall MapWin_gen_overlays(Console* This, int x, int y)
     // This does not touch the native status panel or landmark table.
     if (This == MapWin && conf.minor_debug_tile_names
         && This->PixelsPerTileX >= 60) {
-        const char* name = minor_terrain_name_at(x, y);
+        const std::string name = minor_terrain_names_at(x, y);
         MAP* sq = mapsq(x, y);
-        if (name[0] && sq && This->cOwner >= 0
+        if (!name.empty() && sq && This->cOwner >= 0
             && This->cOwner < MaxPlayerNum && sq->is_known(This->cOwner)) {
             RECT label_rect;
             MapWin_tile_to_pixel(This, x, y, &label_rect.left, &label_rect.top);
             label_rect.right = label_rect.left + This->PixelsPerTileX;
             label_rect.bottom = label_rect.top + This->PixelsPerTileY;
             char label[64] = {};
-            strcpy_n(label, sizeof(label), name);
+            strcpy_n(label, sizeof(label), name.c_str());
             Buffer_set_text_color(&This->oMainWin.oCanvas, ColorWhite, 0, 1, 1);
             Buffer_set_font(&This->oMainWin.oCanvas, &This->oFont2, 0, 0, 0);
             Buffer_write_cent_l_7(&This->oMainWin.oCanvas, label, &label_rect, 20);
@@ -2084,7 +2084,7 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
     // do not reject a valid resource draw using that unrelated argument.
     const int x = frame[8], y = frame[9];
     MAP* tile = mapsq(x, y);
-    if (!tile || minor_landmark_at(x, y) != MINOR_TITANIUM
+    if (!tile || !minor_landmark_has(x, y, MINOR_TITANIUM)
         || (tile->items & BIT_BONUS_RES)) {
         // Normal icons (including procedural ones) are prioritised by
         // mod_bonus_at before the renderer reaches this type-4 draw branch.
@@ -2210,7 +2210,7 @@ static void draw_native_minor_jungle(Console* win, int x, int y)
             continue;
         }
         const bool native = (n->landmarks & (LM_DISABLE | LM_JUNGLE)) == LM_JUNGLE;
-        if (native || minor_landmark_at(nx, ny) == MINOR_JUNGLE) {
+        if (native || minor_landmark_has(nx, ny, MINOR_JUNGLE)) {
             mask |= 1u << k;
         }
     }
@@ -2264,53 +2264,41 @@ static void draw_native_minor_jungle(Console* win, int x, int y)
 static void draw_minor_terrain_tile(Console* win, int x, int y)
 {
     if (conf.reduced_mode || win != MapWin || !*MapTiles
-        || win->cOwner < 0 || win->cOwner >= MaxPlayerNum) {
-        return;
-    }
-    const MinorLandmark type = minor_landmark_at(x, y);
-    if (type <= MINOR_NONE || type >= MINOR_TYPE_COUNT) {
+        || win->cOwner < 0 || win->cOwner >= MaxPlayerNum
+        || !minor_landmark_any_at(x, y)) {
         return;
     }
     MAP* tile = mapsq(x, y);
-    if (type == MINOR_JUNGLE && conf.minor_native_jungle) {
-        // The original terrain function draws native Jungle from the
-        // game's texture array before resources, fungus and improvements.
-        // Never repeat Jungle in our late sprite/diagnostic overlay.
-        return;
-    }
-    if ((type == MINOR_URANIUM && conf.minor_native_uranium)
-        || (type == MINOR_TITANIUM && conf.minor_native_titanium)) {
-        // The engine draws both minerals using the same native resource
-        // sprite. Never duplicate them with a late custom PCX overlay.
-        return;
-    }
     if (!tile || !(tile->is_known(win->cOwner)
         || (*GameState & STATE_OMNISCIENT_VIEW))
         || tile->is_base() || (tile->items & BIT_VEH_IN_TILE)) {
-        // A post-map proof-of-concept must not paint over base/unit art.
-        // The feature remains in the underlying minor tile data.
         return;
     }
-    if (type == MINOR_JUNGLE && conf.minor_native_jungle_preview) {
-        draw_native_minor_jungle(win, x, y);
-        return;
-    }
-
-    Buffer* canvas = &win->oMainWin.oCanvas;
-    load_minor_terrain_sprites(canvas);
-    if (!minor_sprite_ready[type]) {
-        return;
-    }
-
-    long px = 0;
-    long py = 0;
-    MapWin_tile_to_pixel(win, x, y, &px, &py);
-    const int tile_width = win->PixelsPerTileX;
-    if (tile_width > 0 && win->PixelsPerTileY > 0) {
-        const int draw_width = max(1, tile_width * 3 / 4);
-        Sprite_draw_2(&minor_sprites[type], canvas, 253,
-            (int)px + (tile_width - draw_width) / 2,
-            (int)py + win->PixelsPerTileY / 8, draw_width, 104);
+    for (const MinorTerrainEntry& entry : minor_landmark_entries_at(x, y)) {
+        const MinorLandmark type = static_cast<MinorLandmark>(entry.type);
+        if ((type == MINOR_JUNGLE && conf.minor_native_jungle)
+            || (type == MINOR_URANIUM && conf.minor_native_uranium)
+            || (type == MINOR_TITANIUM && conf.minor_native_titanium)) {
+            continue;
+        }
+        if (type == MINOR_JUNGLE && conf.minor_native_jungle_preview) {
+            draw_native_minor_jungle(win, x, y);
+            continue;
+        }
+        Buffer* canvas = &win->oMainWin.oCanvas;
+        load_minor_terrain_sprites(canvas);
+        if (!minor_sprite_ready[type]) {
+            continue;
+        }
+        long px = 0, py = 0;
+        MapWin_tile_to_pixel(win, x, y, &px, &py);
+        const int tile_width = win->PixelsPerTileX;
+        if (tile_width > 0 && win->PixelsPerTileY > 0) {
+            const int draw_width = max(1, tile_width * 3 / 4);
+            Sprite_draw_2(&minor_sprites[type], canvas, 253,
+                (int)px + (tile_width - draw_width) / 2,
+                (int)py + win->PixelsPerTileY / 8, draw_width, 104);
+        }
     }
 }
 
@@ -2329,12 +2317,16 @@ static void draw_minor_terrain_map(Console* win)
     for (int id = 0; id < *MapAreaTiles; ++id) {
         const int y = id / *MapHalfX;
         const int x = 2 * (id % *MapHalfX) + (y & 1);
-        const MinorLandmark type = minor_landmark_at(x, y);
-        if (type > MINOR_NONE && type < MINOR_TYPE_COUNT) {
-            counts[type]++;
+        if (minor_landmark_any_at(x, y)) {
+            for (const MinorTerrainEntry& entry : minor_landmark_entries_at(x, y)) {
+                if (entry.type > MINOR_NONE && entry.type < MINOR_TYPE_COUNT) {
+                    ++counts[entry.type];
+                }
+            }
             draw_minor_terrain_tile(win, x, y);
         }
     }
+
     if (first_scan) {
         first_scan = false;
         for (int id = MINOR_JUNGLE; id < MINOR_TYPE_COUNT; ++id) {

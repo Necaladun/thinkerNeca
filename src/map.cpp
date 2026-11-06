@@ -812,7 +812,7 @@ int __cdecl mod_crop_yield(int faction_id, int base_id, int x, int y, int flag) 
     int alt = sq->alt_level();
     bool has_limit = false;
     bool bonus_landmark = false;
-    const int minor_nutrients = minor_terrain_definition(minor_landmark_at(x, y)).nutrient;
+    const int minor_nutrients = minor_terrain_yields_at(x, y).nutrient;
     bool bonus_nutrient = bonus_at(x, y) == RES_NUTRIENT;
     bool is_base = sq->is_base();
     int planet = Factions[faction_id].SE_planet_pending;
@@ -948,7 +948,7 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
         return 0;
     }
     // Minor minerals use the same cap/mine interaction as a landmark bonus.
-    const int minor_minerals = minor_terrain_definition(minor_landmark_at(x, y)).mineral;
+    const int minor_minerals = minor_terrain_yields_at(x, y).mineral;
     bool has_limit = true;
     bool bonus_landmark = false;
     bool bonus_mineral = bonus_at(x, y) == RES_MINERAL;
@@ -1068,7 +1068,7 @@ int __cdecl mod_energy_yield(int faction_id, int base_id, int x, int y, int flag
     bool is_fungus = false;
     bool has_limit = true;
     bool bonus_energy = bonus_at(x, y) == RES_ENERGY;
-    const int minor_energy = minor_terrain_definition(minor_landmark_at(x, y)).energy;
+    const int minor_energy = minor_terrain_yields_at(x, y).energy;
     bool is_base = sq->is_base();
     int economy = Factions[faction_id].SE_economy_pending
         + (base_id >= 0 && Bases[base_id].golden_age_active() ? 1 : 0);
@@ -1419,10 +1419,9 @@ int __cdecl mod_bonus_at(int x, int y) {
 #else
     const uintptr_t caller = 0; // Unsupported compiler: no visual shortcut.
 #endif
-    const MinorLandmark minor_type = minor_landmark_at(x, y);
     const bool native_geology =
-        (minor_type == MINOR_URANIUM && conf.minor_native_uranium)
-        || (minor_type == MINOR_TITANIUM && conf.minor_native_titanium);
+        (minor_landmark_has(x, y, MINOR_URANIUM) && conf.minor_native_uranium)
+        || (minor_landmark_has(x, y, MINOR_TITANIUM) && conf.minor_native_titanium);
     if (native_geology && caller >= 0x4632D0u && caller < 0x467000u) {
         return 4; // Rendering-only sentinel; no natural resource on this tile.
     }
@@ -1607,7 +1606,7 @@ int item_yield(int x, int y, int faction_id, int bonus, MapItem item) {
         if (sq->items & BIT_RIVER && !is_ocean(sq)) {
             E++;
         }
-        const MinorTerrainDefinition& minor = minor_terrain_definition(minor_landmark_at(x, y));
+        const MinorTerrainYield minor = minor_terrain_yields_at(x, y);
         N += minor.nutrient;
         M += minor.mineral;
         E += minor.energy;

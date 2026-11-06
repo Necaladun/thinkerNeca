@@ -31,12 +31,17 @@ def main() -> None:
     patches = source('src/patch.cpp')
     ini = source('docs/thinker.ini')
 
-    require('struct MinorTerrainTile' in defs and 'uint8_t type;' in defs
+    require('struct MinorTerrainEntry' in defs and 'uint8_t type;' in defs
             and 'uint8_t code;' in defs
-            and 'static_assert(sizeof(MinorTerrainTile) == 2' in defs,
-            'Minor terrain must have an independent two-byte tile record')
-    require('static const uint32_t MinorLandmarkVersion = 2;' in store,
-            'Expected version-2 type/code saves')
+            and 'std::vector<MinorTerrainEntry> features;' in defs
+            and 'sizeof(MinorTerrainEntry) == 2' in defs,
+            'Minor terrain must store ordered type/code pairs per tile')
+    require('static const uint32_t MinorLandmarkVersion = 3;' in store
+            and 'tile.features.resize(size)' in store
+            and 'entry.type <= last_type' in store
+            and 'minor_landmark_clear_all' in store
+            and 'entries.insert(it' in store,
+            'Expected validated v3 multi-feature save and type-specific mutation')
 
     expected = {
         'Jungle': ('1', '0', '0', '1', 'MINOR_GENERATE_EARLY'),
@@ -64,8 +69,8 @@ def main() -> None:
     late = mapgen.index('generate_minor_landmarks(MINOR_GENERATE_LATE);')
     require(early < landmarks < climate < late,
             'Jungle generation must precede landmarks and final rainfall')
-    require('minor_landmark_code_at(x, y)' in mapgen
-            and 'minor_landmark_at(x, y) == MINOR_JUNGLE' in mapgen,
+    require('minor_landmark_code_at(x, y, MINOR_JUNGLE)' in mapgen
+            and 'minor_landmark_has(x, y, MINOR_JUNGLE)' in mapgen,
             'Rainfall must consult independent Jungle type/code')
     require('if (conf.world_mirror_x || conf.world_mirror_y)' in
             body_between(mapgen, 'static void generate_minor_landmarks(', 'void __cdecl mod_world_diamond('),
@@ -81,7 +86,7 @@ def main() -> None:
             'Modified Jungle must use independent storage only')
     require('minor_landmark_set(p.x, p.y, type' in geology
             and 'MINOR_URANIUM' in geology and 'MINOR_TITANIUM' in geology
-            and 'minor_landmark_at(tx, ty) == MINOR_NONE' in geology,
+            and '!minor_landmark_any_at(tx, ty)' in geology,
             'Uranium and Titanium must share non-overlapping independent storage')
     require('TableRange[2]' in geology
             and 'for (int round = 0; round < patch_count; ++round)' in geology
@@ -91,17 +96,17 @@ def main() -> None:
             'The two geological types must alternate, keep separation, and clear fungus')
     require('new_landmark(' not in jungle + geology,
             'Minor terrain may not create native named landmarks')
-    require('minor_landmark_clear(tx, ty)' in mapgen,
+    require('minor_landmark_clear_all(tx, ty)' in mapgen,
             'Major landmark footprints must clear earlier minor terrain')
 
     for metric, func in [('nutrient', 'mod_crop_yield'),
                          ('mineral', 'mod_mine_yield'),
                          ('energy', 'mod_energy_yield')]:
-        require(re.search(r'const int minor_\w+\s*=\s*minor_terrain_definition\('
-                          r'minor_landmark_at\(x, y\)\)\.' + metric,
-                          yields) is not None,
+        require(re.search(r'const int minor_\w+\s*=\s*minor_terrain_yields_at'
+                          r'\(x, y\)\.' + metric, yields) is not None,
                 f'Expected central minor {metric} bonus in {func}')
-    require('N += minor.nutrient;' in yields
+    require('const MinorTerrainYield minor = minor_terrain_yields_at(x, y);' in yields
+            and 'N += minor.nutrient;' in yields
             and 'M += minor.mineral;' in yields
             and 'E += minor.energy;' in yields,
             'Thinker AI yield estimator must include all three types')
@@ -135,8 +140,8 @@ def main() -> None:
                                     'static int underlying_resource_bonus_at(',
                                     'int __cdecl mod_bonus_at(int x, int y) {')
     require('const bool native_geology' in bonus_wrapper
-            and '(minor_type == MINOR_URANIUM && conf.minor_native_uranium)' in bonus_wrapper
-            and '(minor_type == MINOR_TITANIUM && conf.minor_native_titanium)' in bonus_wrapper
+            and '(minor_landmark_has(x, y, MINOR_URANIUM) && conf.minor_native_uranium)' in bonus_wrapper
+            and '(minor_landmark_has(x, y, MINOR_TITANIUM) && conf.minor_native_titanium)' in bonus_wrapper
             and 'return 4;' in bonus_wrapper,
             'Both metals must share the native renderer-only Uranium sprite')
     require('BIT_BONUS_RES' in native_resources
@@ -152,7 +157,7 @@ def main() -> None:
             and 'type == MINOR_TITANIUM && conf.minor_native_titanium' in renderer,
             'Do not restore the old hand-positioned Titanium draw hook')
     require('minor_inspector_feature_line(const char* native, int x, int y)' in renderer
-            and 'minor_terrain_name_at(x, y)' in renderer
+            and 'minor_terrain_names_at(x, y)' in renderer
             and 'line += ", ";' in renderer
             and 'minor_inspector_trace_hover(ptTile.x, ptTile.y);' in renderer,
             'Build a format-only feature-line seam without native landmark spoofing')
@@ -220,7 +225,7 @@ def main() -> None:
             'Titanium extractor must sample the post-load indexed palette')
     require('minor_titanium_select_native_sprite(' in renderer
             and 'frame[8], y = frame[9]' in renderer
-            and 'minor_landmark_at(x, y) != MINOR_TITANIUM' in renderer
+            and '!minor_landmark_has(x, y, MINOR_TITANIUM)' in renderer
             and 'mode == 1 || mode == 3' in renderer
             and 'mode == 3' in renderer
             and 'const NecaSpriteId id = mode == 3' in renderer
@@ -259,7 +264,7 @@ def main() -> None:
     require('int __cdecl minor_native_inspector_strlen_hook()' in renderer
             and 'minor_inspector_length_inner(char* text, int tile_half_x, int tile_y)' in renderer
             and "const size_t capacity = 256;" in renderer
-            and "memcpy(end, name, name_len + 1);" in renderer
+            and "memcpy(end, name.c_str(), name_len + 1);" in renderer
             and 'INSPECTOR APPEND x=%d y=%d' in renderer
             and '"INSPECTOR HOOK native feature strlen' in renderer,
             'Feature-line append needs native ABI, bounded output and logging')

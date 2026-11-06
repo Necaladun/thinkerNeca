@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Read Thinker's independent minor-terrain layer in a SMAC/X SAV.
+"""Inspect THINKER's independent multi-feature THMIN001 v3 save layer.
 
-Pure Python; no game installation needed. This does not interpret the native
-status window or calculate full engine resource yields.
-
+Does not calculate full engine resource output or require a game install.
 Usage: python tools/inspect_minor_save.py game.SAV 133,65 90,30
 """
 import argparse
@@ -12,7 +10,7 @@ from pathlib import Path
 import struct
 
 MAGIC = b'THMIN001'
-VERSION = 2
+VERSION = 3
 HEADER_SIZE = 0xAA4
 MAP_TILE_BYTES = 44
 NAMES = ('None', 'Jungle', 'Uranium', 'Titanium')
@@ -29,12 +27,11 @@ def read_save(raw):
     version, count = struct.unpack_from('<II', raw, offset + 8)
     if version != VERSION:
         raise ValueError(f'Unsupported minor-terrain version {version} (expected {VERSION})')
-    if count <= 0 or len(raw) < offset + 16 + 2*count:
-        raise ValueError('Truncated or invalid minor-terrain array')
+    if count <= 0 or count > 10000000:
+        raise ValueError('Invalid map tile count')
 
-    # Map format: 0xAA4 game metadata + count 44-byte MAP records +
-    # map-abstract bytes + THMIN001 extension. Work backwards from the
-    # extension rather than guessing where the map begins in the SAV.
+    # Original native map format: 0xAA4 metadata + 44 bytes per tile
+    # + compact abstract map, followed by independent THMIN001.
     dimensions = []
     for half_width in range(1, count + 1):
         if count % half_width:
@@ -42,29 +39,47 @@ def read_save(raw):
         width, height = 2*half_width, count // half_width
         if not (8 <= width <= 4096 and 8 <= height <= 4096):
             continue
-        ax = (width + 4) // 5
-        ay = (height + 4) // 5
+        ax, ay = (width + 4)//5, (height + 4)//5
         abstract_size = ay*((ax + 1)//2)
         header = offset - abstract_size - count*MAP_TILE_BYTES - HEADER_SIZE
         if header < 0 or header + 8 > len(raw):
             continue
         if struct.unpack_from('<ii', raw, header) == (width, height):
             dimensions.append((width, height, header))
-
     if len(dimensions) != 1:
         raise ValueError(f'Could not uniquely identify native map dimensions: {dimensions}')
     width, height, header = dimensions[0]
     map_start = header + HEADER_SIZE
-    types = raw[offset + 16:offset + 16 + 2*count]
+
+    pos = offset + 16
     tiles = {}
     for i in range(count):
+        if pos >= len(raw):
+            raise ValueError(f'Truncated minor tile entry {i}')
+        n = raw[pos]
+        pos += 1
+        if n >= len(NAMES):
+            raise ValueError(f'Invalid feature count {n} at tile index {i}')
+        if pos + 2*n > len(raw):
+            raise ValueError(f'Truncated minor feature array at tile index {i}')
+        features = {}
+        previous = 0
+        for _ in range(n):
+            typ, code = raw[pos], raw[pos + 1]
+            pos += 2
+            if typ <= previous or typ >= len(NAMES):
+                raise ValueError(f'Unsorted, duplicate or unknown type {typ} at tile index {i}')
+            if (typ == 1 and code > 120) or (typ in (2, 3) and code > 8):
+                raise ValueError(f'Invalid feature code type={typ} code={code}')
+            features[typ] = code
+            previous = typ
+
         y = i // (width//2)
         x = 2*(i % (width//2)) + (y & 1)
         start = map_start + MAP_TILE_BYTES*i
         climate = raw[start]
         items, native_lm = struct.unpack_from('<II', raw, start + 8)
-        terrain_type, code = types[i*2:i*2+2]
-        tiles[(x, y)] = dict(type=terrain_type, code=code,
+        tiles[(x, y)] = dict(features=features,
                              native_landmarks=native_lm & 0xFFFF,
                              items=items, altitude=climate >> 5,
                              rainfall=(climate >> 3) & 3)
@@ -72,7 +87,7 @@ def read_save(raw):
 
 
 def components(tiles, feature, width):
-    unseen = {pos for pos, tile in tiles.items() if tile['type'] == feature}
+    unseen = {pos for pos, tile in tiles.items() if feature in tile['features']}
     groups = []
     while unseen:
         seed = unseen.pop()
@@ -90,33 +105,22 @@ def components(tiles, feature, width):
 
 
 def summary(width, height, version, tiles):
-    counts = Counter(tile['type'] for tile in tiles.values())
-    errors = []
-    overlaps = []
-    for pos, tile in tiles.items():
-        feature, code = tile['type'], tile['code']
-        if feature not in range(len(NAMES)):
-            errors.append((pos, f'unknown type {feature}'))
-        if feature == 0 and code:
-            errors.append((pos, f'empty tile has code {code}'))
-        if feature == 1 and code > 120:
-            errors.append((pos, f'Jungle code {code} outside 0..120'))
-        if feature in (2, 3) and code > 8:
-            errors.append((pos, f'geological code {code} outside 0..8'))
-        if feature and tile['native_landmarks']:
-            overlaps.append((pos, tile['native_landmarks']))
-        if feature and tile['altitude'] < 3:
-            errors.append((pos, 'minor terrain generated in ocean'))
+    counts = Counter(typ for tile in tiles.values() for typ in tile['features'])
+    overlaps = [(pos, tile['native_landmarks']) for pos, tile in tiles.items()
+                if tile['features'] and tile['native_landmarks']]
+    stacks = [pos for pos, tile in tiles.items() if len(tile['features']) > 1]
+    ocean = [pos for pos, tile in tiles.items()
+             if tile['features'] and tile['altitude'] < 3]
     lines = [f'Map {width}x{height} ({len(tiles)} playable tiles); THMIN001 v{version}']
     for feature in (1, 2, 3):
         groups = components(tiles, feature, width)
         lengths = sorted((len(g) for g in groups), reverse=True)
         lines.append(f'{NAMES[feature]}: {counts[feature]} tiles, '
                      f'{len(groups)} connected patches; sizes {lengths}')
+    lines.append(f'Stacked independent tiles: {len(stacks)}')
     lines.append(f'Minor tiles overlapping native landmarks: {len(overlaps)}')
-    lines.append(f'Invalid type/code/ocean entries: {len(errors)}')
-    for pos, issue in errors[:10]:
-        lines.append(f'  ERROR {pos}: {issue}')
+    lines.append(f'Minor tiles stored in ocean: {len(ocean)}')
+    lines.append(f'Invalid type/code/ocean entries: {len(ocean)}')
     for pos, flags in overlaps[:10]:
         lines.append(f'  OVERLAP {pos}: native LM flags 0x{flags:x}')
     return '\n'.join(lines)
@@ -138,9 +142,8 @@ def main():
         if tile is None:
             print(f'({x},{y}): invalid map coordinate')
             continue
-        feature = tile['type']
-        name = NAMES[feature] if 0 <= feature < len(NAMES) else f'Unknown {feature}'
-        print(f'({x},{y}): {name}, code={tile["code"]}, '
+        names = ', '.join(f'{NAMES[t]}(code={c})' for t, c in tile['features'].items())
+        print(f'({x},{y}): {names or "None"}, '
               f'altitude={tile["altitude"]}, rainfall={tile["rainfall"]}, '
               f'items=0x{tile["items"]:08X}, native_LM=0x{tile["native_landmarks"]:04X}')
 

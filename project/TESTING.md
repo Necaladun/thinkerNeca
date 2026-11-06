@@ -22,13 +22,13 @@
 | Configuration | Parser/INI structural checks, mode 3 selected by user | Local overrides and experimental economic balance |
 | Release/PRACX | Release x86 DLL/launcher cross-compilation **passed** on `4809cb7`; custom Titanium/Inspector hooks remain Develop-only, PRACX unverified | Native art/Inspector parity, actual in-game checks, clean install and supported binaries |
 
-## Pending multi-minor and native-underlay regression plan (DEC-016; no runtime implementation yet)
+## Multi-minor source regression and native-underlay plan (DEC-016; new source not yet Windows-verified)
 
 **TERR-004 storage and mechanics:** exercise single-feature tiles and all pairwise combinations of Jungle/Uranium/Titanium, plus the three-way combination **through constructed/editor/test tiles only**. Fresh generated worlds must contain **zero overlap among the current three types** and retain existing native-major separation. Verify independent per-type code persistence after adding and removing another type; exact per-feature Inspector labels; stacked N/M/E effects once per feature, resource limits and ordinary bonus coexistence; Forest, Mine, Borehole, river, fungus, base square, crawler and future AI-yield paths. Include native-landmark-plus-minor data coexistence without altering native `MAP::landmarks`. Validate fresh-game generation, save→exit→reload→turn advance→save→reload using the *same* DLL and new versioned `THMIN001` format. Structural synthetic tests do not establish Windows runtime correctness.
 
 **REND-005 layering:** compare independent Uranium alone to editor-painted native `LM_URANIUM`; compare explicit natural and editor resource overlaps, with resource glyph always above geology. Check Jungle + Uranium, Jungle + Titanium, Uranium + Titanium and all three on **constructed** tiles for no crashes, corrupted draw state or resource-overdraw; **dual-geology artwork need not be pretty or both visible**, provided behaviour is deterministic and ordinary resource icons are preserved. Exercise fog, reveal, movement/units/bases, scrolling/zoom/clipping, optional/missing `neca_sprites.pcx` and same-build save/reload. Validate only after the native Uranium rendering stage/call contract has been established and a new Windows build is available.
 
-**Status:** Requirements agreed; these are not tests already passed. Existing Develop variant-0 and BUG-003 runtime evidence belongs to the previous single-type implementation.
+**Status:** TERR-004 code and v3 synthetic tests added to PR #4; CI is pending at commit creation and no Windows runtime pass has occurred on the new build. REND-005 still lacks its native rendering change. Existing Develop variant-0 and BUG-003 runtime evidence belongs to the previous single-type/v2 implementation.
 
 ## Combined PR #4 + PR #5 Windows Develop smoke report — 7 November 2026
 
