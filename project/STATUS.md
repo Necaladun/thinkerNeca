@@ -12,7 +12,7 @@
 
 ## Experimental UI (separate draft PR #5)
 
-- [UI-001](WORK-QUEUE.md): Native Empire Report [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5). **Windows verified:** twelve tabs incl. Messages/Units, Growth/Economy/Defenses/Attention, standalone Change Production, Next readout, Hurry and Gov. **Windows Queue diagnostic (7 Nov):** `flatButtons2[20]` is visible/enabled `queue` (ID 20), but **all** listed `cb_left_click` fields are null. Both previous Queue activation paths failed. **New source candidate:** guarded `BaseWin_on_button_clicked(BaseWin, 20)` within the working one-shot in-colony dispatch; native Queue behaviour still needs Windows testing. PR stays draft/unmerged; no game-rule or save changes.
+- [UI-001](WORK-QUEUE.md): Native Empire Report [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5). **Windows verified:** twelve tabs incl. Messages/Units, Growth/Economy/Defenses/Attention; Change Production, Next readout, Hurry and Gov. **7 Nov Queue fix verified in-game at `54e3803`:** Next in Queue opens the native Queue editor for both populated and empty queues (`None`), Building opens the separate Change Production picker, and no popup appears after closing the colony. The underlying `BaseWin_on_button_clicked(BaseWin, 20)` route replaces the failed native callback/coordinate approaches. **Still outstanding:** Insert/Replace/Delete, Cancel/OK persistence, scrolling/wrong-base regression, hurry/governor interaction and same-build save→reload→continue. PR remains draft/unmerged.
 
 ## Active test configuration
 

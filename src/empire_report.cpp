@@ -1476,8 +1476,8 @@ void __cdecl draw_report_window() {
 // The Windows Develop diagnostic identified Queue as flatButtons2[20]:
 // button ID 20, visible and enabled, name "queue". Every native base
 // FlatButton had cb_left_click == nullptr, including working controls.
-// The existing BaseWin_on_button_clicked is the plausible window-level
-// dispatch path; this remains a candidate until tested in the actual game.
+// BaseWin_on_button_clicked is the verified native window-level dispatch:
+// user tested both populated and empty Queue targets on Windows (7 Nov).
 std::string native_button_label(const char* source) {
     std::string value;
     if (!copy_native_message_text(source, value)) return "";
@@ -1516,7 +1516,7 @@ void invoke_native_queue_button() {
     }
 #endif
     if (queue_id >= 0) {
-        // Source-level candidate only; verify native Queue mode in Windows.
+        // Windows-verified on populated and empty queues (7 Nov 2026).
         BaseWin_on_button_clicked(BaseWin, queue_id);
     }
 }
