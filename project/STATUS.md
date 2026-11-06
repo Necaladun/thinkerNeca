@@ -30,8 +30,8 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 ## Remaining before PR #4 can merge
 
 - [TERR-001](WORK-QUEUE.md): broad same-build save→reload→continue, fog/redraw and UI smoke now reported passing on combined Develop; finish any specifically identified edge-case evidence on the final integrated binary.
-- [REND-001/002/004](WORK-QUEUE.md): Jungle all-site preflight is implemented but needs Windows verification; Release/packaging parity and the second Uranium/Titanium sprite variant remain open (variant 1 still uses native Uranium).
-- [BUG-002](WORK-QUEUE.md): Inspector currently looks correct but prior intermittent omission not isolated. [BUG-003](WORK-QUEUE.md): source-level procedural-resource precedence fix received broad positive smoke but still needs a clearly identified natural overlap. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
+- [REND-001/002/004](WORK-QUEUE.md): Jungle positive-path rendering and missing-PCX Uranium fallback pass Windows Develop. Negative Jungle-hook preflight requires a harness; Release runtime parity is deferred; the supplied log only encountered Titanium sprite variant 0 (variant 1 not characterised).
+- [BUG-002](WORK-QUEUE.md): Inspector hook installed and labels look correct; prior intermittent omission remains unreproduced. [BUG-003](WORK-QUEUE.md): **done** for the original resource-precedence bug, specifically checked on a natural overlap. [REND-005](WORK-QUEUE.md): new approved goal to show **both** resource and geological art, ordinary resource on top; not yet implemented. [BUG-001](WORK-QUEUE.md): capture investigation deferred, workaround remains.
 - Generation looked good in the user's combined-build pass; reproducible multi-seed/climate/landmark coverage remains to record. PR #4 stays **draft**.
 
 
@@ -45,4 +45,4 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 
 Source inspection identified an existing ordinary-artillery-bombardment reactor-normalization mismatch under `ignore_reactor_power=1` ([BUG-004](WORK-QUEUE.md)); a reported late-game Spore Launcher weakness is consistent but lacks isolated Windows reproduction. Broader chassis, armour cost and artillery-duel changes are **unapproved exploration** ([BAL-004](WORK-QUEUE.md)). Neither changes the active terrain PR's merge criteria; [technical reference](technical/unit-combat-and-costs.md).
 
-**Next:** complete REND-001 negative preflight harness, REND-004 variant-1 sprite/geometry and REND-002 Release parity; keep targeted BUG-002/003 reproduction and BUG-001 probe capture investigation visible, then run a final integrated-binary regression. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).
+**Next:** design/implement REND-005 safe native dual-glyph rendering with default Planet Uranium Flats screenshot as visual precedent. Investigate reachability of native sprite variant 1; complete REND-001 negative preflight harness. Probe capture and Release feature parity are explicitly deferred, not resolved. Test all resulting code on the final integrated Windows binary. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).

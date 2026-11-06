@@ -43,6 +43,20 @@
 
 **Integration gate:** this is evidence for the *existing* PR #5 binary `3c08b52`, not for a future merged/rebased DLL. Rerun a short Windows regression on the final integrated commit before closing either PR.
 
+## Follow-up graphics tests and design reference — 7 November 2026
+
+**Tested build:** PR #5's combined PR #4 + PR #5 Windows x86 Develop artifact `3c08b52`; user confirmed relevant INI options. This is **Windows user evidence**, not a CI/runtime instrumented result.
+
+- **Renderer installation and atlas:** `TITANIUM DRAW HOOK bonus=0x00465DFC draw=0x00465E37 matches=1 target=0x005E4B9A active=1`. `NECA SPRITE` log shows 1024×1024 indexed atlas, 7→9/6→9 mask conversion, Uranium reference hash `24A1B67A` verified and Titanium hash `D4B3AC2C` verified. Both extracted 100×62, transparency key 9.
+- **Variant coverage:** four `TITANIUM SPRITE TEST mode=3 variant=0 swapped=1` entries at (35,41), (31,43), (33,43), (35,43). Native source pointer `0078a700`, geometry 100×62 / offset 9,2 / pitch 82 / key 9. Selected Titanium 100×62 / offset 11,3 / pitch 80 / key 9. **No variant-1 draw observed.** REND-004's variant-1 geometry remains unknown, not defective by inference.
+- **Inspector:** native strlen-hook `active=1`; user cannot reproduce earlier label omission. This specific log contains **no** `INSPECTOR HOVER` or `INSPECTOR APPEND` entries. Preserve intermittent BUG-002 as monitor/repro.
+- **Ordinary resource on independent geology:** user explicitly found a naturally generated resource overlapping Uranium/Titanium; normal bonus sprite **replaces** geology glyph, unlike Jungle (native texture). Both mechanical yields and the tile viewer still register both. **Original BUG-003 precedence error is corrected and Windows-confirmed.** User now requests **two visible glyphs**, resource **above** geology: independent REND-005, not yet implemented.
+- **Visual precedent:** user supplied a screenshot of the **native Uranium Flats major landmark on the default Planet map**, whose landmark terrain remains apparent with a normal resource icon over it. Treat as a visual reference for REND-005. Native major-landmark rendering differs from the present single resource-slot Uranium/Titanium minor art; screenshot does not verify code reuse.
+- **Atlas fallback:** with mode 3 and `neca_sprites.pcx` absent, Titanium appears as native yellow Uranium with **+1 mineral** still functional. Develop fallback passes; not Release parity.
+- **Jungle:** positive-path appearance passes; three-site unexpected-byte **negative preflight** remains engineering-only. **Probe/base capture** comparison and **Release** runtime parity were explicitly deferred by user; keep `base_capture_fix=0` workaround.
+
+**For REND-005 acceptance:** test naturally generated *and* editor-placed resources over both geology types; distinguish both icons visually rather than only rendering the upper glyph; confirm overlay order, native zoom/clipping/fog, movement/bases, reload, fallback and actual yields. New code requires a new DLL and in-game verification. Existing UI-001 Empire Report acceptance is unaffected.
+
 ## Verified sprite trace — 5 November 2026
 
 - **External Uranium mode 1:** `NECA SPRITE processed name=uranium_test corner=9 transparent=5635 visible=565 hash=24A1B67A expected=24A1B67A verified=1`. Extracted `100x62 offset=9,2 pitch=82 key=9`; native reported the same geometry, offsets, pitch and key, with `variant=0 swapped=1`. User confirmed visual equivalence.
@@ -51,7 +65,7 @@
 
 ## Reported resource-icon overlap — 5 November 2026
 
-The user reports editor-placed resource bonuses visually replace Titanium/Uranium icons while retaining independent yields, but naturally seeded resources can be visually obscured by the geological art even though the Inspector and both yield effects remain. Forest/fungus naturally render beneath mineral art; roads and Forest descriptions coexist in the Inspector; independent Jungle textures continue to show beneath resource icons. Code inspection confirmed `mod_bonus_at` previously checked only `BIT_BONUS_RES` before returning renderer sentinel `4`, while the native resource routine also recognises *procedural* map-seed/coordinate bonuses without that flag. **BUG-003 source fix** now resolves the complete ordinary bonus (including procedural) before returning sprite sentinel 4. This is source/CI-level reasoning only; actual Windows overlap behaviour must be retested with the new DLL.
+The user reports editor-placed resource bonuses visually replace Titanium/Uranium icons while retaining independent yields, but naturally seeded resources can be visually obscured by the geological art even though the Inspector and both yield effects remain. Forest/fungus naturally render beneath mineral art; roads and Forest descriptions coexist in the Inspector; independent Jungle textures continue to show beneath resource icons. Code inspection confirmed `mod_bonus_at` previously checked only `BIT_BONUS_RES` before returning renderer sentinel `4`, while the native resource routine also recognises *procedural* map-seed/coordinate bonuses without that flag. **BUG-003 source fix** now resolves the complete ordinary bonus (including procedural) before the geological sentinel; the 7 November Windows natural-overlap test confirms that the normal glyph takes precedence while both yields remain. User's subsequent two-glyph visual request is **new REND-005** work, not regression of BUG-003.
 
 ## Remaining runtime regression procedure
 
