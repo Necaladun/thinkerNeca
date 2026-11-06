@@ -1,5 +1,7 @@
 # Decisions and working assumptions
 
+> **Status boundary:** Decisions about independent terrain/rendering refer to experimental [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4) until it merges. Design approval does not mean default-branch implementation.
+
 Record choices that materially constrain implementation. **Established** means intentional and current; **Trial** means subject to gameplay testing. A proposal remains in [IDEAS](IDEAS.md), not here, unless adopted. Updated 2026-11-05.
 
 | ID | State | Decision / rationale | Revisit when |
@@ -15,6 +17,9 @@ Record choices that materially constrain implementation. **Established** means i
 | DEC-009 | Established, user-verified | **Sunny Mesa adds +1 energy only in its central 3×3**, not the wider 7×7. Both actual and projected energy use tile codes 0–8; user confirmed this effect in-game. | Future landmark balance decision |
 | DEC-010 | Rejected / reverted | **Do not raise Mesa's 3×3 centre to ~2,000 m with the existing renderer.** The stepped variant produced a rounded/bulging summit instead of a flat top in the 2026-11-04 user screenshot. Restore the 5×5 1,000–1,999 m plateau and surrounding sub-1,000 m rim; keep core +1E. | A different rendering/terrain solution is explicitly proposed |
 | DEC-011 | Established for supported Develop variant 0 | **Custom minor resource art uses a local indexed `neca_sprites.pcx` and native-stage Sprite-pointer substitution.** User confirmed actual blue-grey Titanium, transparency, zoom and +1M. Keep native draw geometry, layering and fallback, not a hand-positioned overlay. This decision does not assert variant 1, Release/PRACX or arbitrary-size art support. | Additional drawing contexts or different sprite formats become necessary |
+| DEC-012 | Established combat-design policy; source bug outstanding | **Keep `ignore_reactor_power=1` as the intended balance rule.** Reactor upgrades retain construction-cost benefits but must not increase *effective* HP or endurance, including against ordinary bombardment. The engine retains `10 × reactor level` stored HP and normalizes direct-combat/duel damage; ordinary bombardment currently fails to normalize (BUG-004). Any future chassis HP bonus must be reactor-independent in effective terms. | Only if the fundamental reactor-combat policy is deliberately reconsidered |
+| DEC-013 | Established design, implementation pending | **New optional telemetry is separate from legacy `debug.txt` and does not alter gameplay or RNG.** Store campaign-specific snapshots, event history, AI decision evidence, manifests and session/save lineage. Ordinary playable games and AI simulations use the same recorder. | Proven implementation constraint or reproducibility issue |
+| DEC-014 | Established design, implementation pending | **AI-only automation should reuse ordinary single-player turn processing and the existing Scenario Editor AI handover path first.** Suppress or resolve only classified blocking interactions; keep native save/reload and victory behaviour correct, support unattended windowed games, and postpone true headless operation. | Source/runtime shows a safer mechanism or a necessary behavioural trade-off |
 
 **Not decided:** reducing Forest to 1/1/1; making geological bonuses Mine-only; a replacement for major slot 10; reworking Former scoring. Those are tracked as TBD in [WORK-QUEUE](WORK-QUEUE.md) or exploratory [IDEAS](IDEAS.md).
 

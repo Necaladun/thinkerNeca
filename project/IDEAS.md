@@ -2,6 +2,12 @@
 
 **Not commitments.** This is a parking place for possible gameplay/engineering directions. If a proposal is accepted for investigation or implementation, create/advance a stable ID in [WORK-QUEUE](WORK-QUEUE.md). Record only actual decisions in [DECISIONS](DECISIONS.md).
 
+## Additional deferred reference reviews
+
+- **Special abilities:** [29-ability review](technical/special-abilities.md) covers combat/economic value, AI selection, navy interactions and deferred balance concepts. No implementation is authorised by preserving the reference.
+- **Air combat and aircraft design:** [aircraft mechanics review](technical/aircraft-combat.md) documents Air Superiority and SAM/AAA interactions, armour economics, transports and a low-priority proposed Heavy-Artillery Needlejet bomber. The armour-as-speed/weight proposal was considered but not adopted.
+- **Operational AI and formations:** [strategy/operations discussion](technical/ai-strategy-operations.md) captures inherited staging, land-combat coordination, raids, operational failure, faction doctrine and observer-game evidence; this is **not** an approved implementation programme. The separate [telemetry/automation plan](technical/telemetry-automation.md) is accepted foundational work.
+
 ## Terraforming and terrain economics
 
 - **Less universal Forests:** reduce Forest from 1 nutrient / 2 minerals / 1 energy to 1/1/1 to increase the relevance of dedicated Farms, Mines and Solar Collectors. Needs evaluation alongside Tree Farms, upkeep, terraforming turns and Thinker AI choices. See BAL-002.
@@ -29,6 +35,68 @@
 ### Explicit non-ideas
 
 Old-save/scenario compatibility is not a target. Strong Solar output by itself is not a bug. Changing `tile_output_limit` to 3/3/3 is **already an active trial** (BAL-001), not merely a hypothetical.
+
+
+## Military chassis, artillery and unit economics — exploratory (BAL-004)
+
+**Status: ideas only.** The existing mechanics are documented in [unit combat and costs](technical/unit-combat-and-costs.md). None of the following chassis bonuses, technology progression, artillery rules or cost formulas are implemented or agreed balance values. BUG-004 is a *separate existing correctness defect*, not an argument for a reactor-based HP bonus.
+
+### Economic problem and intended roles
+
+Current construction costs strongly reward high-weapon/low-armour units, particularly Impact and Missile Rovers. An armoured mobile unit can cost as much as two naked attackers, while a surviving durable unit can save replacement minerals, preserve experience and continue an offensive campaign. Analyse **single-battle mineral efficiency** separately from **campaign endurance and repair**.
+
+| Chassis | Proposed specialisation |
+| --- | --- |
+| Infantry | Economical positional defence, garrisons and base assaults |
+| Rover | Fast, replaceable mobile attacker, exploitation and raiding |
+| Tank | Costly durable land unit designed to survive counterattacks and sustained offensives |
+| Foil | Light patrol/interception/attack vessel |
+| Cruiser | More expensive durable fleet unit, escort and transport support |
+
+This does not assume the current Tank or Cruiser has extra HP. Existing mobile open-ground attack bonuses are **speed-based** and can apply to Tanks; making them Rover-only would require an explicit combat change.
+
+### Possible land mobility progression
+
+- Early Rover speed 2 (existing baseline).
+- Unlock a conventional Tank earlier than the current Hovertank, possibly speed 2 with normal terrain movement.
+- Later allow Rover speed 3, without granting early access to greatly increased Unity Pod exploration.
+- Later allow Tank speed 2 **all-terrain** movement rather than simply giving it superior top speed.
+- Determine technology prerequisites, coexistence with current chassis, pathfinding and AI valuation **before** any rule changes.
+
+### Chassis endurance versus armour economics
+
+Test **+1 and +2 effective HP** for Tanks and perhaps Cruisers **independently** of any cost reduction. In an idealised equal-strength 10-HP-versus-10-HP round-by-round battle, moving one participant to 11 HP changes its win chance from 50% to about 58.8%; 12 HP gives about 66.8%. Those are analytic illustrations, not runtime measurements.
+
+The bonus supports repeated engagements and survival of expensive experienced units, but also improves **unarmoured** offensive Tanks. A naked 6-1 Tank should not simply replace a cheaper Rover. Test costs, movement, exposed counterattacks, repairs and AI design decisions, not win probability alone.
+
+An **alternative**, not an automatic additional bonus, is removing/reducing the mobile combined weapon-and-armour cost surcharges for Tanks. Under the current Fission formula a 4-2 Impact Tank costs 70 minerals; a hypothetical removal of both surcharge increments would give 50. Compare this with a +HP Tank before stacking benefits.
+
+Another **lower-priority alternative** is an armour-derived offensive Tank bonus (for example +5% per armour point above 1). This risks making armour a cheap surrogate for weapons at higher reactors, and introduces another specialist modifier. No coefficient is approved.
+
+### Land and naval artillery-duel armour
+
+Current artillery duels use weapon versus weapon, ignoring installed armour as the defender's ordinary resistance. This particularly undermines armoured Cruisers fighting cheap armed Foils at range, but also affects **land counterbattery artillery**.
+
+Possible *symmetric* duel changes to investigate:
+- Add a **fraction of armour above 1** to each participant's effective duel strength, with a cap or diminishing returns if needed.
+- Make armour reduce incoming duel damage rather than modify per-round win probability.
+- Consider a bounded counterbattery-protection bonus for armour-equipped artillery.
+
+A possible mathematical **example only**, not a settled design: `duel strength = weapon + 0.5 × (armour - 1)`. Under it, 6-1 uses 6, 6-3 uses 7, and 6-8 uses 9.5 (before any chosen integer/fixed-point implementation). Test both combatants symmetrically, compare morale/altitude, and avoid changing ordinary direct attacks or air intercepts accidentally.
+
+Naval armour is already cheaper in the existing cost formula, but ships lack forest/rocky or anti-Rover ECM defences. Qualifying sensors, AAA and port defences remain relevant; **these do not protect an ordinary open-sea weapon-only artillery duel through the standard armour path**. Before altering Cruiser HP or price, compare direct naval attacks, ship artillery duels, bombardment against transports and air threats. Extra HP can help duels without making armour itself useful, so it does not solve the whole problem.
+
+### Other related construction ideas
+
+- Investigate finer-than-ten-mineral unit price granularity only if the game and AI can consistently support it.
+- Measure rounding plateaus and nominally free equipment upgrades across Fission/Fusion/Quantum/Singularity.
+- Compare component-based costing models such as WTP's for inspiration, **without** importing their entire balance assumptions.
+- Separately evaluate limited mineral overflow carryover or multi-unit production where cheap-unit spam causes production inefficiencies.
+- Avoid altering these unrelated systems in the first chassis experiment.
+
+### Investigation and test requirements
+
+BAL-004 first needs a cost and win-rate comparison spanning weapon/armour combinations, reactors, terrain, artillery, ship/land roles and repair opportunities. Then select one minimal experimental rule set and verify actual gameplay, AI behaviour, same-build save/reload and adverse edge cases. See [WORK-QUEUE](WORK-QUEUE.md) for the single actionable entry.
 
 ## Native ecology and fungal forests — future exploration
 
@@ -85,3 +153,15 @@ State should be **local to an ecological network/region**, not a single global �
 - **Validation if adopted later:** same-build save/reload, deterministic seed and budget tests, long-run ecological stability, speed on huge maps, balance across native-life settings, Perihelion and different faction playstyles. Preserve a way to disable experimental ecology for A/B comparison.
 
 **Scope boundary:** Keep this as exploratory design until explicitly selected for a later project phase. Do not blend it into the ongoing PR #4 terrain-rendering acceptance work or put speculative subtasks in `WORK-QUEUE.md`.
+
+## Empire Turn Report (UI-002) — future workflow, not present in PR #5
+
+The parked native Empire Report (UI-001, [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5)) is a manually opened **live-state** view. The desired **start-of-turn Turn Report** is distinct: finish all relevant faction-wide upkeep first, then present the **results and pending player decisions together**, instead of asking for sequential colony orders while energy and labs are still changing.
+
+- Headline: **“X colonies finished production and need new orders.”** For each genuine completion, list the colony, exact item completed, the next queue/current order and a native **Change Production / Queue** action. It must handle 30 or more completions with independent scrolling, not rely on the current Stockpile Energy listing.
+- Show opening/closing treasury, credited income/maintenance, research progress and breakthroughs, population changes, major incidents, riots/starvation, and actionable colony exceptions. Distinguish routine advisories such as habitation caps from urgent decisions.
+- **Stockpile Energy** already serves as a native fallback for some unqueued facility/Secret Project completions; keep that behaviour while deferring later choices. A base intentionally stockpiling does *not* prove that it completed production this turn. Do not overwrite valid queued items or governor decisions.
+- **Secret Project completed** is an exceptional notification. Offer **“View movie?”** using the existing playback route; current game preferences gate the automatic playback. The proposal must not suppress project rewards, council/victory effects, interludes or normal project completion rules.
+- Implement in stages: **capture true events and snapshots without changing upkeep**, then distinguish safe routine notifications from mechanically significant decisions, then integrate an automatic reopenable post-upkeep report. The game's `production_phase() -> mod_base_upkeep()` processes colonies sequentially and can invoke native `BaseWin_zoom()` during processing; a mid-loop report would show partial totals. Guard same-build save/reload, eliminated bases, research breakthroughs, upkeep order and multiplayer/PBEM differences.
+
+This design is deferred under [UI-002](WORK-QUEUE.md) and **does not hold up merging the currently functional manual Empire Report**.

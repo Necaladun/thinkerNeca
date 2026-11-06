@@ -1,6 +1,8 @@
 # Testing and verification
 
-**Updated 2026-11-05.** Runtime evidence is from draft [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), Windows 32-bit **Develop**. The user installed a matching DLL and a local 1024×1024 `neca_sprites.pcx`, with `minor_native_titanium=1` and `minor_titanium_sprite_mode=3`. The user's entire installed `thinker.ini`/`thinker_user.ini` has **not** been inspected; [docs/thinker.ini](../docs/thinker.ini) is the distributed test profile.
+> **Branch scope:** Most terrain evidence below relates to draft PR #4, **not** a merged feature on `master`. PR #5's Empire Report is also unmerged. Documentation-only integration has no Windows runtime test requirement; code changes still do.
+
+**Updated 2026-11-07.** Runtime evidence is from draft [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), Windows 32-bit **Develop**. The user installed a matching DLL and a local 1024×1024 `neca_sprites.pcx`, with `minor_native_titanium=1` and `minor_titanium_sprite_mode=3`. The user's entire installed `thinker.ini`/`thinker_user.ini` has **not** been inspected; [docs/thinker.ini](../docs/thinker.ini) is the distributed test profile.
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
@@ -8,6 +10,7 @@
 
 | Area | Evidence | Remaining checks |
 | --- | --- | --- |
+| UI-001 Empire Report (PR #5, parked) | **Windows user reports:** native Report and 12 views functional; Overview and genuine SMAC/X inset frames visible; six colour-separated summary groups approved visually; current Stockpile Energy links open Change Production; native populated/empty Queue Insert/Replace/Delete and Cancel/OK work. [PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) source head `cbddd36` passed Windows Develop+Release [CI](https://github.com/Necaladun/thinkerNeca/actions/runs/42289432728), which does not execute the game. **This code is not merged into master.** | On rebased/retargeted final PR #5: test 1024×768 and high-res clipping; 40–60+ colonies, scrolling and correct base clicks; zoom-independent text; all tabs and action routing including Hurry/Gov/modal focus, fullscreen/windowed where supported; new-game same-build save/reload/continue. Game-load-while-open quirk accepted. UI-002 future event report is out of scope. |
 | Windows Develop | CI success on `4809cb7` (5 November 2026): x86 DLL/launcher cross-compilation plus synthetic sprite, save, config and source contracts | Clean installation and actual Windows runtime tests; compiler/CI does not execute the game |
 | Minor storage/yields | Synthetic THMIN001 v2 saves; user confirms Jungle +1N, Uranium +1E, Titanium +1M. **5 Nov user test:** Titanium yield persists through save→load→turns→load, works with Mine and raised resource caps; Forest/road Inspector and built improvements/bases work. | Repeat explicit persistence for Jungle/Uranium; fog and crawler interactions; actual normal-resource icon precedence after BUG-003 fix |
 | Jungle/Uranium graphics | User reports native sprites and resource effects working; `b76feed` preflights all three Jungle patch sites before modifying any | Check Jungle hook on the supported executable and forced unsupported preimage; fog/units, composite tiles and Release |
@@ -44,8 +47,29 @@ Prioritise one normal Windows Develop test game before changing INI options or a
 
 **Evidence handling:** `minor_terrain_render.log` is written beside the game executable and **truncated on DLL startup**; copy it before restarting when a repro occurs. Hover and append diagnostics are capped per process. For failures, supply DLL commit, effective INI (including `thinker_user.ini`), map size/seed/year, tile coordinates, what happened versus expected, and a screenshot or a copied log. Do not alter your original `terranx.exe` for negative hook tests.
 
+
+## Combat reactor normalization — source finding, Windows validation pending
+
+**BUG-004:** The existing `ignore_reactor_power=1` setting removes effective reactor endurance advantages in conventional direct combat and weapon-versus-weapon artillery duels. Ordinary bombardment still subtracts unscaled damage from `10 × reactor` stored HP; this is a source-confirmed discrepancy, **not yet** a Windows reproduction or fixed feature. A user separately reported poor Spore Launcher performance versus Fusion units; this is consistent with BUG-004 but its cause has not been isolated.
+
+| Target/test | Expected evidence |
+| --- | --- |
+| Otherwise identical Fission/Fusion/Quantum/Singularity defenders | Compare effective percentage HP loss and damage distribution under repeated identical artillery conditions |
+| Conventional land bombardment | Check armour, morale, terrain, repair and the correct target reactor conversion |
+| Spore Launcher vs conventional defenders | Ensure native psi-artillery attack does not inadvertently reward target reactor level |
+| Conventional artillery vs native units | Preserve existing special native/psi handling; no false reactor advantages |
+| Sea bombardment vs transport/non-artillery vessel | Check damage, 100% sea cap and destruction |
+| Armed ship vs armed ship at range | Confirm weapon-versus-weapon duel path and existing reactor-normalised round damage |
+| Bunker/base and open-ground targets | Check 50% / 99% damage limits and integer rounding near HP floors |
+| `ignore_reactor_power=0` | Verify original reactor behaviour remains consistent if retaining this configuration path |
+| Save/reload, visual damage, healing | Correct stored damage and recovery using same DLL and effective INI |
+
+Record the exact unit prototypes, reactors, morale, tile, year, attack method, effective `thinker.ini`/`thinker_user.ini`, stored/effective HP before/after, DLL commit and screenshot/log. Source inspection, automated calculations, compilation and user observation are **distinct** evidence classes.
+
+**BAL-004 (future, not yet tested):** If chassis HP, armour-priced Tanks or armour-contributing artillery duels are approved, compare individual battle odds, sustained engagements, repair/replacement mineral costs, land terrain bonuses, sea defence, unit-design AI and new-game save/reload. Do not mark hypothetical formula results as Windows-verified.
+
 ## CI and deployment
 
-[Windows workflow](../.github/workflows/build-windows.yml): Develop and Release compilation (separate jobs); synthetic tests for the local-input [sprite atlas builder](technical/sprite-atlas.md), old legacy placeholder and source masks; source/INI/slot-10/Mesa contracts and synthetic save reader. **The artifact distributes DLL and EXE only**, not user/original-game art or the old placeholder PCX.
+[PR #4 Windows workflow](https://github.com/Necaladun/thinkerNeca/blob/feature/minor-terrain-generation-migration/.github/workflows/build-windows.yml): Develop and Release compilation (separate jobs); synthetic tests for the local-input [sprite atlas builder](technical/sprite-atlas.md), old legacy placeholder and source masks; source/INI/slot-10/Mesa contracts and synthetic save reader. **The artifact distributes DLL and EXE only**, not user/original-game art or the old placeholder PCX.
 
 Record the commit, effective INI including overrides, map/save coordinates and year, screenshot, PCX source and `minor_terrain_render.log` when investigating remaining problems.

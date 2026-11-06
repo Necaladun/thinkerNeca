@@ -1,5 +1,8 @@
 # Configuration — current fork test profile
 
+> **Branch scope (2026-11-07):** This reference documents experimental terrain/rendering/configuration work on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4). The corresponding engine and game-data changes are **not merged into `master`**. The default-branch files retain earlier behaviour; consult the PR branch for the implementation and test profile.
+
+
 **Authoritative shipped example:** [`docs/thinker.ini`](../../docs/thinker.ini). **Parser/defaults:** `src/main.cpp` / `src/main.h`. **Status:** user-selected test configuration, not upstream Thinker defaults or a settled balance release.
 
 At startup, the fork reads `thinker.ini`, then optionally `thinker_user.ini` from the same game folder. The latter overrides ordinary single-value settings when present. Repeated options such as `skip_event`, `skip_faction` and `music_label` have special additive semantics, so they cannot always be undone by simply placing a different value in an override. To reproduce the tested profile, check both files.
@@ -24,6 +27,15 @@ At startup, the fork reads `thinker.ini`, then optionally `thinker_user.ini` fro
 The older major-landmark options `jungle=0` and `uranium=0` **are distinct** from the independent minor settings. **`canyon=` is no longer recognised**; the retired native major slot 10 is reserved. Delete old `canyon=1` or `canyon=0` lines from *both* INI files to avoid parser warnings.
 
 `modified_landmarks=1` and `new_world_builder=1` are required for all three independent minor types. Uranium and Titanium each retain an on/off switch but share alternating late generation. See [minor terrain](minor-terrain.md) and [CFG-001](../WORK-QUEUE.md).
+
+
+## Combat-policy settings and known mismatch
+
+- **`ignore_reactor_power=1`** is the established intended policy (DEC-012): reactor research retains cost advantages but must **not** increase effective unit endurance. The engine still stores `10 × reactor` HP; direct combat and artillery duels correctly scale damage. Ordinary bombardment fails to do so (BUG-004), pending a separate fix and Windows validation. This is a source behaviour defect, **not** a reason to change the setting to `0`.
+- **`long_range_artillery=2`** grants additional artillery range to qualifying ships equipped with Heavy Artillery. Conventional positive-weapon ships can already perform artillery under `can_arty()`. It does not grant artillery ability to them in the first place. Naval direct attacks, ranged weapon-only duels and ordinary bombardment differ.
+- **`sensor_defense_ocean=1`** enables qualifying sensor defence at sea under the distributed profile, but ships still lack land forest/rocky and anti-mobile-land ECM defence. AAA against aircraft and port facilities remain conditional exceptions.
+
+See [unit combat and costs](unit-combat-and-costs.md) for current code paths and [BUG-004/BAL-004](../WORK-QUEUE.md) for correctness versus balance design. This section explains *existing* settings; no parser, compiled-default or distribution-profile changes are proposed.
 
 ## Config maintenance
 
