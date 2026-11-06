@@ -1,5 +1,7 @@
 # Testing and verification
 
+> **Branch scope:** Most terrain evidence below relates to draft PR #4, **not** a merged feature on `master`. PR #5's Empire Report is also unmerged. Documentation-only integration has no Windows runtime test requirement; code changes still do.
+
 **Updated 2026-11-05.** Runtime evidence is from draft [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), Windows 32-bit **Develop**. The user installed a matching DLL and a local 1024×1024 `neca_sprites.pcx`, with `minor_native_titanium=1` and `minor_titanium_sprite_mode=3`. The user's entire installed `thinker.ini`/`thinker_user.ini` has **not** been inspected; [docs/thinker.ini](../docs/thinker.ini) is the distributed test profile.
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
@@ -44,8 +46,29 @@ Prioritise one normal Windows Develop test game before changing INI options or a
 
 **Evidence handling:** `minor_terrain_render.log` is written beside the game executable and **truncated on DLL startup**; copy it before restarting when a repro occurs. Hover and append diagnostics are capped per process. For failures, supply DLL commit, effective INI (including `thinker_user.ini`), map size/seed/year, tile coordinates, what happened versus expected, and a screenshot or a copied log. Do not alter your original `terranx.exe` for negative hook tests.
 
+
+## Combat reactor normalization — source finding, Windows validation pending
+
+**BUG-004:** The existing `ignore_reactor_power=1` setting removes effective reactor endurance advantages in conventional direct combat and weapon-versus-weapon artillery duels. Ordinary bombardment still subtracts unscaled damage from `10 × reactor` stored HP; this is a source-confirmed discrepancy, **not yet** a Windows reproduction or fixed feature. A user separately reported poor Spore Launcher performance versus Fusion units; this is consistent with BUG-004 but its cause has not been isolated.
+
+| Target/test | Expected evidence |
+| --- | --- |
+| Otherwise identical Fission/Fusion/Quantum/Singularity defenders | Compare effective percentage HP loss and damage distribution under repeated identical artillery conditions |
+| Conventional land bombardment | Check armour, morale, terrain, repair and the correct target reactor conversion |
+| Spore Launcher vs conventional defenders | Ensure native psi-artillery attack does not inadvertently reward target reactor level |
+| Conventional artillery vs native units | Preserve existing special native/psi handling; no false reactor advantages |
+| Sea bombardment vs transport/non-artillery vessel | Check damage, 100% sea cap and destruction |
+| Armed ship vs armed ship at range | Confirm weapon-versus-weapon duel path and existing reactor-normalised round damage |
+| Bunker/base and open-ground targets | Check 50% / 99% damage limits and integer rounding near HP floors |
+| `ignore_reactor_power=0` | Verify original reactor behaviour remains consistent if retaining this configuration path |
+| Save/reload, visual damage, healing | Correct stored damage and recovery using same DLL and effective INI |
+
+Record the exact unit prototypes, reactors, morale, tile, year, attack method, effective `thinker.ini`/`thinker_user.ini`, stored/effective HP before/after, DLL commit and screenshot/log. Source inspection, automated calculations, compilation and user observation are **distinct** evidence classes.
+
+**BAL-004 (future, not yet tested):** If chassis HP, armour-priced Tanks or armour-contributing artillery duels are approved, compare individual battle odds, sustained engagements, repair/replacement mineral costs, land terrain bonuses, sea defence, unit-design AI and new-game save/reload. Do not mark hypothetical formula results as Windows-verified.
+
 ## CI and deployment
 
-[Windows workflow](../.github/workflows/build-windows.yml): Develop and Release compilation (separate jobs); synthetic tests for the local-input [sprite atlas builder](technical/sprite-atlas.md), old legacy placeholder and source masks; source/INI/slot-10/Mesa contracts and synthetic save reader. **The artifact distributes DLL and EXE only**, not user/original-game art or the old placeholder PCX.
+[PR #4 Windows workflow](https://github.com/Necaladun/thinkerNeca/blob/feature/minor-terrain-generation-migration/.github/workflows/build-windows.yml): Develop and Release compilation (separate jobs); synthetic tests for the local-input [sprite atlas builder](technical/sprite-atlas.md), old legacy placeholder and source masks; source/INI/slot-10/Mesa contracts and synthetic save reader. **The artifact distributes DLL and EXE only**, not user/original-game art or the old placeholder PCX.
 
 Record the commit, effective INI including overrides, map/save coordinates and year, screenshot, PCX source and `minor_terrain_render.log` when investigating remaining problems.

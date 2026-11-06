@@ -1,5 +1,7 @@
 # Unit combat, artillery and prototype economics
 
+**Related review:** [aircraft, interception, SAM/AAA and transport design](aircraft-combat.md).
+
 **Scope:** existing mechanics in the current thinkerNeca source, plus explicitly identified defects. This is **not** a specification of approved balance changes. See [BUG-004 and BAL-004](../WORK-QUEUE.md) and [exploratory military ideas](../IDEAS.md).
 
 **Source authority:** [`src/veh.cpp`](../../src/veh.cpp) (cost and artillery eligibility), [`src/veh_combat.cpp`](../../src/veh_combat.cpp) (combat types, strengths and damage), [`src/engine_veh.h`](../../src/engine_veh.h) (unit HP), [`docs/alphax.txt`](../../docs/alphax.txt) (chassis, weapons, armour, rules), [`docs/thinker.ini`](../../docs/thinker.ini) (distributed test settings). The installed `thinker_user.ini` can override the distributed test profile. Combat code is currently identical between `master` and the PR #4 branch; the distributed data/config profiles may differ.

@@ -1,5 +1,7 @@
 # Current status
 
+> **Master documentation status (7 November 2026):** PR #4 terrain/rendering and PR #5 Empire Report are still unmerged. Their working branches contain code that `master` does not; this document records their experimental state, not master runtime functionality.
+
 **Updated:** 2026-11-05. **Repository:** `Necaladun/thinkerNeca`. **Active:** [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), `feature/minor-terrain-generation-migration` → `master`.
 
 ## Verified foundation
@@ -22,5 +24,16 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 - [REND-001/002/004](WORK-QUEUE.md): Jungle all-site preflight is implemented but needs Windows verification; Release/packaging parity and the second Uranium/Titanium sprite variant remain open (variant 1 still uses native Uranium).
 - [BUG-002](WORK-QUEUE.md): intermittent Inspector label. [BUG-003](WORK-QUEUE.md): naturally seeded resource icons were hidden by geology though yields stacked; resource-priority source fix now needs Windows retest. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
 - More map seeds/climates and landmark regressions remain open. PR #4 stays **draft**.
+
+
+## Other development and design documentation
+
+- **PR #5:** Empire Report native UI remains a draft feature requiring further game-specific validation; its source is not part of `master`.
+- **Telemetry/automation:** accepted future work with actionable `TEL-*`, `AUTO-*`, `DIAG-*` and `DEV-*` entries; no unattended simulation code is implemented in `master`. See [technical plan](technical/telemetry-automation.md).
+- **Deferred studies:** [special abilities](technical/special-abilities.md), [aircraft combat](technical/aircraft-combat.md) and [AI operations/formations](technical/ai-strategy-operations.md) record source inspection and ideas without committing to gameplay changes.
+
+## Separate combat review
+
+Source inspection identified an existing ordinary-artillery-bombardment reactor-normalization mismatch under `ignore_reactor_power=1` ([BUG-004](WORK-QUEUE.md)); a reported late-game Spore Launcher weakness is consistent but lacks isolated Windows reproduction. Broader chassis, armour cost and artillery-duel changes are **unapproved exploration** ([BAL-004](WORK-QUEUE.md)). Neither changes the active terrain PR's merge criteria; [technical reference](technical/unit-combat-and-costs.md).
 
 **Next:** same-build save/reload, fog/unit/Inspector checks with the working mode-3 atlas; verify the new all-site Jungle preflight, then variant 1 and Release parity. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).
