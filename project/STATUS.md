@@ -14,7 +14,7 @@
 
 ## Parked Empire Report (unmerged draft PR #5)
 
-- [UI-001](WORK-QUEUE.md): Native Empire Report (12 views, Overview with grouped stats/native art, colony/production controls) remains on [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), **parked** after positive Windows user testing and latest visual approval. PR #5 is stacked on PR #4, which currently conflicts with the newer `master` documentation. Before merge: resolve PR #4 or decouple, preserve the consolidated design docs, rebuild and finish targeted Windows regression and same-build save/reload checks. See [testing](TESTING.md).
+- [UI-001](WORK-QUEUE.md): Native Empire Report (12 views, Overview with grouped stats/native art, colony/production controls) remains on [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), **parked** after positive Windows user testing and latest visual approval. PR #5 remains stacked on draft PR #4. PR #4 integrated current `master` documentation in merge commit [`392fd66`](https://github.com/Necaladun/thinkerNeca/commit/392fd6655e69866f52b26daf4afad6d5998a2f76), clearing its documentation conflicts. Before merging PR #5: complete and merge PR #4 (or explicitly decouple PR #5), rebuild, and finish targeted Windows regression and same-build save/reload checks. See [testing](TESTING.md).
 - [UI-002](WORK-QUEUE.md): Deferred **start-of-turn consolidated Turn Report** with 30+ actual production-completion events, post-upkeep finances/research, actionable colony orders and optional Secret Project movie choice. This is **not implemented** in PR #5 and is not a blocker for merging its manual report.
 
 ## Active test configuration
