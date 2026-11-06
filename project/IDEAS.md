@@ -30,14 +30,11 @@
 
 Old-save/scenario compatibility is not a target. Strong Solar output by itself is not a bug. Changing `tile_output_limit` to 3/3/3 is **already an active trial** (BAL-001), not merely a hypothetical.
 
-## Empire Report — deferred Production actions
+## Empire Report — production access and future queue interaction
 
-These are user-requested possibilities for a **later** UI iteration, not approved for implementation in the current artwork/appearance pass. The existing native base-name navigation, Hurry dialog and queue rules must continue to work.
+**Implemented on draft PR #5:** Current-build icon/name opens native Change Production for the selected base. The next queued item is displayed read-only; Windows testing confirmed the existing picker, cancel, change and preview. Commit `bd334ba` additionally opens the full native colony screen first, then invokes the same picker; this newer presentation sequence awaits Windows validation.
 
-- **Direct Change Production:** clicking the current build name, its pictogram/artwork, or a separate action could open the game's native Change Production picker **for the correct base without first entering the colony screen**. Decide the click target and verify native base context, modal return/focus and production queue effects before implementing. The icon need not become an implicit button unless that is later selected.
-- **Next in Queue preview:** show the base's next queued production item alongside the current build, including a clear empty-queue state. Investigate the game's actual production-queue ordering and special cases (for example Stockpile Energy, queued projects, automation and queue updates) rather than assuming array index semantics. A preview alone must not alter the queue.
-
-Promote either proposal to a concrete [UI-001 follow-up](WORK-QUEUE.md) or new work ID only when selected for implementation.
+**Potential later enhancement, not currently implemented:** a dedicated full-queue view/edit action from the Empire Report. Queue editing, ordering and automation must use native game behaviour rather than independently changing the queued items. The colony-first shortcut aims to let the player inspect the queue and colony details in the original base window after closing the native picker.
 
 ## Native ecology and fungal forests — future exploration
 
