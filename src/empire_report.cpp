@@ -132,6 +132,39 @@ struct NativeMessageSourceStatus {
 NativeMessageSourceStatus message_status = {};
 std::vector<std::string> native_messages;
 
+// The native linked lists are only provisionally understood. Avoid chasing
+// stale or out-of-range pointers during report redraw on different executables.
+size_t readable_native_region(const void* ptr) {
+    if (!ptr) return 0;
+    MEMORY_BASIC_INFORMATION page = {};
+    if (VirtualQuery(ptr, &page, sizeof(page)) != sizeof(page)
+        || page.State != MEM_COMMIT
+        || (page.Protect & (PAGE_GUARD | PAGE_NOACCESS))) {
+        return 0;
+    }
+    const uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
+    const uintptr_t start = reinterpret_cast<uintptr_t>(page.BaseAddress);
+    const size_t offset = addr - start;
+    return offset < page.RegionSize ? page.RegionSize - offset : 0;
+}
+bool readable_native_struct(const void* ptr, size_t bytes) {
+    return readable_native_region(ptr) >= bytes;
+}
+bool copy_native_message_text(const char* value, std::string& out) {
+    const size_t limit = min((size_t)1024, readable_native_region(value));
+    if (!limit) return false;
+    size_t len = 0;
+    while (len < limit && value[len]) {
+        const unsigned char c = (unsigned char)value[len];
+        if (c < 32 && c != '\n' && c != '\r' && c != '\t') return false;
+        ++len;
+    }
+    // Only complete, null-terminated text from a readable region is accepted.
+    if (!len || len == limit) return false;
+    out.assign(value, len);
+    return true;
+}
+
 void read_native_message_list(StringStruct* list, int& raw_count,
                               int& readable_count) {
     if (!list || list->count < 0 || list->count > 1024) return;
@@ -141,12 +174,14 @@ void read_native_message_list(StringStruct* list, int& raw_count,
     StringStructNode* node = list->head;
     const int max_nodes = min(list->count + 2, 1026);
     for (int i = 0; i < max_nodes && node; ++i) {
-        if (node->data && node->data->text && node->data->text[0]) {
-            ++readable_count;
-            if (native_messages.size() < 512) {
-                char line[1024];
-                snprintf(line, sizeof(line), "%s", node->data->text);
-                native_messages.emplace_back(line);
+        if (!readable_native_struct(node, sizeof(*node))) break;
+        if (readable_native_struct(node->data, sizeof(*node->data))) {
+            std::string value;
+            if (copy_native_message_text(node->data->text, value)) {
+                ++readable_count;
+                if (native_messages.size() < 512) {
+                    native_messages.emplace_back(std::move(value));
+                }
             }
         }
         StringStructNode* next = node->next;
