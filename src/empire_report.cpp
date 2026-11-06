@@ -23,6 +23,7 @@ int wheel_remainder = 0;
 int pending_production_base_id = -1;
 uint32_t pending_production_ticket = 0;
 uint32_t next_production_ticket = 0;
+int report_faction();  // Defined below; used by the deferred production shortcut.
 
 const int REPORT_DESIRED_WIDTH = 1350;  // 150% of the previous 900-pixel target
 const int REPORT_DESIRED_HEIGHT = 990;  // 150% of the previous 660-pixel target
