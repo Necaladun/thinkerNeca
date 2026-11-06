@@ -94,6 +94,28 @@ State should be **local to an ecological network/region**, not a single global â
 
 **Scope boundary:** Keep this as exploratory design until explicitly selected for a later project phase. Do not blend it into the ongoing PR #4 terrain-rendering acceptance work or put speculative subtasks in `WORK-QUEUE.md`.
 
+## Empire Turn Report â€” original management objective (7 November 2026)
+
+**Approved direction, implementation deferred (UI-002).** This is **not** the general Empire Overview implemented on draft PR #5. Empire Overview is a reopenable live-state landing page; the future **Turn Report** is an automatically presented, reopenable *post-upkeep event and decision summary*. The user's original aim was to stop having to visit every colony/popup in sequence while treasury, labs and base values change underneath early choices, particularly hurrying production before later income and expenses have resolved.
+
+### Intended player experience
+
+1. Process the faction's normal turn and each colony's production, upkeep and growth using established game rules.
+2. Consolidate completed production, resource accounting, population/riot/Golden Age/ecology changes, and other turn events across all colonies. Routine completions should not require a separate colony popup each.
+3. Show one start-of-player-turn Turn Report with **opening and closing treasury**, credited income and costs where exact source data supports them, research target/progress/labs credited and research results, production completions and current queues, and exceptional bases needing attention.
+4. Offer context actions into the existing native colony/Change Production/Queue/Hurry interfaces and a reopenable report. Cases that genuinely require player decisions should be surfaced together rather than silently defaulted.
+5. After review, proceed with normal orders and spending from the completed, stable upkeep state.
+
+**Source-level finding:** `src/gameturn.cpp:production_phase()` resets faction-wide income/labs counters and iterates through owned colonies calling `mod_base_upkeep()`. `src/base.cpp:mod_base_upkeep()` may open `BaseWin_zoom()` immediately for a flagged base; per-base research and treasury credits occur during that sequence. `faction_upkeep()` continues with additional faction costs/choices before player control. Therefore a UI opened *during* the per-base loop would display partial totals, and merely suppressing popups could change rules or remove required decisions. The correct post-upkeep presentation point is conceptually after faction upkeep and before ordinary human orders, but exact hook placement and all interrupt semantics need dedicated source/runtime investigation.
+
+### Implementation split and constraints
+
+- **Stage 1: Observability only.** Capture pre/post faction treasury and labs, stable base identities, actual completion/event records and an accurate post-upkeep snapshot. Initial version can leave all original popups intact and be invoked manually for testing. Avoid reconstructing completed productions solely from final `queue_items`, or lab generation solely from accumulated-progress differences after breakthroughs.
+- **Stage 2: Safe batching.** Identify existing interruptions that are informational versus those that affect upkeep outcomes. Aggregate routine notices while deferring actual player choices into a dedicated post-upkeep decision phase. Preserve queue rules, built facility/project effects, production overflow, retool/hurry costs and any order-dependent tech effects.
+- **Stage 3: Integrated start-of-turn screen.** Present automatically at the correct player-control boundary and make it reopenable through Empire Report. Prefer concise summaries and actionable exceptions over listing every routine base every turn.
+
+**Do not implement during the current UI visual-prototype test.** Validate the existing navigation/appearance changes first. Multiplayer/PBEM, event popups, new-game arrival, game-over, autosave, base elimination and save/load are edge cases; defer broad support until the single-player path is verified. No new save format or session-only history presented as persistent without an explicit design.
+
 ## Future Empire Report information (proposals only)
 
 Requested: colour-coded values; Garrison facility indicators; eco damage, growth ETA/boom, habitation cap, maintenance and Golden Age; empire integrity/might, commerce, council votes, energy sliders, game year/perihelion and current Social Engineering; eventual Diplomacy standings, relationships, mood, votes and category leaders. Do not implement these yet.
