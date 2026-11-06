@@ -19,7 +19,19 @@ Independent minor terrain is stored per map tile as `MinorTerrainTile { uint8_t 
 | Uranium | +1 energy | Late | Dispersed 3–9 tile deposits, lowland preference |
 | Titanium | +1 mineral | Late | Dispersed 3–9 tile deposits; currently identical lowland preference to Uranium |
 
-Only one independent minor type is stored per tile. The `code` field is type-specific: Jungle uses a climate/rainfall pattern; Uranium and Titanium currently use patch-local indices (0–8).
+**Present limitation:** only one independent minor type is stored per tile. The `code` field is type-specific: Jungle uses a climate/rainfall pattern; Uranium and Titanium currently use patch-local indices (0–8). **Approved replacement (DEC-016/TERR-004; not coded):** each tile may carry several independently identifiable minor types, each with its own code. Do not conflate *representability* with procedural overlap placement, and do not infer that every original native `LM_*` combination is mechanically/renderably valid.
+
+## Approved multi-feature design (TERR-004; not implemented)
+
+The independent layer must become **compositional**, rather than a one-of enum:
+
+- `has_minor(x,y,type)`, `minor_code_at(x,y,type)`, and add/remove/iterate operations must be type-specific. Setting Titanium on Jungle must retain Jungle and its code. A tile may hold Jungle + Uranium + Titanium; the model must also retain native `LM_*` flags and ordinary resource bonuses unchanged.
+- Each present type contributes its registered N/M/E effects **once** through the existing live yield branches and resource caps, with future special-case restrictions made explicit. A tile with Jungle + Uranium + Titanium nominally has +1N/+1M/+1E before technology/improvement/cap rules; no double-counting or treating the extra geology as normal `bonus_at()` resources.
+- Distinguish **storage permission** from **generation choice**. The current generation has one-type-per-tile eligibility and removes early minor features when a major landmark wins. Allowing multiple minor types does *not by itself* decide whether random geology should overlap Jungle, another deposit or a native major. Placement and removal must be consciously updated rather than accidentally overwriting features; optional overlap restrictions need their own documented rationale.
+- `THMIN001` v2's 2-byte record cannot store a general set of independent type/code pairs. A new versioned save representation and associated synthetic tests are required. Do not prematurely choose a fixed mask width solely from the current three features; preserve future extensibility. Old experimental saves are not a release compatibility requirement, but a **new game must save/reload/continue with the same DLL**.
+- The native tile Inspector must list all applicable independent feature names and keep native descriptions. AI evaluation, forecast/worker yields and special improvements require an explicit multi-type audit. Render composition, especially two geological sprites, is a separate REND-005 task.
+
+This decision retains native `LM_JUNGLE`, `LM_URANIUM` and all other original flags unmodified; it does not introduce `LM_TITANIUM` or consume retired Canyon position `0x200`.
 
 ## Generation
 

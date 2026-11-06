@@ -12,6 +12,8 @@
 - Independent Uranium and Titanium do not use `LM_URANIUM` or any other major slot. Each deposit shares Uranium's former lowland eligibility and fungus clearing, and completed patches enforce a two-tile buffer against both types and major landmarks. Different geology preferences are future ideas, not current rules. The old major Jungle/Uranium generators are disabled under the modified-map route.
 - Mirrored world generation currently skips independent minor terrain. Neither mirrored modes nor the native original builder are a supported target for the current fresh-game terrain experience.
 
+**Future overlap policy (DEC-016/TERR-004):** current eligibility and post-generation cleanup intentionally prevent minor-versus-minor and minor-versus-major overlaps. The approved **data model** must allow multiple minor features on a tile, including conjunctions with native flags. Procedural placement rules must be reviewed separately: preserving independently generated Jungle when adding geology and permitting overlapping Uranium/Titanium are no longer intrinsically prohibited by storage, but the distribution/spacing policy is not yet changed. Shared native per-tile `code_at()` can conflict across overlapping native landmarks, so the ability to store multiple `LM_*` bits does not guarantee every native major combination works correctly. This section describes current generation until TERR-004 is implemented.
+
 ## Sixteen native major slots
 
 Original slot ordering is retained; **new independent minor types consume none of them**.

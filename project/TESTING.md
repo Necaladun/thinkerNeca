@@ -22,6 +22,14 @@
 | Configuration | Parser/INI structural checks, mode 3 selected by user | Local overrides and experimental economic balance |
 | Release/PRACX | Release x86 DLL/launcher cross-compilation **passed** on `4809cb7`; custom Titanium/Inspector hooks remain Develop-only, PRACX unverified | Native art/Inspector parity, actual in-game checks, clean install and supported binaries |
 
+## Pending multi-minor and native-underlay regression plan (DEC-016; no runtime implementation yet)
+
+**TERR-004 storage and mechanics:** exercise single-feature tiles and all pairwise combinations of Jungle/Uranium/Titanium, plus the three-way combination. Verify independent per-type code persistence after adding and removing another type; exact per-feature Inspector labels; stacked N/M/E effects once per feature, resource limits and ordinary bonus coexistence; Forest, Mine, Borehole, river, fungus, base square, crawler and future AI-yield paths. Include native-landmark-plus-minor data coexistence without altering native `MAP::landmarks`. Validate fresh-game generation, save→exit→reload→turn advance→save→reload using the *same* DLL and new versioned `THMIN001` format. Structural synthetic tests do not establish Windows runtime correctness.
+
+**REND-005 layering:** compare independent Uranium alone to editor-painted native `LM_URANIUM`; compare explicit natural and editor resource overlaps, with resource glyph always above geology. Render Jungle + Uranium, Jungle + Titanium, Uranium + Titanium and all three on the same tile, ensuring neither geology is unintentionally hidden by a full-sprite overdraw. Exercise fog, reveal, movement/units/bases, scrolling/zoom/clipping, optional/missing `neca_sprites.pcx` and same-build save/reload. Validate only after the native Uranium rendering stage/call contract has been established and a new Windows build is available.
+
+**Status:** Requirements agreed; these are not tests already passed. Existing Develop variant-0 and BUG-003 runtime evidence belongs to the previous single-type implementation.
+
 ## Combined PR #4 + PR #5 Windows Develop smoke report — 7 November 2026
 
 **User-reported, not instrumented validation.** The user installed [Develop CI artifact for PR #5 head `3c08b52`](https://github.com/Necaladun/thinkerNeca/actions/runs/42293858129), which contains PR #4 terrain code plus PR #5 Empire Report UI. Both x86 Develop and Release cross-build jobs passed; only **Develop** was tested in the game. This user confirmation covers the six test areas previously supplied with the combined build:
