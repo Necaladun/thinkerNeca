@@ -700,9 +700,10 @@ void draw_base_list(int faction_id) {
 
     const int x_icon = report_width * 26 / 100;
     const int x_prod = report_width * 32 / 100;
-    const int x_mins = report_width * 62 / 100;
-    const int x_turns = report_width * 78 / 100;
-    const int x_hurry = report_width * 89 / 100;
+    const int x_next = report_width * 50 / 100;
+    const int x_mins = report_width * 67 / 100;
+    const int x_turns = report_width * 82 / 100;
+    const int x_hurry = report_width * 91 / 100;
     const int x_pop = report_width * 34 / 100;
     const int x_stat_pop = report_width * 29 / 100;
     const int x_stat_n = report_width * 35 / 100;
@@ -969,6 +970,7 @@ void draw_base_list(int faction_id) {
     } else if (base_view == VIEW_PRODUCTION) {
         write_text("Icon", x_icon, report_column_y(), ColorYellow);
         write_text("Building", x_prod, report_column_y(), ColorYellow);
+        write_text("Next in queue", x_next, report_column_y(), ColorYellow);
         write_text("Minerals", x_mins, report_column_y(), ColorYellow);
         write_text("Turns", x_turns, report_column_y(), ColorYellow);
         write_text("Action", x_hurry, report_column_y(), ColorYellow);
@@ -1137,7 +1139,24 @@ void draw_base_list(int faction_id) {
             const int item = base.item();
             const bool stockpile = item == -FAC_STOCKPILE_ENERGY;
             draw_production_marker(item, x_icon, y - 1);
-            write_fitted_text(prod_name(item), x_prod, y, x_mins - x_prod - 10);
+            // Cyan denotes the native Change Production action; the queue
+            // preview itself is informational and does not alter the queue.
+            write_fitted_text(prod_name(item), x_prod, y,
+                x_next - x_prod - 10, ColorCyan);
+            // The queue size counts entries after the current item. Never
+            // inspect queue_items[1] for an empty or corrupt queue.
+            if (base.queue_size > 0 && base.queue_size < 10) {
+                const int next_item = base.queue_items[1];
+                if (next_item >= -SP_ID_Last && next_item < MaxProtoNum) {
+                    write_fitted_text(prod_name(next_item), x_next, y,
+                        x_mins - x_next - 10);
+                } else {
+                    write_text("Invalid", x_next, y, ColorRed);
+                }
+            } else {
+                write_text(base.queue_size == 0 ? "--" : "Invalid",
+                    x_next, y, base.queue_size == 0 ? ColorWhite : ColorRed);
+            }
             if (!stockpile) {
                 const int total_minerals = mineral_cost(i, item);
                 const int needed = max(0, total_minerals - base.minerals_accumulated);
@@ -1248,7 +1267,10 @@ void draw_base_list(int faction_id) {
             report_width - x_stat_status - 10, status_color);
     }
 
-    if (base_view == VIEW_GROWTH) {
+    if (base_view == VIEW_PRODUCTION) {
+        write_text("Click current build or icon to change production; Next is read-only.",
+            20, report_height - 40, ColorCyan);
+    } else if (base_view == VIEW_GROWTH) {
         write_text("ETA is approximate; Dome removes the normal habitation limit.",
             20, report_height - 40, ColorCyan);
     } else if (base_view == VIEW_ECONOMY) {
