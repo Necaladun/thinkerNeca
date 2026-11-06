@@ -31,6 +31,7 @@ Technical references: [minor terrain](project/technical/minor-terrain.md), [nati
 - No compatibility obligation for **old saves or custom scenarios** as the fork evolves. A *new* game must still save, reload and continue correctly on the same build.
 - The distributed [`docs/thinker.ini`](docs/thinker.ini) is presently a **user-selected test profile** rather than a neutral upstream default. `thinker_user.ini` overrides settings locally if present.
 - In-game acceptance is required for native x86 hooks, rendering and resource behavior. Green compilation/static CI is necessary but not sufficient.
+- **Native patch order matters:** `thinker.exe` starts `terranx.exe` and loads `thinker.dll`; `src/patch.cpp::patch_setup()` applies Scient's Patch v2.0 (`AXPatchData` in `src/patchdata.h`) **before** Thinker's own hooks. When auditing hardcoded x86 addresses, compare the original executable, post-Scient instructions and post-Thinker hooks rather than assuming raw on-disk disassembly matches the hook sites. Example: Scient's `#ABANDONBASE` fix changes the original `base_hurry` call at `0x4F7A34` into a call at `0x4F7A38`, which is the address Thinker subsequently patches. A raw address mismatch alone does not prove a broken hook.
 - Keep maintainer planning under `project/`: `docs/` is copied into the game distribution by packaging scripts.
 
 ## Next handoff
