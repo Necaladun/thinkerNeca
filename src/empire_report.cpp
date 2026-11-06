@@ -118,36 +118,66 @@ int unit_at(int faction_id, int ordinal) {
     return -1;
 }
 
-// Read native MessageWindow content without installing a message interception
-// hook or inventing a historical log. Only entries retained by the game's
-// present message UI can appear. The list may be empty before initialization,
-// after a turn change, or after the native interface clears its messages.
-StringStruct* native_message_source() {
-    StringStruct* list = &MessageWin->listBox.dialog.strings;
-    if (list->count > 0 && list->count <= 1024 && list->head) return list;
-    list = &MessageWin->stringBox.strings;
-    if (list->count > 0 && list->count <= 1024 && list->head) return list;
-    return nullptr;
+// MessageWindow exposes native lists, but the listbox can hold reference
+// records without direct text data. The original reader used seek_pos and
+// showed a placeholder for every non-text row. Inspect both native lists,
+// and follow their declared linked nodes read-only. Never assume that the
+// existence of a native entry means it has a directly readable message.
+struct NativeMessageSourceStatus {
+    int listbox_entries = 0;
+    int listbox_texts = 0;
+    int detail_entries = 0;
+    int detail_texts = 0;
+};
+NativeMessageSourceStatus message_status = {};
+std::vector<std::string> native_messages;
+
+void read_native_message_list(StringStruct* list, int& raw_count,
+                              int& readable_count) {
+    if (!list || list->count < 0 || list->count > 1024) return;
+    raw_count = list->count;
+    if (!list->head || !list->count) return;
+
+    StringStructNode* node = list->head;
+    const int max_nodes = min(list->count + 2, 1026);
+    for (int i = 0; i < max_nodes && node; ++i) {
+        if (node->data && node->data->text && node->data->text[0]) {
+            ++readable_count;
+            if (native_messages.size() < 512) {
+                char line[1024];
+                snprintf(line, sizeof(line), "%s", node->data->text);
+                native_messages.emplace_back(line);
+            }
+        }
+        StringStructNode* next = node->next;
+        if (!next || next == node || next == list->head) break;
+        node = next;
+    }
 }
+
+// Rebuild on redraw; no snapshot survives as saved game data. Prefer the
+// listbox (event collection). The StringBox may only contain the currently
+// selected message, so use it only if no listbox texts are accessible.
+void refresh_native_messages() {
+    native_messages.clear();
+    message_status = {};
+    read_native_message_list(&MessageWin->listBox.dialog.strings,
+        message_status.listbox_entries, message_status.listbox_texts);
+    if (!native_messages.empty()) return;
+    read_native_message_list(&MessageWin->stringBox.strings,
+        message_status.detail_entries, message_status.detail_texts);
+}
+
 int native_message_count() {
-    StringStruct* list = native_message_source();
-    return list ? min(list->count, 512) : 0;
+    return (int)native_messages.size();
 }
-// Seek using the game's StringStruct API, then restore its entire cursor state
-// to avoid disturbing the native list selection/scroll position. There is no
-// ownership or persistent pointer retained between redraws.
+
 bool native_message_text(int index, char* out, size_t capacity) {
     if (!capacity) return false;
     out[0] = 0;
-    StringStruct* list = native_message_source();
-    if (!list || index < 0 || index >= native_message_count()) return false;
-    const StringStruct saved = *list;
-    StringStruct_seek_pos(list, index);
-    StringStructNode* node = StringStruct_current_entry(list);
-    bool found = node && node->data && node->data->text;
-    if (found) snprintf(out, capacity, "%s", node->data->text);
-    *list = saved;
-    return found;
+    if (index < 0 || index >= (int)native_messages.size()) return false;
+    snprintf(out, capacity, "%s", native_messages[index].c_str());
+    return true;
 }
 const int MESSAGE_ROW_HEIGHT = 46;
 int report_row_height() {
@@ -692,16 +722,20 @@ void draw_base_list(int faction_id) {
         write_text("Messages currently retained in the game's native UI",
             20, report_column_y(), ColorYellow);
         if (!count) {
-            write_text("No native messages currently available.",
+            write_text("No readable native message text available.",
                 20, report_first_row_y(), ColorYellow);
-            write_text("The game may clear these messages between turns.",
+            write_text("Message records may be references rather than text.",
                 20, report_first_row_y() + 24, ColorCyan);
         }
+        snprintf(line, sizeof(line), "Native list: %d entries / %d texts; detail: %d / %d",
+            message_status.listbox_entries, message_status.listbox_texts,
+            message_status.detail_entries, message_status.detail_texts);
+        write_fitted_text(line, 20, report_height - 64,
+            report_width - 36, ColorCyan);
         for (int row = 0; row < rows && base_scroll + row < count; ++row) {
             char raw[1024] = {};
             if (!native_message_text(base_scroll + row, raw, sizeof(raw))) {
-                snprintf(raw, sizeof(raw), "(native entry %d has no text)",
-                    base_scroll + row + 1);
+                continue;
             }
             // Preserve the text, but normalize embedded newlines/tabs so
             // the report can display an entry across two 17px font rows.
@@ -1320,6 +1354,7 @@ void __cdecl draw_report_window() {
         write_text("No active faction.", 20, 65);
         return;
     }
+    if (base_view == VIEW_MESSAGES) refresh_native_messages();
     draw_empire_summary(faction_id);
     draw_research(faction_id);
     draw_base_list(faction_id);
