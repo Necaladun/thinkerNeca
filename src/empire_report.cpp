@@ -30,39 +30,82 @@ int report_faction();  // Defined below; used by the deferred production shortcu
 const int REPORT_DESIRED_WIDTH = 1350;  // 150% of the previous 900-pixel target
 const int REPORT_DESIRED_HEIGHT = 990;  // 150% of the previous 660-pixel target
 const int REPORT_SCREEN_MARGIN = 64;
-const int BASE_FIRST_ROW_Y = 315;
 const int BASE_ROW_HEIGHT = 22;
-const int BASE_BOTTOM_RESERVE = 70; // Only the scroll footer remains below the base rows.
+const int BASE_BOTTOM_RESERVE = 70;
 enum BaseListView { VIEW_STATUS, VIEW_PRODUCTION, VIEW_CITIZENS, VIEW_BEST, VIEW_GOVERNORS, VIEW_GARRISON, VIEW_ATTENTION, VIEW_GROWTH, VIEW_ECONOMY, VIEW_DEFENSES, VIEW_UNITS, VIEW_MESSAGES };
-const int REPORT_TAB_Y = 264;
-const int REPORT_TAB_TOP = 260;
-const int REPORT_TAB_BOTTOM = 287;
-const int REPORT_COLUMN_Y = 292;
-struct ReportTab { BaseListView view; const char* label; int x; int width; };
-const ReportTab REPORT_TABS[] = {
-    // All six labels fit inside the report's 560px minimum width.
-    { VIEW_STATUS, "Status", 20, 78 },
-    { VIEW_PRODUCTION, "Production", 100, 118 },
-    { VIEW_CITIZENS, "Citizens", 225, 95 },
-    { VIEW_BEST, "Best", 325, 65 },
-    { VIEW_GOVERNORS, "Gov", 395, 52 },
-    { VIEW_GARRISON, "Garrison", 453, 100 },
-    { VIEW_ATTENTION, "Attention", 565, 106 },
-    { VIEW_GROWTH, "Growth", 683, 82 },
-    { VIEW_ECONOMY, "Economy", 777, 102 },
-    { VIEW_DEFENSES, "Defenses", 891, 112 },
-    { VIEW_UNITS, "Units", 1015, 80 },
-    { VIEW_MESSAGES, "Messages", 1107, 110 },
-};
-BaseListView base_view = VIEW_PRODUCTION;
-
-// Tab labels flow into additional rows on narrower screens.
-// Drawing, click detection, column headings and list rows share this geometry.
+// The main level is deliberately independent of individual report views.
+// Save the current subtab within each group, but start on the overview.
+enum ReportSection { SECTION_OVERVIEW, SECTION_COLONIES, SECTION_MILITARY, SECTION_INTELLIGENCE, SECTION_RECORDS };
+ReportSection report_section = SECTION_OVERVIEW;
+BaseListView base_view = VIEW_STATUS;
+BaseListView last_colony_view = VIEW_STATUS;
+BaseListView last_military_view = VIEW_GARRISON;
+const int SECTION_NAV_Y = 63;
+const int SECTION_NAV_STEP = 30;
 const int REPORT_SECOND_TAB_OFFSET = 28;
+struct SectionTab { ReportSection section; const char* label; int width; };
+const SectionTab SECTION_TABS[] = {
+    { SECTION_OVERVIEW, "Overview", 112 },
+    { SECTION_COLONIES, "Colonies", 111 },
+    { SECTION_MILITARY, "Military", 105 },
+    { SECTION_INTELLIGENCE, "Intelligence", 136 },
+    { SECTION_RECORDS, "Records", 105 }
+};
+struct ReportTab { BaseListView view; const char* label; int width; };
+const ReportTab REPORT_TABS[] = {
+    { VIEW_STATUS, "Status", 78 },
+    { VIEW_PRODUCTION, "Production", 118 },
+    { VIEW_CITIZENS, "Citizens", 95 },
+    { VIEW_BEST, "Best", 65 },
+    { VIEW_GOVERNORS, "Gov", 52 },
+    { VIEW_GARRISON, "Garrison", 100 },
+    { VIEW_ATTENTION, "Attention", 106 },
+    { VIEW_GROWTH, "Growth", 82 },
+    { VIEW_ECONOMY, "Economy", 102 },
+    { VIEW_DEFENSES, "Defenses", 112 },
+    { VIEW_UNITS, "Units", 80 },
+    { VIEW_MESSAGES, "Messages", 110 },
+};
+
+ReportSection section_for_view(BaseListView view) {
+    switch (view) {
+    case VIEW_GARRISON:
+    case VIEW_DEFENSES:
+    case VIEW_UNITS: return SECTION_MILITARY;
+    case VIEW_MESSAGES: return SECTION_RECORDS;
+    default: return SECTION_COLONIES;
+    }
+}
+int section_nav_position(ReportSection section, int* out_y) {
+    int x = 20;
+    int y = SECTION_NAV_Y;
+    for (const SectionTab& tab : SECTION_TABS) {
+        if (x > 20 && x + tab.width > report_width - 10) {
+            x = 20;
+            y += SECTION_NAV_STEP;
+        }
+        if (tab.section == section) {
+            if (out_y) *out_y = y;
+            return x;
+        }
+        x += tab.width + 8;
+    }
+    if (out_y) *out_y = SECTION_NAV_Y;
+    return 20;
+}
+int section_nav_rows() {
+    int y = SECTION_NAV_Y;
+    section_nav_position(SECTION_RECORDS, &y);
+    return 1 + (y - SECTION_NAV_Y) / SECTION_NAV_STEP;
+}
+int report_subtab_y() {
+    return SECTION_NAV_Y + section_nav_rows() * SECTION_NAV_STEP + 12;
+}
 int report_tab_position(BaseListView view, int* out_y) {
     int x = 20;
-    int y = REPORT_TAB_Y;
+    int y = report_subtab_y();
     for (const ReportTab& tab : REPORT_TABS) {
+        if (section_for_view(tab.view) != report_section) continue;
         if (x > 20 && x + tab.width > report_width - 10) {
             x = 20;
             y += REPORT_SECOND_TAB_OFFSET;
@@ -73,24 +116,32 @@ int report_tab_position(BaseListView view, int* out_y) {
         }
         x += tab.width + 8;
     }
-    if (out_y) *out_y = REPORT_TAB_Y;
+    if (out_y) *out_y = report_subtab_y();
     return 20;
 }
 int report_tab_y(BaseListView view) {
-    int y = REPORT_TAB_Y;
+    int y = report_subtab_y();
     report_tab_position(view, &y);
     return y;
 }
 int report_tab_rows() {
-    const BaseListView last = REPORT_TABS[
-        sizeof(REPORT_TABS) / sizeof(REPORT_TABS[0]) - 1].view;
-    return 1 + (report_tab_y(last) - REPORT_TAB_Y) / REPORT_SECOND_TAB_OFFSET;
+    if (report_section == SECTION_OVERVIEW || report_section == SECTION_INTELLIGENCE)
+        return 0;
+    int max_y = report_subtab_y();
+    for (const ReportTab& tab : REPORT_TABS) {
+        if (section_for_view(tab.view) != report_section) continue;
+        max_y = max(max_y, report_tab_y(tab.view));
+    }
+    return 1 + (max_y - report_subtab_y()) / REPORT_SECOND_TAB_OFFSET;
 }
 int report_column_y() {
-    return REPORT_COLUMN_Y + (report_tab_rows() - 1) * REPORT_SECOND_TAB_OFFSET;
+    return report_subtab_y() + report_tab_rows() * REPORT_SECOND_TAB_OFFSET + 35;
 }
 int report_first_row_y() {
-    return BASE_FIRST_ROW_Y + (report_tab_rows() - 1) * REPORT_SECOND_TAB_OFFSET;
+    return report_column_y() + 23;
+}
+int report_list_heading_y() {
+    return report_column_y() - 26;
 }
 
 enum UnitFilter { UNIT_ALL, UNIT_LAND, UNIT_SEA, UNIT_AIR, UNIT_DAMAGED, UNIT_NO_ORDER };
@@ -607,7 +658,7 @@ EmpireStats collect_empire_stats(int faction_id) {
     return s;
 }
 
-void draw_empire_summary(int faction_id) {
+void draw_empire_summary(int faction_id, int top_y) {
     const Faction& faction = Factions[faction_id];
     const EmpireStats s = collect_empire_stats(faction_id);
     char line[256];
@@ -618,41 +669,43 @@ void draw_empire_summary(int faction_id) {
         s.bases ? s.population / s.bases : 0,
         s.bases ? (10 * (s.population % s.bases)) / s.bases : 0,
         s.units);
-    write_text(line, 20, 57);
+    write_text(line, 20, top_y + 0);
 
     snprintf(line, sizeof(line),
         "Treasury: %d EC    Base economy: %d EC    Psych: %d",
         faction.energy_credits, s.economy, s.psych);
-    write_text(line, 20, 79);
+    write_text(line, 20, top_y + 22);
 
     snprintf(line, sizeof(line),
         "Labs (last upkeep): %d    Energy surplus: %d    Commerce: %d    Facility maint: %d",
         faction.labs_total, s.energy, faction.turn_commerce_income, faction.facility_maint_total);
-    write_text(line, 20, 101);
+    write_text(line, 20, top_y + 44);
 
     snprintf(line, sizeof(line),
         "Nutrient surplus: %+d    Mineral surplus: %+d    Base labs: %d",
         s.nutrients, s.minerals, s.labs);
-    write_text(line, 20, 123);
+    write_text(line, 20, top_y + 66);
 
     snprintf(line, sizeof(line),
         "Golden Ages: %d    Drone riots: %d    Starving: %d    Eco-damage bases: %d",
         s.golden_ages, s.riots, s.starving, s.eco_bases);
-    write_text(line, 20, 145, s.riots || s.starving ? ColorYellow : ColorWhite);
+    write_text(line, 20, top_y + 88, s.riots || s.starving ? ColorYellow : ColorWhite);
 
     // These are live faction values. Keep the existing five-line summary
     // intact on narrower screens instead of overlapping its labels.
-    if (report_width >= 1200) {
-        const int x = report_width * 60 / 100;
+    const bool side_by_side = report_width >= 1200;
+    {
+        const int x = side_by_side ? report_width * 60 / 100 : 20;
+        const int detail_top = side_by_side ? top_y : top_y + 115;
         snprintf(line, sizeof(line), "Allocation: Econ %d%%  Labs %d%%  Psych %d%%",
             100 - 10 * faction.SE_alloc_labs - 10 * faction.SE_alloc_psych,
             10 * faction.SE_alloc_labs, 10 * faction.SE_alloc_psych);
-        write_fitted_text(line, x, 57, report_width - x - 20, ColorCyan);
+        write_fitted_text(line, x, detail_top + 0, report_width - x - 20, ColorCyan);
 
         snprintf(line, sizeof(line), "Sanctions: %d turns   Orbit N/M/E/D: %d/%d/%d/%d",
             faction.sanction_turns, faction.satellites_nutrient,
             faction.satellites_mineral, faction.satellites_energy, faction.satellites_ODP);
-        write_fitted_text(line, x, 79, report_width - x - 20,
+        write_fitted_text(line, x, detail_top + 22, report_width - x - 20,
             faction.sanction_turns ? ColorYellow : ColorWhite);
 
         const int models[4] = { faction.SE_Politics, faction.SE_Economics,
@@ -665,24 +718,24 @@ void draw_empire_summary(int faction_id) {
         }
         snprintf(line, sizeof(line), "SE: %s / %s / %s / %s",
             names[0], names[1], names[2], names[3]);
-        write_fitted_text(line, x, 123, report_width - x - 20);
+        write_fitted_text(line, x, detail_top + 66, report_width - x - 20);
         snprintf(line, sizeof(line), "SE ratings: Eff %+d  Growth %+d  Police %+d",
             faction.SE_effic, faction.SE_growth, faction.SE_police);
-        write_fitted_text(line, x, 145, report_width - x - 20);
+        write_fitted_text(line, x, detail_top + 88, report_width - x - 20);
     }
 }
 
-void draw_research(int faction_id) {
+void draw_research(int faction_id, int top_y) {
     const Faction& faction = Factions[faction_id];
     char line[256];
     const int tech_id = faction.tech_research_id;
     if (tech_id < 0 || tech_id >= TECH_TranT + 1) {
-        write_text("Research: None selected", 20, 174, ColorCyan);
+        write_text("Research: None selected", 20, top_y + 0, ColorCyan);
         return;
     }
 
     snprintf(line, sizeof(line), "Researching: %s", tech_str(tech_id));
-    write_text(line, 20, 174, ColorCyan);
+    write_text(line, 20, top_y + 0, ColorCyan);
 
     const int cost = max(1, mod_tech_rate(faction_id));
     const int progress = max(0, faction.tech_accumulated);
@@ -696,7 +749,7 @@ void draw_research(int faction_id) {
     snprintf(line, sizeof(line),
         "Progress: %d / %d labs    Labs last upkeep: %+d    Effective rate: ~%lld/turn",
         progress, cost, faction.labs_total, (long long)estimate);
-    write_text(line, 20, 197);
+    write_text(line, 20, top_y + 23);
 
     if (remaining == 0) {
         snprintf(line, sizeof(line), "Research threshold met");
@@ -707,7 +760,103 @@ void draw_research(int faction_id) {
     } else {
         snprintf(line, sizeof(line), "Estimated turns remaining: N/A (no recent lab output)");
     }
-    write_text(line, 20, 219);
+    write_text(line, 20, top_y + 45);
+}
+
+void draw_report_panel(int left, int top, int right, int bottom) {
+    RECT outer = { left, top, right, bottom };
+    RECT inner = { left + 2, top + 2, right - 2, bottom - 2 };
+    // Native engine primitives and palette. These are provisional inset frames,
+    // not claims that the game's exact inset-frame art has been identified.
+    Buffer_box_2(&report_window.oCanvas, &outer, ColorCyan, ColorCyan);
+    Buffer_box_2(&report_window.oCanvas, &inner, ColorWhite, ColorWhite);
+}
+void write_native_heading(const char* text, int x, int y, int color) {
+    Font* bold = &StatusWin->oFontBold;
+    // Status-window fonts are from the game, not MapWin's zoom-scaled font.
+    // Fall back to the existing stable report font if geometry is unexpected.
+    if (bold->fontObj && bold->lineHeight >= 12 && bold->lineHeight <= 24) {
+        Buffer_set_font(&report_window.oCanvas, bold, 0, 0, 0);
+        write_text(text, x, y, color);
+        Buffer_set_font(&report_window.oCanvas, report_text_font, 0, 0, 0);
+    } else {
+        write_text(text, x, y, color);
+    }
+}
+void draw_empire_overview(int faction_id) {
+    const int top = report_subtab_y() + 13;
+    const bool wide = report_width >= 1200;
+    const int summary_height = wide ? 145 : 242;
+    const int summary_y = top + 28;
+    const int research_panel_y = top + summary_height + 14;
+    const int research_text_y = research_panel_y + 27;
+    const int attention_panel_y = research_panel_y + 118;
+    draw_report_panel(12, top, report_width - 12, top + summary_height);
+    write_native_heading("FACTION STATUS", 24, top + 7, ColorYellow);
+    draw_empire_summary(faction_id, summary_y);
+    draw_report_panel(12, research_panel_y, report_width - 12, research_panel_y + 110);
+    write_native_heading("RESEARCH", 24, research_panel_y + 5, ColorYellow);
+    draw_research(faction_id, research_text_y);
+    const int panel_bottom = report_height - 66;
+    if (attention_panel_y + 55 < panel_bottom) {
+        draw_report_panel(12, attention_panel_y, report_width - 12, panel_bottom);
+        const int flagged = count_attention_bases(faction_id);
+        char title[96];
+        snprintf(title, sizeof(title), "COLONIES REQUIRING ATTENTION: %d", flagged);
+        write_native_heading(title, 24, attention_panel_y + 7,
+            flagged ? ColorYellow : ColorGreen);
+        if (!flagged) {
+            write_text("No current riot, starvation, stalled build, habitation cap or eco-damage flags.",
+                24, attention_panel_y + 36, ColorGreen);
+        } else {
+            const int available = max(0, (panel_bottom - attention_panel_y - 54) / BASE_ROW_HEIGHT);
+            const int shown = min(flagged, available);
+            for (int i = 0; i < shown; ++i) {
+                const int base_id = attention_base_at(faction_id, i);
+                if (base_id < 0) continue;
+                const int flags = base_attention_flags(base_id);
+                const int y = attention_panel_y + 36 + BASE_ROW_HEIGHT * i;
+                write_fitted_text(Bases[base_id].name, 24, y,
+                    max(80, report_width * 37 / 100 - 40), ColorCyan);
+                const char* condition = flags & ATT_RIOT ? "Drone riot"
+                    : flags & ATT_STARVING ? "Starvation"
+                    : flags & ATT_STALLED ? "Production stalled"
+                    : flags & ATT_HAB_CAP ? "Habitation cap" : "Eco-damage";
+                write_fitted_text(condition, report_width * 40 / 100, y,
+                    report_width * 55 / 100, attention_severity(flags) == 3
+                    ? ColorRed : ColorYellow);
+            }
+            if (flagged > shown)
+                write_text("More colonies require attention; see Colonies / Attention.",
+                    24, panel_bottom - 26, ColorCyan);
+        }
+    }
+    write_text("Select Colonies, Military, Intelligence or Records for detailed reports.",
+        20, report_height - 39, ColorCyan);
+}
+void draw_intelligence_placeholder() {
+    const int y = report_subtab_y() + 13;
+    draw_report_panel(12, y, report_width - 12, min(report_height - 65, y + 155));
+    write_native_heading("INTELLIGENCE", 24, y + 9, ColorYellow);
+    write_text("Future area: known faction standings, diplomacy and espionage.",
+        24, y + 42);
+    write_text("No hidden data is collected or displayed by this prototype.",
+        24, y + 70, ColorCyan);
+    write_text("Existing colony, military and Messages reports remain available.",
+        24, y + 98);
+}
+void draw_section_navigation() {
+    for (const SectionTab& tab : SECTION_TABS) {
+        const int x = section_nav_position(tab.section, nullptr);
+        int y = SECTION_NAV_Y;
+        section_nav_position(tab.section, &y);
+        const bool active = report_section == tab.section;
+        if (active) {
+            RECT rect = { x - 4, y - 3, x + tab.width - 4, y + 21 };
+            Buffer_box_2(&report_window.oCanvas, &rect, ColorCyan, ColorCyan);
+        }
+        write_text(tab.label, x + 3, y, active ? ColorYellow : ColorCyan);
+    }
 }
 
 void draw_base_list(int faction_id) {
@@ -734,7 +883,7 @@ void draw_base_list(int faction_id) {
         snprintf(line, sizeof(line), "BASE OVERVIEW    %d bases    showing %d-%d",
             total, total ? base_scroll + 1 : 0, min(total, base_scroll + rows));
     }
-    write_text(line, 20, 242, ColorCyan);
+    write_text(line, 20, report_list_heading_y(), ColorCyan);
 
 
     const int x_icon = report_width * 26 / 100;
@@ -782,6 +931,7 @@ void draw_base_list(int faction_id) {
 
     // A separate tab line leaves the base-count heading unobscured on narrow screens.
     for (const ReportTab& tab : REPORT_TABS) {
+        if (section_for_view(tab.view) != report_section) continue;
         char caption[32];
         if (base_view == tab.view) {
             snprintf(caption, sizeof(caption), "[%s]", tab.label);
@@ -858,7 +1008,7 @@ void draw_base_list(int faction_id) {
         const int order_x = report_width * 91 / 100;
         snprintf(line, sizeof(line), "Filter: %s  (click to cycle)",
             UNIT_FILTER_NAMES[unit_filter]);
-        write_fitted_text(line, report_width * 66 / 100, 242,
+        write_fitted_text(line, report_width * 66 / 100, report_list_heading_y(),
             report_width * 34 / 100 - 15, ColorCyan);
         write_text("Unit / design", name_x, report_column_y(), ColorYellow);
         write_text("Domain", triad_x, report_column_y(), ColorYellow);
@@ -1334,7 +1484,26 @@ void __cdecl on_report_left_button_up(int x, int y) {
     if (faction_id < 0 || !empire_report_visible()) {
         return;
     }
-    if (base_view == VIEW_UNITS && y >= 238 && y < REPORT_TAB_TOP
+    // Main section buttons always take precedence over data hitboxes.
+    for (const SectionTab& section : SECTION_TABS) {
+        int section_y = SECTION_NAV_Y;
+        const int section_x = section_nav_position(section.section, &section_y);
+        if (x >= section_x - 4 && x < section_x + section.width - 4
+            && y >= section_y - 4 && y < section_y + 22) {
+            if (report_section != section.section) {
+                report_section = section.section;
+                if (report_section == SECTION_COLONIES) base_view = last_colony_view;
+                if (report_section == SECTION_MILITARY) base_view = last_military_view;
+                if (report_section == SECTION_RECORDS) base_view = VIEW_MESSAGES;
+                base_scroll = 0;
+                GraphicWin_redraw(&report_window);
+            }
+            return;
+        }
+    }
+    if (report_section == SECTION_OVERVIEW || report_section == SECTION_INTELLIGENCE)
+        return;
+    if (base_view == VIEW_UNITS && y >= report_list_heading_y() - 4 && y < report_list_heading_y() + 21
         && x >= report_width * 66 / 100 && x < report_width - 10) {
         unit_filter = (UnitFilter)((unit_filter + 1) % UNIT_FILTER_COUNT);
         base_scroll = 0;
@@ -1343,19 +1512,22 @@ void __cdecl on_report_left_button_up(int x, int y) {
     }
     // Resolve tab hitboxes using the same flow geometry as drawing.
     for (const ReportTab& tab : REPORT_TABS) {
+        if (section_for_view(tab.view) != report_section) continue;
         const int tab_x = report_tab_position(tab.view, nullptr);
         const int tab_top = report_tab_y(tab.view) - 4;
-        if (y >= tab_top && y < tab_top + (REPORT_TAB_BOTTOM - REPORT_TAB_TOP)
+        if (y >= tab_top && y < tab_top + 27
             && x >= tab_x && x < tab_x + tab.width) {
             if (base_view != tab.view) {
                 base_view = tab.view;
+                if (report_section == SECTION_COLONIES) last_colony_view = tab.view;
+                if (report_section == SECTION_MILITARY) last_military_view = tab.view;
+                base_scroll = 0;
                 GraphicWin_redraw(&report_window);
             }
             return;
         }
     }
-    if (y >= REPORT_TAB_TOP && y < REPORT_TAB_BOTTOM +
-        (report_tab_rows() - 1) * REPORT_SECOND_TAB_OFFSET) return;
+    if (y < report_first_row_y() - 3) return;
     if (base_view == VIEW_UNITS || base_view == VIEW_MESSAGES) return;  // Read-only views.
     const int name_right = (base_view == VIEW_PRODUCTION
         ? report_width * 26 / 100 // Stop before the new icon column.
@@ -1451,7 +1623,7 @@ void __cdecl on_report_left_button_up(int x, int y) {
 void __cdecl draw_report_window() {
     GraphicWin_fill(&report_window, 0);
     Buffer_set_font(&report_window.oCanvas, report_text_font, 0, 0, 0);
-    write_text("EMPIRE REPORT  -  live status", 20, 23, ColorCyan);
+    write_native_heading("EMPIRE REPORT", 20, 23, ColorCyan);
     if (report_width >= 900) {
         char heading[128];
         snprintf(heading, sizeof(heading), "Year %d    Perihelion: %s",
@@ -1467,10 +1639,15 @@ void __cdecl draw_report_window() {
         write_text("No active faction.", 20, 65);
         return;
     }
-    if (base_view == VIEW_MESSAGES) refresh_native_messages();
-    draw_empire_summary(faction_id);
-    draw_research(faction_id);
-    draw_base_list(faction_id);
+    draw_section_navigation();
+    if (report_section == SECTION_OVERVIEW) {
+        draw_empire_overview(faction_id);
+    } else if (report_section == SECTION_INTELLIGENCE) {
+        draw_intelligence_placeholder();
+    } else {
+        if (base_view == VIEW_MESSAGES) refresh_native_messages();
+        draw_base_list(faction_id);
+    }
 }
 
 // The Windows Develop diagnostic identified Queue as flatButtons2[20]:
