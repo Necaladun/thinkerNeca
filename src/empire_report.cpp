@@ -338,6 +338,26 @@ void open_governor_options(int base_id) {
     }
 }
 
+// Use the same native base context setup as the verified Hurry/Gov actions.
+// Do NOT call mod_base_change: it would bypass the game's production picker,
+// native cancellation, queue handling, retooling confirmation and net locks.
+// BaseWin_production's two native arguments are not yet semantically mapped;
+// zero values select the ordinary, unmodified entry path for initial runtime
+// validation. Never change a base's current item before entering this handler.
+void open_change_production(int base_id) {
+    if (base_id < 0 || base_id >= *BaseCount) return;
+    empire_report_hide();
+    BaseWin_soft_zoom(BaseWin, base_id);
+    if (*CurrentBaseID != base_id
+        || *CurrentBase != &Bases[base_id]
+        || BaseWin->cur_base_id != base_id) {
+        // Do not let a stale row cause production changes at another base.
+        empire_report_show();
+        return;
+    }
+    BaseWin_production(BaseWin, 0, 0);
+}
+
 // Pure, live-state warnings. No event recording or hidden unit scanning.
 enum AttentionFlags {
     ATT_RIOT = 1, ATT_STARVING = 2, ATT_STALLED = 4,
@@ -1325,16 +1345,21 @@ void __cdecl on_report_left_button_up(int x, int y) {
             || base_view == VIEW_DEFENSES ? report_width * 29 / 100
         : base_view == VIEW_ATTENTION ? report_width * 37 / 100
         : report_width * 34 / 100) - 8;
-    const int hurry_left = report_width * 89 / 100;
+    const int hurry_left = report_width * 91 / 100;
     const int gov_left = report_width * 89 / 100;
+    const int build_left = report_width * 26 / 100 - 4;
+    const int build_right = report_width * 50 / 100 - 8;
     const bool is_name_click = x >= 20 && x < name_right;
+    const bool is_change_click = base_view == VIEW_PRODUCTION
+        && x >= build_left && x < build_right;
     const bool is_hurry_click = base_view == VIEW_PRODUCTION
         && x >= hurry_left && x < report_width - 10;
     const bool is_gov_click = (base_view == VIEW_GOVERNORS || base_view == VIEW_BEST)
         && x >= gov_left && x < report_width - 10;
     const bool is_best_base_click = base_view == VIEW_BEST
         && x >= 20 && x < gov_left;
-    if ((!is_name_click && !is_hurry_click && !is_gov_click && !is_best_base_click)
+    if ((!is_name_click && !is_change_click && !is_hurry_click
+        && !is_gov_click && !is_best_base_click)
         || y < report_first_row_y() - 3) {
         return;
     }
@@ -1369,6 +1394,10 @@ void __cdecl on_report_left_button_up(int x, int y) {
     }
     if (is_gov_click) {
         open_governor_options(base_id);
+        return;
+    }
+    if (is_change_click) {
+        open_change_production(base_id);
         return;
     }
     if (is_hurry_click) {
