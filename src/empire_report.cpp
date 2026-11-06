@@ -455,8 +455,18 @@ int base_attention_flags(int base_id) {
 }
 int attention_severity(int flags) {
     if (flags & (ATT_RIOT | ATT_STARVING)) return 3;
-    if (flags & (ATT_STALLED | ATT_HAB_CAP)) return 2;
-    return (flags & ATT_ECO) ? 1 : 0;
+    if (flags & ATT_STALLED) return 2;
+    // Habitation limits are often normal during an era without the next
+    // Hab facility. They should not outrank a stalled production line.
+    return (flags & (ATT_ECO | ATT_HAB_CAP)) ? 1 : 0;
+}
+int count_attention_actionable(int faction_id) {
+    int count = 0;
+    for (int i = 0; i < *BaseCount; ++i) {
+        if (Bases[i].faction_id == faction_id
+            && attention_severity(base_attention_flags(i)) >= 2) ++count;
+    }
+    return count;
 }
 int count_attention_bases(int faction_id) {
     int count = 0;
@@ -659,71 +669,192 @@ EmpireStats collect_empire_stats(int faction_id) {
     return s;
 }
 
-void draw_empire_summary(int faction_id, int top_y) {
+// Separate native inset panels in a six-group display instead of a few long
+// undifferentiated status lines. Each group is a compact, live readout.
+void draw_report_panel(int left, int top, int right, int bottom);
+void write_native_heading(const char* text, int x, int y, int color);
+int overview_summary_height() {
+    // On smaller displays keep the former condensed height to preserve
+    // space for the lists and research panel below.
+    return report_width >= 1150 ? 268 : 242;
+}
+void summary_item(const char* label, const char* value, int left, int top,
+                  int width, int row, int color = ColorWhite) {
+    const int label_x = left + 12;
+    const int value_x = left + min(166, width * 43 / 100);
+    const int y = top + 31 + row * 19;
+    write_fitted_text(label, label_x, y,
+        max(1, value_x - label_x - 9), ColorCyan);
+    write_fitted_text(value, value_x, y,
+        max(1, left + width - value_x - 12), color);
+}
+void draw_empire_summary(int faction_id, int top) {
     const Faction& faction = Factions[faction_id];
-    const EmpireStats s = collect_empire_stats(faction_id);
-    char line[256];
-
-    snprintf(line, sizeof(line),
-        "Bases: %d    Population: %d    Average: %d.%d    Units: %d",
-        s.bases, s.population,
-        s.bases ? s.population / s.bases : 0,
-        s.bases ? (10 * (s.population % s.bases)) / s.bases : 0,
-        s.units);
-    write_text(line, 20, top_y + 0);
-
-    snprintf(line, sizeof(line),
-        "Treasury: %d EC    Base economy: %d EC    Psych: %d",
-        faction.energy_credits, s.economy, s.psych);
-    write_text(line, 20, top_y + 22);
-
-    snprintf(line, sizeof(line),
-        "Labs (last upkeep): %d    Energy surplus: %d    Commerce: %d    Facility maint: %d",
-        faction.labs_total, s.energy, faction.turn_commerce_income, faction.facility_maint_total);
-    write_text(line, 20, top_y + 44);
-
-    snprintf(line, sizeof(line),
-        "Nutrient surplus: %+d    Mineral surplus: %+d    Base labs: %d",
-        s.nutrients, s.minerals, s.labs);
-    write_text(line, 20, top_y + 66);
-
-    snprintf(line, sizeof(line),
-        "Golden Ages: %d    Drone riots: %d    Starving: %d    Eco-damage bases: %d",
-        s.golden_ages, s.riots, s.starving, s.eco_bases);
-    write_text(line, 20, top_y + 88, s.riots || s.starving ? ColorYellow : ColorWhite);
-
-    // These are live faction values. Keep the existing five-line summary
-    // intact on narrower screens instead of overlapping its labels.
-    const bool side_by_side = report_width >= 1200;
-    {
-        const int x = side_by_side ? report_width * 60 / 100 : 20;
-        const int detail_top = side_by_side ? top_y : top_y + 115;
-        snprintf(line, sizeof(line), "Allocation: Econ %d%%  Labs %d%%  Psych %d%%",
+    const EmpireStats stats = collect_empire_stats(faction_id);
+    char value[192];
+    if (report_width < 1150) {
+        // Compact original-width fallback. Always show the right-hand data;
+        // never hide allocations/satellites solely due to window width.
+        const int x = 24;
+        const int width = report_width - 48;
+        snprintf(value, sizeof(value), "COLONIES   %d bases   %d population   %d units   Average %d.%d",
+            stats.bases, stats.population, stats.units,
+            stats.bases ? stats.population / stats.bases : 0,
+            stats.bases ? 10 * (stats.population % stats.bases) / stats.bases : 0);
+        write_fitted_text(value, x, top + 28, width, ColorCyan);
+        snprintf(value, sizeof(value),
+            "ECONOMY   Treasury %d EC   Base EC %d   Commerce %d   Maint %d",
+            faction.energy_credits, stats.economy, faction.turn_commerce_income,
+            faction.facility_maint_total);
+        write_fitted_text(value, x, top + 48, width, ColorEnergy);
+        snprintf(value, sizeof(value),
+            "SURPLUS   Nutrients %+d   Minerals %+d   Energy %+d",
+            stats.nutrients, stats.minerals, stats.energy);
+        write_fitted_text(value, x, top + 68, width,
+            stats.nutrients < 0 || stats.minerals < 0 ? ColorRed : ColorGreen);
+        snprintf(value, sizeof(value), "RESEARCH   Labs %d last upkeep   Base labs %d   Psych %d",
+            faction.labs_total, stats.labs, stats.psych);
+        write_fitted_text(value, x, top + 88, width, ColorCyan);
+        snprintf(value, sizeof(value), "ALLOCATION   Econ %d%%   Labs %d%%   Psych %d%%",
             100 - 10 * faction.SE_alloc_labs - 10 * faction.SE_alloc_psych,
             10 * faction.SE_alloc_labs, 10 * faction.SE_alloc_psych);
-        write_fitted_text(line, x, detail_top + 0, report_width - x - 20, ColorCyan);
-
-        snprintf(line, sizeof(line), "Sanctions: %d turns   Orbit N/M/E/D: %d/%d/%d/%d",
-            faction.sanction_turns, faction.satellites_nutrient,
-            faction.satellites_mineral, faction.satellites_energy, faction.satellites_ODP);
-        write_fitted_text(line, x, detail_top + 22, report_width - x - 20,
-            faction.sanction_turns ? ColorYellow : ColorWhite);
-
+        write_fitted_text(value, x, top + 108, width, ColorWhite);
+        snprintf(value, sizeof(value),
+            "CONDITIONS   Golden Ages %d   Riots %d   Starving %d   Eco-damage %d",
+            stats.golden_ages, stats.riots, stats.starving, stats.eco_bases);
+        write_fitted_text(value, x, top + 128, width,
+            stats.riots || stats.starving ? ColorRed : ColorYellow);
         const int models[4] = { faction.SE_Politics, faction.SE_Economics,
             faction.SE_Values, faction.SE_Future };
         const char* names[4] = { "?", "?", "?", "?" };
-        for (int i = 0; i < 4; ++i) {
-            if (models[i] >= 0 && models[i] < 4 && SocialField[i].soc_name[models[i]]) {
+        for (int i = 0; i < 4; ++i)
+            if (models[i] >= 0 && models[i] < 4 && SocialField[i].soc_name[models[i]])
                 names[i] = SocialField[i].soc_name[models[i]];
-            }
-        }
-        snprintf(line, sizeof(line), "SE: %s / %s / %s / %s",
+        snprintf(value, sizeof(value), "GOVERNMENT   %s / %s / %s / %s",
             names[0], names[1], names[2], names[3]);
-        write_fitted_text(line, x, detail_top + 66, report_width - x - 20);
-        snprintf(line, sizeof(line), "SE ratings: Eff %+d  Growth %+d  Police %+d",
+        write_fitted_text(value, x, top + 148, width, ColorGreen);
+        snprintf(value, sizeof(value), "RATINGS   Efficiency %+d   Growth %+d   Police %+d",
             faction.SE_effic, faction.SE_growth, faction.SE_police);
-        write_fitted_text(line, x, detail_top + 88, report_width - x - 20);
+        write_fitted_text(value, x, top + 168, width);
+        snprintf(value, sizeof(value),
+            "ORBIT N/M/E/D  %d/%d/%d/%d     Sanctions %d turns",
+            faction.satellites_nutrient, faction.satellites_mineral,
+            faction.satellites_energy, faction.satellites_ODP, faction.sanction_turns);
+        write_fitted_text(value, x, top + 188, width,
+            faction.sanction_turns ? ColorYellow : ColorWhite);
+        return;
     }
+
+    const int gap = 8;
+    const int left_edge = 12;
+    const int col_width = (report_width - 24 - 2 * gap) / 3;
+    const int row_height = 130;
+    const int panel_left[3] = {
+        left_edge, left_edge + col_width + gap,
+        left_edge + 2 * (col_width + gap)
+    };
+    const char* title[6] = { "COLONIES", "ECONOMY", "RESEARCH / ALLOCATION",
+        "CONDITIONS", "GOVERNMENT", "STRATEGIC" };
+    const int title_color[6] = { ColorCyan, ColorEnergy, ColorCyan,
+        ColorYellow, ColorGreen, ColorYellow };
+    for (int index = 0; index < 6; ++index) {
+        const int left = panel_left[index % 3];
+        const int y = top + (index / 3) * (row_height + gap);
+        draw_report_panel(left, y, left + col_width, y + row_height);
+        write_native_heading(title[index], left + 12, y + 7, title_color[index]);
+    }
+
+    // Colonies
+    int left = panel_left[0];
+    snprintf(value, sizeof(value), "%d", stats.bases);
+    summary_item("Bases", value, left, top, col_width, 0, ColorWhite);
+    snprintf(value, sizeof(value), "%d (avg %d.%d)", stats.population,
+        stats.bases ? stats.population / stats.bases : 0,
+        stats.bases ? 10 * (stats.population % stats.bases) / stats.bases : 0);
+    summary_item("Population", value, left, top, col_width, 1);
+    snprintf(value, sizeof(value), "%d", stats.units);
+    summary_item("Units", value, left, top, col_width, 2);
+    snprintf(value, sizeof(value), "%+d", stats.nutrients);
+    summary_item("Nutrient surplus", value, left, top, col_width, 3,
+        stats.nutrients < 0 ? ColorRed : ColorGreen);
+    snprintf(value, sizeof(value), "%+d", stats.minerals);
+    summary_item("Mineral surplus", value, left, top, col_width, 4,
+        stats.minerals < 0 ? ColorRed : ColorGreen);
+
+    // Economy
+    left = panel_left[1];
+    snprintf(value, sizeof(value), "%d EC", faction.energy_credits);
+    summary_item("Treasury", value, left, top, col_width, 0, ColorEnergy);
+    snprintf(value, sizeof(value), "%d EC", stats.economy);
+    summary_item("Base economy", value, left, top, col_width, 1, ColorEnergy);
+    snprintf(value, sizeof(value), "%+d", stats.energy);
+    summary_item("Energy surplus", value, left, top, col_width, 2,
+        stats.energy < 0 ? ColorRed : ColorEnergy);
+    snprintf(value, sizeof(value), "%d EC", faction.turn_commerce_income);
+    summary_item("Commerce", value, left, top, col_width, 3);
+    snprintf(value, sizeof(value), "%d EC", faction.facility_maint_total);
+    summary_item("Maintenance", value, left, top, col_width, 4, ColorYellow);
+
+    // Research
+    left = panel_left[2];
+    snprintf(value, sizeof(value), "%d", faction.labs_total);
+    summary_item("Labs last upkeep", value, left, top, col_width, 0, ColorCyan);
+    snprintf(value, sizeof(value), "%d", stats.labs);
+    summary_item("Base labs", value, left, top, col_width, 1, ColorCyan);
+    snprintf(value, sizeof(value), "%d", stats.psych);
+    summary_item("Base psych", value, left, top, col_width, 2);
+    snprintf(value, sizeof(value), "%d%%", 100 - 10 * faction.SE_alloc_labs
+        - 10 * faction.SE_alloc_psych);
+    summary_item("Economy alloc", value, left, top, col_width, 3);
+    snprintf(value, sizeof(value), "%d%% / %d%%", 10 * faction.SE_alloc_labs,
+        10 * faction.SE_alloc_psych);
+    summary_item("Labs / Psych", value, left, top, col_width, 4);
+
+    const int lower_top = top + row_height + gap;
+    // Conditions
+    left = panel_left[0];
+    snprintf(value, sizeof(value), "%d", stats.golden_ages);
+    summary_item("Golden Ages", value, left, lower_top, col_width, 0,
+        stats.golden_ages ? ColorGreen : ColorWhite);
+    snprintf(value, sizeof(value), "%d", stats.riots);
+    summary_item("Drone riots", value, left, lower_top, col_width, 1,
+        stats.riots ? ColorRed : ColorWhite);
+    snprintf(value, sizeof(value), "%d", stats.starving);
+    summary_item("Starving", value, left, lower_top, col_width, 2,
+        stats.starving ? ColorRed : ColorWhite);
+    snprintf(value, sizeof(value), "%d", stats.eco_bases);
+    summary_item("Eco-damage bases", value, left, lower_top, col_width, 3,
+        stats.eco_bases ? ColorYellow : ColorWhite);
+    snprintf(value, sizeof(value), "%d", count_attention_actionable(faction_id));
+    summary_item("Actionable bases", value, left, lower_top, col_width, 4,
+        count_attention_actionable(faction_id) ? ColorYellow : ColorWhite);
+
+    // Social Engineering: use the game's localised model names.
+    left = panel_left[1];
+    const int models[4] = { faction.SE_Politics, faction.SE_Economics,
+        faction.SE_Values, faction.SE_Future };
+    const char* labels[4] = { "Politics", "Economics", "Values", "Future" };
+    for (int i = 0; i < 4; ++i) {
+        const char* name = "?";
+        if (models[i] >= 0 && models[i] < 4 && SocialField[i].soc_name[models[i]])
+            name = SocialField[i].soc_name[models[i]];
+        summary_item(labels[i], name, left, lower_top, col_width, i, ColorGreen);
+    }
+
+    // Faction-wide ratings, orbital assets and sanctions.
+    left = panel_left[2];
+    snprintf(value, sizeof(value), "Eff %+d / Gr %+d / Pol %+d",
+        faction.SE_effic, faction.SE_growth, faction.SE_police);
+    summary_item("SE ratings", value, left, lower_top, col_width, 0);
+    snprintf(value, sizeof(value), "%d", faction.sanction_turns);
+    summary_item("Sanctions", value, left, lower_top, col_width, 1,
+        faction.sanction_turns ? ColorYellow : ColorWhite);
+    snprintf(value, sizeof(value), "%d / %d", faction.satellites_nutrient,
+        faction.satellites_mineral);
+    summary_item("Orbit N / M", value, left, lower_top, col_width, 2);
+    snprintf(value, sizeof(value), "%d / %d", faction.satellites_energy,
+        faction.satellites_ODP);
+    summary_item("Orbit E / ODP", value, left, lower_top, col_width, 3);
 }
 
 void draw_research(int faction_id, int top_y) {
@@ -810,7 +941,7 @@ struct OverviewPane { int left, top, right, bottom; };
 struct OverviewLowerLayout { OverviewPane attention, stockpile; };
 OverviewLowerLayout overview_lower_layout() {
     const int top = report_subtab_y() + 13;
-    const int summary_height = report_width >= 1200 ? 145 : 242;
+    const int summary_height = overview_summary_height();
     const int lower_top = top + summary_height + 14 + 118;
     const int bottom = report_height - 66;
     if (report_width >= 850) {
@@ -839,10 +970,12 @@ void draw_overview_attention(int faction_id, const OverviewPane& pane) {
     if (pane.bottom - pane.top < 56) return;
     draw_report_panel(pane.left, pane.top, pane.right, pane.bottom);
     const int flagged = count_attention_bases(faction_id);
+    const int actionable = count_attention_actionable(faction_id);
     char label[80];
-    snprintf(label, sizeof(label), "COLONIES REQUIRING ATTENTION: %d", flagged);
+    snprintf(label, sizeof(label), "ATTENTION: %d action / %d advisory",
+        actionable, flagged - actionable);
     write_native_heading(label, pane.left + 12, pane.top + 8,
-        flagged ? ColorYellow : ColorGreen);
+        actionable ? ColorYellow : flagged ? ColorCyan : ColorGreen);
     if (!flagged) {
         write_fitted_text("No colonies currently flagged.", pane.left + 12,
             pane.top + 36, pane.right - pane.left - 24, ColorGreen);
@@ -863,7 +996,8 @@ void draw_overview_attention(int faction_id, const OverviewPane& pane) {
             : flags & ATT_HAB_CAP ? "Hab cap" : "Eco-damage";
         write_fitted_text(condition, detail_x, y,
             pane.right - detail_x - 12,
-            attention_severity(flags) == 3 ? ColorRed : ColorYellow);
+            attention_severity(flags) == 3 ? ColorRed
+            : attention_severity(flags) == 2 ? ColorYellow : ColorCyan);
     }
     if (flagged > visible) {
         snprintf(label, sizeof(label), "...and %d more; see Colonies / Attention",
@@ -877,7 +1011,8 @@ void draw_overview_stockpile(int faction_id, const OverviewPane& pane) {
     draw_report_panel(pane.left, pane.top, pane.right, pane.bottom);
     const int count = overview_stockpile_count(faction_id);
     char label[96];
-    snprintf(label, sizeof(label), "STOCKPILE ENERGY: %d bases", count);
+    snprintf(label, sizeof(label), "STOCKPILE ENERGY: %d %s",
+        count, count == 1 ? "base" : "bases");
     write_native_heading(label, pane.left + 12, pane.top + 8,
         count ? ColorYellow : ColorGreen);
     if (!count) {
@@ -904,15 +1039,15 @@ void draw_overview_stockpile(int faction_id, const OverviewPane& pane) {
 }
 void draw_empire_overview(int faction_id) {
     const int top = report_subtab_y() + 13;
-    const bool wide = report_width >= 1200;
-    const int summary_height = wide ? 145 : 242;
-    const int summary_y = top + 28;
+    const int summary_height = overview_summary_height();
     const int research_panel_y = top + summary_height + 14;
     const int research_text_y = research_panel_y + 27;
     const OverviewLowerLayout lower = overview_lower_layout();
-    draw_report_panel(12, top, report_width - 12, top + summary_height);
-    write_native_heading("FACTION STATUS", 24, top + 7, ColorYellow);
-    draw_empire_summary(faction_id, summary_y);
+    if (report_width < 1150) {
+        draw_report_panel(12, top, report_width - 12, top + summary_height);
+        write_native_heading("FACTION STATUS", 24, top + 7, ColorYellow);
+    }
+    draw_empire_summary(faction_id, top);
     draw_report_panel(12, research_panel_y, report_width - 12,
         research_panel_y + 110);
     write_native_heading("RESEARCH", 24, research_panel_y + 5, ColorYellow);
@@ -940,10 +1075,14 @@ void draw_section_navigation() {
         section_nav_position(tab.section, &y);
         const bool active = report_section == tab.section;
         if (active) {
-            RECT rect = { x - 4, y - 3, x + tab.width - 4, y + 21 };
-            Buffer_box_2(&report_window.oCanvas, &rect, ColorCyan, ColorCyan);
+            draw_report_panel(x - 4, y - 4, x + tab.width - 4, y + 23);
+        } else {
+            // Native highlight line separates inactive buttons from the screen.
+            Buffer_line_2(&report_window.oCanvas, x - 2, y + 22,
+                x + tab.width - 6, y + 22, ColorCyan);
         }
-        write_text(tab.label, x + 3, y, active ? ColorYellow : ColorCyan);
+        write_native_heading(tab.label, x + 3, y,
+            active ? ColorYellow : ColorCyan);
     }
 }
 
@@ -1027,6 +1166,11 @@ void draw_base_list(int faction_id) {
             snprintf(caption, sizeof(caption), "%s", tab.label);
         }
         const int tab_x = report_tab_position(tab.view, nullptr);
+        if (base_view == tab.view) {
+            RECT rect = { tab_x - 4, report_tab_y(tab.view) - 4,
+                tab_x + tab.width - 4, report_tab_y(tab.view) + 22 };
+            Buffer_box_2(&report_window.oCanvas, &rect, ColorCyan, ColorCyan);
+        }
         write_text(caption, tab_x, report_tab_y(tab.view),
             base_view == tab.view ? ColorYellow : ColorCyan);
     }
@@ -1751,6 +1895,9 @@ void __cdecl draw_report_window() {
         return;
     }
     draw_section_navigation();
+    // Visual boundary between table content and the persistent native footer.
+    Buffer_line_2(&report_window.oCanvas, 16, report_height - 58,
+        report_width - 16, report_height - 58, ColorCyan);
     if (report_section == SECTION_OVERVIEW) {
         draw_empire_overview(faction_id);
     } else if (report_section == SECTION_INTELLIGENCE) {
