@@ -1,6 +1,7 @@
 #include "gui.h"
 #include "empire_report.h"
 #include "basewin.h"
+#include "gameturn.h"
 #include "tech.h"
 #include <string>
 
@@ -764,12 +765,14 @@ void draw_research(int faction_id, int top_y) {
 }
 
 void draw_report_panel(int left, int top, int right, int bottom) {
+    if (right - left < 12 || bottom - top < 12) return;
     RECT outer = { left, top, right, bottom };
-    RECT inner = { left + 2, top + 2, right - 2, bottom - 2 };
-    // Native engine primitives and palette. These are provisional inset frames,
-    // not claims that the game's exact inset-frame art has been identified.
-    Buffer_box_2(&report_window.oCanvas, &outer, ColorCyan, ColorCyan);
-    Buffer_box_2(&report_window.oCanvas, &inner, ColorWhite, ColorWhite);
+    RECT inner = { left + 3, top + 3, right - 3, bottom - 3 };
+    // The exact two-pass native screen-panel sequence used by control_turn()
+    // for MainInfc panels. Reuse game-owned BoxSpriteParams, not imitated lines
+    // or guessed layouts. The caller supplies only bounded destination rects.
+    Buffer_box_sprite(&report_window.oCanvas, &outer, dword_78D870);
+    Buffer_box_sprite(&report_window.oCanvas, &inner, dword_78D7F8);
 }
 void write_native_heading(const char* text, int x, int y, int color) {
     Font* bold = &StatusWin->oFontBold;
@@ -783,6 +786,122 @@ void write_native_heading(const char* text, int x, int y, int color) {
         write_text(text, x, y, color);
     }
 }
+// A live Stockpile Energy order is not proof of a production completion;
+// a turn-specific completed-items list will require UI-002 event capture.
+int overview_stockpile_base_at(int faction_id, int ordinal) {
+    if (ordinal < 0) return -1;
+    for (int id = 0; id < *BaseCount; ++id) {
+        if (Bases[id].faction_id == faction_id
+            && Bases[id].item() == -FAC_STOCKPILE_ENERGY) {
+            if (ordinal-- == 0) return id;
+        }
+    }
+    return -1;
+}
+int overview_stockpile_count(int faction_id) {
+    int result = 0;
+    for (int id = 0; id < *BaseCount; ++id)
+        result += Bases[id].faction_id == faction_id
+            && Bases[id].item() == -FAC_STOCKPILE_ENERGY;
+    return result;
+}
+
+struct OverviewPane { int left, top, right, bottom; };
+struct OverviewLowerLayout { OverviewPane attention, stockpile; };
+OverviewLowerLayout overview_lower_layout() {
+    const int top = report_subtab_y() + 13;
+    const int summary_height = report_width >= 1200 ? 145 : 242;
+    const int lower_top = top + summary_height + 14 + 118;
+    const int bottom = report_height - 66;
+    if (report_width >= 850) {
+        const int centre = report_width / 2;
+        return {
+            { 12, lower_top, centre - 6, bottom },
+            { centre + 6, lower_top, report_width - 12, bottom }
+        };
+    }
+    const int middle = lower_top + (bottom - lower_top) / 2;
+    return {
+        { 12, lower_top, report_width - 12, middle - 6 },
+        { 12, middle + 6, report_width - 12, bottom }
+    };
+}
+int overview_pane_rows(const OverviewPane& pane) {
+    return max(0, (pane.bottom - pane.top - 74) / BASE_ROW_HEIGHT);
+}
+int overview_row_hit(const OverviewPane& pane, int x, int y) {
+    if (x < pane.left + 8 || x >= pane.right - 8
+        || y < pane.top + 34 || y >= pane.bottom - 16) return -1;
+    const int row = (y - pane.top - 34) / BASE_ROW_HEIGHT;
+    return row < overview_pane_rows(pane) ? row : -1;
+}
+void draw_overview_attention(int faction_id, const OverviewPane& pane) {
+    if (pane.bottom - pane.top < 56) return;
+    draw_report_panel(pane.left, pane.top, pane.right, pane.bottom);
+    const int flagged = count_attention_bases(faction_id);
+    char label[80];
+    snprintf(label, sizeof(label), "COLONIES REQUIRING ATTENTION: %d", flagged);
+    write_native_heading(label, pane.left + 12, pane.top + 8,
+        flagged ? ColorYellow : ColorGreen);
+    if (!flagged) {
+        write_fitted_text("No colonies currently flagged.", pane.left + 12,
+            pane.top + 36, pane.right - pane.left - 24, ColorGreen);
+        return;
+    }
+    const int visible = min(flagged, overview_pane_rows(pane));
+    const int detail_x = pane.left + (pane.right - pane.left) * 57 / 100;
+    for (int row = 0; row < visible; ++row) {
+        const int base_id = attention_base_at(faction_id, row);
+        if (base_id < 0) continue;
+        const int flags = base_attention_flags(base_id);
+        const int y = pane.top + 34 + BASE_ROW_HEIGHT * row;
+        write_fitted_text(Bases[base_id].name, pane.left + 12, y,
+            detail_x - pane.left - 20, ColorCyan);
+        const char* condition = flags & ATT_RIOT ? "Riot"
+            : flags & ATT_STARVING ? "Starving"
+            : flags & ATT_STALLED ? "Build stalled"
+            : flags & ATT_HAB_CAP ? "Hab cap" : "Eco-damage";
+        write_fitted_text(condition, detail_x, y,
+            pane.right - detail_x - 12,
+            attention_severity(flags) == 3 ? ColorRed : ColorYellow);
+    }
+    if (flagged > visible) {
+        snprintf(label, sizeof(label), "...and %d more; see Colonies / Attention",
+            flagged - visible);
+        write_fitted_text(label, pane.left + 12, pane.bottom - 27,
+            pane.right - pane.left - 24, ColorYellow);
+    }
+}
+void draw_overview_stockpile(int faction_id, const OverviewPane& pane) {
+    if (pane.bottom - pane.top < 56) return;
+    draw_report_panel(pane.left, pane.top, pane.right, pane.bottom);
+    const int count = overview_stockpile_count(faction_id);
+    char label[96];
+    snprintf(label, sizeof(label), "STOCKPILE ENERGY: %d bases", count);
+    write_native_heading(label, pane.left + 12, pane.top + 8,
+        count ? ColorYellow : ColorGreen);
+    if (!count) {
+        write_fitted_text("No bases currently using Stockpile Energy.",
+            pane.left + 12, pane.top + 36,
+            pane.right - pane.left - 24, ColorGreen);
+        return;
+    }
+    const int visible = min(count, overview_pane_rows(pane));
+    const int action_x = pane.left + (pane.right - pane.left) * 57 / 100;
+    for (int row = 0; row < visible; ++row) {
+        const int base_id = overview_stockpile_base_at(faction_id, row);
+        if (base_id < 0) continue;
+        const int y = pane.top + 34 + BASE_ROW_HEIGHT * row;
+        write_fitted_text(Bases[base_id].name, pane.left + 12, y,
+            action_x - pane.left - 20, ColorCyan);
+        write_fitted_text("Change build", action_x, y,
+            pane.right - action_x - 12, ColorCyan);
+    }
+    write_fitted_text(count > visible ? "More stockpiles in Colonies / Production"
+        : "Current orders; turn completions are not yet tracked.",
+        pane.left + 12, pane.bottom - 27, pane.right - pane.left - 24,
+        ColorYellow);
+}
 void draw_empire_overview(int faction_id) {
     const int top = report_subtab_y() + 13;
     const bool wide = report_width >= 1200;
@@ -790,48 +909,17 @@ void draw_empire_overview(int faction_id) {
     const int summary_y = top + 28;
     const int research_panel_y = top + summary_height + 14;
     const int research_text_y = research_panel_y + 27;
-    const int attention_panel_y = research_panel_y + 118;
+    const OverviewLowerLayout lower = overview_lower_layout();
     draw_report_panel(12, top, report_width - 12, top + summary_height);
     write_native_heading("FACTION STATUS", 24, top + 7, ColorYellow);
     draw_empire_summary(faction_id, summary_y);
-    draw_report_panel(12, research_panel_y, report_width - 12, research_panel_y + 110);
+    draw_report_panel(12, research_panel_y, report_width - 12,
+        research_panel_y + 110);
     write_native_heading("RESEARCH", 24, research_panel_y + 5, ColorYellow);
     draw_research(faction_id, research_text_y);
-    const int panel_bottom = report_height - 66;
-    if (attention_panel_y + 55 < panel_bottom) {
-        draw_report_panel(12, attention_panel_y, report_width - 12, panel_bottom);
-        const int flagged = count_attention_bases(faction_id);
-        char title[96];
-        snprintf(title, sizeof(title), "COLONIES REQUIRING ATTENTION: %d", flagged);
-        write_native_heading(title, 24, attention_panel_y + 7,
-            flagged ? ColorYellow : ColorGreen);
-        if (!flagged) {
-            write_text("No current riot, starvation, stalled build, habitation cap or eco-damage flags.",
-                24, attention_panel_y + 36, ColorGreen);
-        } else {
-            const int available = max(0, (panel_bottom - attention_panel_y - 54) / BASE_ROW_HEIGHT);
-            const int shown = min(flagged, available);
-            for (int i = 0; i < shown; ++i) {
-                const int base_id = attention_base_at(faction_id, i);
-                if (base_id < 0) continue;
-                const int flags = base_attention_flags(base_id);
-                const int y = attention_panel_y + 36 + BASE_ROW_HEIGHT * i;
-                write_fitted_text(Bases[base_id].name, 24, y,
-                    max(80, report_width * 37 / 100 - 40), ColorCyan);
-                const char* condition = flags & ATT_RIOT ? "Drone riot"
-                    : flags & ATT_STARVING ? "Starvation"
-                    : flags & ATT_STALLED ? "Production stalled"
-                    : flags & ATT_HAB_CAP ? "Habitation cap" : "Eco-damage";
-                write_fitted_text(condition, report_width * 40 / 100, y,
-                    report_width * 55 / 100, attention_severity(flags) == 3
-                    ? ColorRed : ColorYellow);
-            }
-            if (flagged > shown)
-                write_text("More colonies require attention; see Colonies / Attention.",
-                    24, panel_bottom - 26, ColorCyan);
-        }
-    }
-    write_text("Select Colonies, Military, Intelligence or Records for detailed reports.",
+    draw_overview_attention(faction_id, lower.attention);
+    draw_overview_stockpile(faction_id, lower.stockpile);
+    write_text("Colonies / Production edits current orders. Turn event history is planned.",
         20, report_height - 39, ColorCyan);
 }
 void draw_intelligence_placeholder() {
@@ -1501,8 +1589,31 @@ void __cdecl on_report_left_button_up(int x, int y) {
             return;
         }
     }
-    if (report_section == SECTION_OVERVIEW || report_section == SECTION_INTELLIGENCE)
+    if (report_section == SECTION_OVERVIEW) {
+        const OverviewLowerLayout lower = overview_lower_layout();
+        const int attention_row = overview_row_hit(lower.attention, x, y);
+        if (attention_row >= 0 && attention_row < count_attention_bases(faction_id)) {
+            const int base_id = attention_base_at(faction_id, attention_row);
+            if (base_id >= 0 && base_id < *BaseCount
+                && Bases[base_id].faction_id == faction_id) {
+                empire_report_hide();
+                BaseWin_zoom(BaseWin, base_id, 1);
+            }
+            return;
+        }
+        const int stockpile_row = overview_row_hit(lower.stockpile, x, y);
+        if (stockpile_row >= 0 && stockpile_row < overview_stockpile_count(faction_id)) {
+            const int base_id = overview_stockpile_base_at(faction_id, stockpile_row);
+            if (base_id >= 0 && base_id < *BaseCount
+                && Bases[base_id].faction_id == faction_id
+                && Bases[base_id].item() == -FAC_STOCKPILE_ENERGY) {
+                open_colony_production(base_id, COLONY_CHANGE_BUILD);
+            }
+            return;
+        }
         return;
+    }
+    if (report_section == SECTION_INTELLIGENCE) return;
     if (base_view == VIEW_UNITS && y >= report_list_heading_y() - 4 && y < report_list_heading_y() + 21
         && x >= report_width * 66 / 100 && x < report_width - 10) {
         unit_filter = (UnitFilter)((unit_filter + 1) % UNIT_FILTER_COUNT);
@@ -1646,6 +1757,12 @@ void __cdecl draw_report_window() {
         draw_intelligence_placeholder();
     } else {
         if (base_view == VIEW_MESSAGES) refresh_native_messages();
+        // Leave a clear gap around the current subtab row and the footer.
+        // Do not enclose Messages: its native metadata is in the footer.
+        if (base_view != VIEW_MESSAGES) {
+            draw_report_panel(12, report_list_heading_y() - 11,
+                report_width - 12, report_height - 65);
+        }
         draw_base_list(faction_id);
     }
 }
