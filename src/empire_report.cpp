@@ -1473,10 +1473,11 @@ void __cdecl draw_report_window() {
     draw_base_list(faction_id);
 }
 
-// The report cannot infer a native click target from rcQueueTitle: that
-// rectangle describes rendering, not the actual Queen/Queue button. Match
-// the installed native button labels conservatively, keeping a diagnostic
-// probe in Develop until the real game's routing is verified.
+// The Windows Develop diagnostic identified Queue as flatButtons2[20]:
+// button ID 20, visible and enabled, name "queue". Every native base
+// FlatButton had cb_left_click == nullptr, including working controls.
+// The existing BaseWin_on_button_clicked is the plausible window-level
+// dispatch path; this remains a candidate until tested in the actual game.
 std::string native_button_label(const char* source) {
     std::string value;
     if (!copy_native_message_text(source, value)) return "";
@@ -1488,76 +1489,36 @@ std::string native_button_label(const char* source) {
     const size_t last = value.find_last_not_of(" \t\r\n");
     return value.substr(first, last - first + 1);
 }
-int native_queue_label_score(const FlatButton& b) {
-    const std::string name = native_button_label(b.name);
-    const std::string tip = native_button_label(b.bubbleText);
-    if (name == "queue") return 100;
-    if (tip == "queue") return 90;
-    if (name == "production queue" || name == "build queue") return 85;
-    if (tip == "production queue" || tip == "build queue") return 80;
-    if (name.find("queue") != std::string::npos) return 40;
-    if (tip.find("queue") != std::string::npos) return 20;
-    return 0;
-}
-FlatButton* native_queue_button() {
-    FlatButton* best = nullptr;
-    int score = 0;
-    auto consider = [&](FlatButton& button) {
-        if (!button.cb_left_click || button.disabled
-            || button.button_id < 0 || !Win_is_visible(&button)) return;
-        const int candidate = native_queue_label_score(button);
-        if (candidate > score) {
-            score = candidate;
-            best = &button;
-        }
-    };
-    consider(BaseWin->flatButton1);
-    for (FlatButton& button : BaseWin->flatButtons2) consider(button);
-    return best;
-}
-#ifndef BUILD_REL
-// Develop is not BUILD_DEBUG, so debug(...) is compiled out, and debug.txt
-// ordinarily contains crash reports only. Show the real native controls on
-// screen, once per game process, to make the reverse engineering actionable.
-void show_queue_diagnostics(const FlatButton* selected) {
-    static bool shown = false;
-    if (shown) return;
-    shown = true;
-
-    std::string report = "Empire Report: native Queue routing diagnostic\r\n";
-    report += "This is a one-time Develop-build diagnostic.\r\n";
-    report += "Please screenshot this window if Queue still fails.\r\n";
-    report += "id | visible enabled callback | name / tooltip\r\n";
-    auto append = [&](FlatButton& button, int slot) {
-        char row[256];
-        const std::string name = native_button_label(button.name).substr(0, 35);
-        const std::string tip = native_button_label(button.bubbleText).substr(0, 35);
-        snprintf(row, sizeof(row), "%2d: %3d | %d %d %d | %.35s / %.35s\r\n",
-            slot, button.button_id, !!Win_is_visible(&button),
-            !button.disabled, !!button.cb_left_click, name.c_str(), tip.c_str());
-        report += row;
-    };
-    append(BaseWin->flatButton1, -1);
-    for (int i = 0; i < 22; ++i) append(BaseWin->flatButtons2[i], i);
-    char footer[120];
-    snprintf(footer, sizeof(footer), "Selected Queue callback: %d\r\n",
-        selected ? selected->button_id : -1);
-    report += footer;
-    MessageBoxA(*phWnd, report.c_str(), "ThinkerNeca Queue diagnostic",
-        MB_OK | MB_ICONINFORMATION);
-}
-#endif
 
 void invoke_native_queue_button() {
-    FlatButton* button = native_queue_button();
-#ifndef BUILD_REL
-    show_queue_diagnostics(button);
-#endif
-    if (button && button->cb_left_click) {
-        button->cb_left_click(button->button_id);
+    // Verify identity and active state before entering the native handler.
+    // ID 20 is confirmed for the tested executable; fail closed if changed.
+    int queue_id = -1;
+    for (FlatButton& button : BaseWin->flatButtons2) {
+        if (native_button_label(button.name) != "queue") continue;
+        if (button.button_id != 20 || button.disabled
+            || !Win_is_visible(&button) || queue_id >= 0) {
+            queue_id = -1;
+            break;
+        }
+        queue_id = button.button_id;
     }
-    // If no labeled native button is found, fail closed. Do not silently
-    // route to Change Production or guess a native button ID.
+#ifndef BUILD_REL
+    if (queue_id < 0) {
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            MessageBoxA(*phWnd,
+                "Native Queue control did not match the verified button "
+                "(name=queue, ID=20, visible/enabled). No action was taken.",
+                "ThinkerNeca Queue routing", MB_OK | MB_ICONWARNING);
+        }
+    }
+#endif
+    if (queue_id >= 0) {
+        // Source-level candidate only; verify native Queue mode in Windows.
+        BaseWin_on_button_clicked(BaseWin, queue_id);
+    }
 }
 
 } // namespace
@@ -1590,8 +1551,8 @@ void empire_report_dispatch_production(int base_id, uint32_t ticket) {
     if (action == COLONY_CHANGE_BUILD) {
         BaseWin_production(BaseWin, 0, 0);
     } else {
-        // Invoke the real QUEUE button's installed native callback. The prior
-        // rcQueueTitle coordinate was not an interactive Queue control.
+        // Route the verified Queue ID through the existing native
+        // window-level button handler; the coordinate/callback paths failed.
         invoke_native_queue_button();
     }
 }
