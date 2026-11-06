@@ -153,3 +153,15 @@ State should be **local to an ecological network/region**, not a single global �
 - **Validation if adopted later:** same-build save/reload, deterministic seed and budget tests, long-run ecological stability, speed on huge maps, balance across native-life settings, Perihelion and different faction playstyles. Preserve a way to disable experimental ecology for A/B comparison.
 
 **Scope boundary:** Keep this as exploratory design until explicitly selected for a later project phase. Do not blend it into the ongoing PR #4 terrain-rendering acceptance work or put speculative subtasks in `WORK-QUEUE.md`.
+
+## Empire Turn Report (UI-002) — future workflow, not present in PR #5
+
+The parked native Empire Report (UI-001, [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5)) is a manually opened **live-state** view. The desired **start-of-turn Turn Report** is distinct: finish all relevant faction-wide upkeep first, then present the **results and pending player decisions together**, instead of asking for sequential colony orders while energy and labs are still changing.
+
+- Headline: **“X colonies finished production and need new orders.”** For each genuine completion, list the colony, exact item completed, the next queue/current order and a native **Change Production / Queue** action. It must handle 30 or more completions with independent scrolling, not rely on the current Stockpile Energy listing.
+- Show opening/closing treasury, credited income/maintenance, research progress and breakthroughs, population changes, major incidents, riots/starvation, and actionable colony exceptions. Distinguish routine advisories such as habitation caps from urgent decisions.
+- **Stockpile Energy** already serves as a native fallback for some unqueued facility/Secret Project completions; keep that behaviour while deferring later choices. A base intentionally stockpiling does *not* prove that it completed production this turn. Do not overwrite valid queued items or governor decisions.
+- **Secret Project completed** is an exceptional notification. Offer **“View movie?”** using the existing playback route; current game preferences gate the automatic playback. The proposal must not suppress project rewards, council/victory effects, interludes or normal project completion rules.
+- Implement in stages: **capture true events and snapshots without changing upkeep**, then distinguish safe routine notifications from mechanically significant decisions, then integrate an automatic reopenable post-upkeep report. The game's `production_phase() -> mod_base_upkeep()` processes colonies sequentially and can invoke native `BaseWin_zoom()` during processing; a mid-loop report would show partial totals. Guard same-build save/reload, eliminated bases, research breakthroughs, upkeep order and multiplayer/PBEM differences.
+
+This design is deferred under [UI-002](WORK-QUEUE.md) and **does not hold up merging the currently functional manual Empire Report**.

@@ -2,7 +2,7 @@
 
 > **Master documentation status (7 November 2026):** PR #4 terrain/rendering and PR #5 Empire Report are still unmerged. Their working branches contain code that `master` does not; this document records their experimental state, not master runtime functionality.
 
-**Updated:** 2026-11-05. **Repository:** `Necaladun/thinkerNeca`. **Active:** [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), `feature/minor-terrain-generation-migration` → `master`.
+**Updated:** 2026-11-07. **Repository:** `Necaladun/thinkerNeca`. **Active:** [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), `feature/minor-terrain-generation-migration` → `master`.
 
 ## Verified foundation
 
@@ -11,6 +11,11 @@
 - External Uranium reference mode 1 visually matched native Uranium. Runtime log confirmed processed hash `24A1B67A`, 5635 transparent / 565 visible pixels and identical sprite size, offsets, pitch and transparency key. Mode-3 Titanium log: hash `D4B3AC2C` and 559 visible pixels.
 - New-map geology, native Jungle and Uranium art have positive user reports. Great Dunes look good; Sunny Mesa centre-only +1E confirmed. Raised Mesa experiment was rejected and reverted (MAP-006).
 - **CI passed on `4809cb7` (5 November):** separate Windows 32-bit Develop and Release cross-builds; Develop synthetic save/atlas/configuration/source contracts all passed. **Neither build executes SMAC/X.** Source changes add Jungle patch preflight, avoid redundant overlay scans, trace successful native Inspector appends and independently log variant-1 sprite geometry; their Windows runtime effects remain unverified.
+
+## Parked Empire Report (unmerged draft PR #5)
+
+- [UI-001](WORK-QUEUE.md): Native Empire Report (12 views, Overview with grouped stats/native art, colony/production controls) remains on [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), **parked** after positive Windows user testing and latest visual approval. PR #5 is stacked on PR #4, which currently conflicts with the newer `master` documentation. Before merge: resolve PR #4 or decouple, preserve the consolidated design docs, rebuild and finish targeted Windows regression and same-build save/reload checks. See [testing](TESTING.md).
+- [UI-002](WORK-QUEUE.md): Deferred **start-of-turn consolidated Turn Report** with 30+ actual production-completion events, post-upkeep finances/research, actionable colony orders and optional Secret Project movie choice. This is **not implemented** in PR #5 and is not a blocker for merging its manual report.
 
 ## Active test configuration
 
