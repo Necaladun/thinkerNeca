@@ -20,7 +20,9 @@ int report_height = 0;
 int base_scroll = 0;
 int wheel_remainder = 0;
 // One-shot request consumed from the game's modal colony message pump.
+enum ColonyProductionAction { COLONY_CHANGE_BUILD, COLONY_EDIT_QUEUE };
 int pending_production_base_id = -1;
+ColonyProductionAction pending_production_action = COLONY_CHANGE_BUILD;
 uint32_t pending_production_ticket = 0;
 uint32_t next_production_ticket = 0;
 int report_faction();  // Defined below; used by the deferred production shortcut.
@@ -344,11 +346,10 @@ void open_governor_options(int base_id) {
 }
 
 // BaseWin_zoom owns a modal event loop and does not return until the colony
-// closes. Calling BaseWin_production *after* it therefore opens the picker
-// too late. Post a one-shot private window message before entering the zoom:
-// the message is processed inside the colony's modal loop while it is open.
-// No production or queue fields are changed by this shortcut.
-void open_change_production(int base_id) {
+// closes. Post a one-shot private window message to enter the appropriate
+// native editor while the selected colony screen is open. The report never
+// edits its queue directly: cancellation and insertion use native behavior.
+void open_colony_production(int base_id, ColonyProductionAction action) {
     if (base_id < 0 || base_id >= *BaseCount
         || Bases[base_id].faction_id != report_faction()
         || pending_production_base_id >= 0) return;
@@ -359,6 +360,7 @@ void open_change_production(int base_id) {
     uint32_t ticket = ++next_production_ticket;
     if (!ticket) ticket = ++next_production_ticket;
     pending_production_base_id = base_id;
+    pending_production_action = action;
     pending_production_ticket = ticket;
 
     empire_report_hide();
@@ -1176,8 +1178,8 @@ void draw_base_list(int faction_id) {
             const int item = base.item();
             const bool stockpile = item == -FAC_STOCKPILE_ENERGY;
             draw_production_marker(item, x_icon, y - 1);
-            // Cyan denotes the native Change Production action; the queue
-            // preview itself is informational and does not alter the queue.
+            // Cyan denotes separately clickable native Change and Queue
+            // actions. Neither report action writes queue_items directly.
             write_fitted_text(prod_name(item), x_prod, y,
                 x_next - x_prod - 10, ColorCyan);
             // The queue size counts entries after the current item. Never
@@ -1186,13 +1188,13 @@ void draw_base_list(int faction_id) {
                 const int next_item = base.queue_items[1];
                 if (next_item >= -SP_ID_Last && next_item < MaxProtoNum) {
                     write_fitted_text(prod_name(next_item), x_next, y,
-                        x_mins - x_next - 10);
+                        x_mins - x_next - 10, ColorCyan);
                 } else {
                     write_text("Invalid", x_next, y, ColorRed);
                 }
             } else {
-                write_text(base.queue_size == 0 ? "--" : "Invalid",
-                    x_next, y, base.queue_size == 0 ? ColorWhite : ColorRed);
+                write_text(base.queue_size == 0 ? "None" : "Invalid",
+                    x_next, y, base.queue_size == 0 ? ColorCyan : ColorRed);
             }
             if (!stockpile) {
                 const int total_minerals = mineral_cost(i, item);
@@ -1305,7 +1307,7 @@ void draw_base_list(int faction_id) {
     }
 
     if (base_view == VIEW_PRODUCTION) {
-        write_text("Click current build for colony + production; Next is read-only.",
+        write_text("Building = Change Production; Next (including None) = edit Queue.",
             20, report_height - 40, ColorCyan);
     } else if (base_view == VIEW_GROWTH) {
         write_text("ETA is approximate; Dome removes the normal habitation limit.",
@@ -1366,17 +1368,21 @@ void __cdecl on_report_left_button_up(int x, int y) {
     const int gov_left = report_width * 89 / 100;
     const int build_left = report_width * 26 / 100 - 4;
     const int build_right = report_width * 50 / 100 - 8;
+    const int queue_left = report_width * 50 / 100 - 4;
+    const int queue_right = report_width * 67 / 100 - 8;
     const bool is_name_click = x >= 20 && x < name_right;
     const bool is_change_click = base_view == VIEW_PRODUCTION
         && x >= build_left && x < build_right;
+    const bool is_queue_click = base_view == VIEW_PRODUCTION
+        && x >= queue_left && x < queue_right;
     const bool is_hurry_click = base_view == VIEW_PRODUCTION
         && x >= hurry_left && x < report_width - 10;
     const bool is_gov_click = (base_view == VIEW_GOVERNORS || base_view == VIEW_BEST)
         && x >= gov_left && x < report_width - 10;
     const bool is_best_base_click = base_view == VIEW_BEST
         && x >= 20 && x < gov_left;
-    if ((!is_name_click && !is_change_click && !is_hurry_click
-        && !is_gov_click && !is_best_base_click)
+    if ((!is_name_click && !is_change_click && !is_queue_click
+        && !is_hurry_click && !is_gov_click && !is_best_base_click)
         || y < report_first_row_y() - 3) {
         return;
     }
@@ -1414,7 +1420,11 @@ void __cdecl on_report_left_button_up(int x, int y) {
         return;
     }
     if (is_change_click) {
-        open_change_production(base_id);
+        open_colony_production(base_id, COLONY_CHANGE_BUILD);
+        return;
+    }
+    if (is_queue_click) {
+        open_colony_production(base_id, COLONY_EDIT_QUEUE);
         return;
     }
     if (is_hurry_click) {
@@ -1480,7 +1490,9 @@ UINT empire_report_production_message() {
 void empire_report_dispatch_production(int base_id, uint32_t ticket) {
     if (base_id != pending_production_base_id
         || ticket != pending_production_ticket) return;
+    const ColonyProductionAction action = pending_production_action;
     pending_production_base_id = -1;
+    pending_production_action = COLONY_CHANGE_BUILD;
     pending_production_ticket = 0;
     if (*GameHalted || base_id < 0 || base_id >= *BaseCount
         || !Win_is_visible(BaseWin)
@@ -1488,7 +1500,22 @@ void empire_report_dispatch_production(int base_id, uint32_t ticket) {
         || *CurrentBase != &Bases[base_id]
         || BaseWin->cur_base_id != base_id
         || Bases[base_id].faction_id != MapWin->cOwner) return;
-    BaseWin_production(BaseWin, 0, 0);
+    if (action == COLONY_CHANGE_BUILD) {
+        BaseWin_production(BaseWin, 0, 0);
+    } else {
+        // Invoke the colony's own queue-title click path. Queue and Change
+        // launch different modes of the Production Readout; calling the
+        // Change picker with guessed native arguments is not equivalent.
+        // The native rect is discovered at runtime, after the colony opens.
+        const RECT& rect = BaseWin->rcQueueTitle;
+        if (rect.right > rect.left && rect.bottom > rect.top
+            && rect.left >= 0 && rect.top >= 0
+            && rect.right <= *ScreenWidth && rect.bottom <= *ScreenHeight) {
+            BaseWin_on_left_click(BaseWin,
+                rect.left + (rect.right - rect.left) / 2,
+                rect.top + (rect.bottom - rect.top) / 2);
+        }
+    }
 }
 
 bool empire_report_visible() {
