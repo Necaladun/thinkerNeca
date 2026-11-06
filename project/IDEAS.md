@@ -22,6 +22,7 @@
 
 ## AI and developer experience
 
+- **Special abilities and related military AI (deferred):** [Full 29-ability discussion and source-backed review](technical/special-abilities.md). Includes prototype roles (cheap/disposable versus elite), context-sensitive specialist scoring, Clean Reactor economics, Fungicide and police deployment, naval artillery pricing, marine capture, airborne assaults and invasion transport protection. **Reference only:** no accepted work or mechanics changes; reassess against current source and queue when deliberately reopened.
 - **Candidate-improvement evaluator:** compare Forest/Farm/Mine/Solar/Borehole on actual future N/M/E, unlock techs, altitude, improvements, base needs and work turns. Could replace a collection of special-case Former heuristics after economic design stabilises.
 - **Seeded visual/regression catalogue:** record a small number of representative map seeds and screenshots to check generation after refactors without committing saves. Develop counters for deposit placement/rejections may help.
 - **Future release profile:** if the fork becomes redistributable, separate stable and diagnostic renderer settings and test a clean game installation first.
