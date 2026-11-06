@@ -338,22 +338,19 @@ void open_governor_options(int base_id) {
     }
 }
 
-// Use the same native base context setup as the verified Hurry/Gov actions.
-// Do NOT call mod_base_change: it would bypass the game's production picker,
-// native cancellation, queue handling, retooling confirmation and net locks.
-// BaseWin_production's two native arguments are not yet semantically mapped.
-// The provisional (0, 0) call MUST be validated against the game's own
-// Change button before this action can be considered correct. No direct
-// production mutation occurs in our callback.
+// Show the actual colony screen before opening its native production
+// picker. Unlike soft_zoom, the full colony stays available when the picker
+// closes, so the player can examine yields, facilities and the entire queue.
+// Reuse the user-verified native picker call; do not change queue_items here.
 void open_change_production(int base_id) {
     if (base_id < 0 || base_id >= *BaseCount) return;
     empire_report_hide();
-    BaseWin_soft_zoom(BaseWin, base_id);
+    BaseWin_zoom(BaseWin, base_id, 1);
     if (*CurrentBaseID != base_id
         || *CurrentBase != &Bases[base_id]
         || BaseWin->cur_base_id != base_id) {
-        // Do not let a stale row cause production changes at another base.
-        empire_report_show();
+        // Do not act on a different colony if the native zoom did not
+        // establish the requested context. No production action is issued.
         return;
     }
     BaseWin_production(BaseWin, 0, 0);
@@ -1289,7 +1286,7 @@ void draw_base_list(int faction_id) {
     }
 
     if (base_view == VIEW_PRODUCTION) {
-        write_text("Click current build or icon to change production; Next is read-only.",
+        write_text("Click current build for colony + production; Next is read-only.",
             20, report_height - 40, ColorCyan);
     } else if (base_view == VIEW_GROWTH) {
         write_text("ETA is approximate; Dome removes the normal habitation limit.",
