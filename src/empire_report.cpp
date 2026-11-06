@@ -1483,9 +1483,9 @@ std::string native_button_label(const char* source) {
     for (char& c : value) {
         if (c >= 'A' && c <= 'Z') c = (char)(c + ('a' - 'A'));
     }
-    const size_t first = value.find_first_not_of(" \\t\\r\\n");
+    const size_t first = value.find_first_not_of(" \t\r\n");
     if (first == std::string::npos) return "";
-    const size_t last = value.find_last_not_of(" \\t\\r\\n");
+    const size_t last = value.find_last_not_of(" \t\r\n");
     return value.substr(first, last - first + 1);
 }
 int native_queue_label_score(const FlatButton& b) {
@@ -1524,15 +1524,15 @@ void show_queue_diagnostics(const FlatButton* selected) {
     if (shown) return;
     shown = true;
 
-    std::string report = "Empire Report: native Queue routing diagnostic\\r\\n";
-    report += "This is a one-time Develop-build diagnostic.\\r\\n";
-    report += "Please screenshot this window if Queue still fails.\\r\\n";
-    report += "id | visible enabled callback | name / tooltip\\r\\n";
+    std::string report = "Empire Report: native Queue routing diagnostic\r\n";
+    report += "This is a one-time Develop-build diagnostic.\r\n";
+    report += "Please screenshot this window if Queue still fails.\r\n";
+    report += "id | visible enabled callback | name / tooltip\r\n";
     auto append = [&](FlatButton& button, int slot) {
         char row[256];
         const std::string name = native_button_label(button.name).substr(0, 35);
         const std::string tip = native_button_label(button.bubbleText).substr(0, 35);
-        snprintf(row, sizeof(row), "%2d: %3d | %d %d %d | %.35s / %.35s\\r\\n",
+        snprintf(row, sizeof(row), "%2d: %3d | %d %d %d | %.35s / %.35s\r\n",
             slot, button.button_id, !!Win_is_visible(&button),
             !button.disabled, !!button.cb_left_click, name.c_str(), tip.c_str());
         report += row;
@@ -1540,7 +1540,7 @@ void show_queue_diagnostics(const FlatButton* selected) {
     append(BaseWin->flatButton1, -1);
     for (int i = 0; i < 22; ++i) append(BaseWin->flatButtons2[i], i);
     char footer[120];
-    snprintf(footer, sizeof(footer), "Selected Queue callback: %d\\r\\n",
+    snprintf(footer, sizeof(footer), "Selected Queue callback: %d\r\n",
         selected ? selected->button_id : -1);
     report += footer;
     MessageBoxA(*phWnd, report.c_str(), "ThinkerNeca Queue diagnostic",
