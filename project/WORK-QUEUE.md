@@ -25,6 +25,22 @@
 | CFG-001 | P2 | TODO | **Generator switch consistency.** Decide whether `modified_landmarks` should govern independent Jungle/Uranium, and document/migrate settings without silently changing tested maps. |
 | TEST-001 | P2 | TODO | **Runtime observability.** Make useful seed/patch-count diagnostics available to Develop tests and consider automated generation checks. Do not accidentally change RNG order. |
 
+## Campaign telemetry and autonomous testing (accepted, not yet implemented)
+
+| ID | Priority | State | Task and completion criterion |
+| --- | --- | --- | --- |
+| TEL-001 | P1 | TODO | **Campaign recorder foundation.** Optional standalone files (never change `debug.txt`), unique campaign/session IDs, manifest with effective build/configuration and complete-turn all-faction snapshots; tests for missing/failed writes, no RNG perturbation, clean 10–20-turn history and same-build save/reload. |
+| AUTO-001 | P1 | TODO | **Turn driver using existing AI handover.** Validate Scenario Editor's 'switch faction / keep AI control' state; automate advance after manual handover, then automatic start handover, stop at N turns; confirm the original player faction actually uses AI and ordinary gameplay paths. |
+| AUTO-002 | P1 | TODO | **Noninteractive UI policy.** Categorise game popups and movies; suppress passive notices, preserve choice semantics/AI action and stop on unknown modals; record victory cleanly. Actual 100+ turn Windows unattended run with no input. |
+| AUTO-003 | P1 | TODO | **Checkpoints, restarts and watchdog.** Campaign-scoped saves and lineage, configurable checkpoint period, heartbeat, external stalled-process detection, graceful stop/reload/continue, negative tests for deliberate stall/crash. |
+| TEL-002 | P2 | TODO | **Game events and decision reasons.** Instrument combat, diplomacy, economy, projects, research, ecology and selected strategic AI decisions with factual inputs/chosen outputs and stable entity IDs; demonstrate reconstruction of a sampled turn. |
+| DIAG-001 | P2 | TODO | **Movement-loop flight recorder.** Bounded intra-turn and inter-turn movement trace; detect no-progress loops/group oscillation on magtubes without affecting movement decisions; capture target/order/route context. |
+| AUTO-004 | P2 | TODO | **Multi-instance batch runner.** Launch multiple isolated game installations with distinct files and seeds; verify independence, completion, crashes, throughput, and reproducible cross-run metadata. |
+| TEL-003 | P2 | TODO | **Offline reporting and comparisons.** Campaign timelines, faction graphs and issue summaries from recorded history; support repeated output and derived narrative without treating flavour as AI rationale. |
+| DEV-001 | P2 | TODO | **Optional CI Debug build + diagnostics guide.** Publish a distinct Windows Debug artifact and document existing developer shortcuts, keeping Debug mode side effects explicit and ordinary telemetry usable in Develop. |
+
+See [technical design](technical/telemetry-automation.md) for schemas, constraints, test stages and limitations. No logging/automation implementation exists on this planning branch.
+
 ## Design decisions and later work
 
 | ID | Priority | State | Decision or work |
