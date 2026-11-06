@@ -24,6 +24,12 @@ Native Uranium selects `0x78A700` (**variant 0**) or `0x78A72C` (**variant 1**).
 
 Jungle's current patch sites are `0x463CC5`, `0x463D93` and `0x464E78`. The installer now compares all three original six-byte instruction sequences before writing any; an unsupported/mismatched site returns without installing a partial hook. This has source-level coverage, not yet Windows failure-path verification. The Develop Inspector uses a guarded native `strlen` site at `0x4B7A0C`, without hijacking the status window or rewriting terrain flags. PRACX/reduced mode and Release custom-art parity are not established.
 
+## Native-editor Uranium baseline for REND-005 (source/save inspection)
+
+The user supplied `uranium H'minee of the Caretakers, 2105.SAV`, with an area manually stamped using the Scenario Editor's old Uranium tile tool. The tool does **not** create a named Uranium Flats entry, but the saved MAP tiles **do** carry the original `LM_URANIUM` bit (`0x8`). At **(48,64)**, native landmarks are `0x00400008`, while `THMIN001` independent minor type/code is `0/0`. The contiguous painted native Uranium region contains 225 tiles. At **(47,67)**, `LM_URANIUM=0x8` and normal `BIT_BONUS_RES=0x400` coexist; the normal resource is nutrient according to `src/map.cpp::underlying_resource_bonus_at`. This is a concrete native editor reference for the observed ability to draw a resource above Uranium.
+
+The old native `LM_URANIUM` flag is not our new `MinorLandmark::MINOR_URANIUM` storage. In particular, `src/mapgen.cpp::mod_world_diamond` uses `bit2_set(..., LM_URANIUM, true)` for legacy Uranium, whereas independent geology stores `THMIN001` per-tile type/code and deliberately leaves native LM flags untouched. **Source hypothesis:** hook the native Uranium landmark's *rendering-only* predicate or stage to additionally accept independent Uranium/Titanium, then use validated native resource-sprite substitution for blue-grey Titanium while leaving ordinary bonus sprites above it. The save confirms data fields, not the exact draw-stage call graph; disassemble/trace supported `terranx.exe` before selecting a patch. No global LM mutation, named-landmark spoofing, altered yields, or unvalidated Sprite calls.
+
 ## PCX loading and extraction
 
 The **local** `neca_sprites.pcx` is a 1024×1024 8-bit indexed image with the exact original `TER1.PCX` palette. The verified native processing sequence is:

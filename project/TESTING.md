@@ -64,6 +64,18 @@
 - Geological placement does not read the erosion setting directly, but its current source favours lower terrain elevations. Erosion can therefore have an *indirect* effect by changing eligible terrain; this is not currently a separate implemented geological erosion rule.
 - **Evidence correction:** the subsequently attached SAV was identified by the user as the **wrong save**. Exclude it entirely from PR #4 testing, resource-overlap regression, map-size/patch statistics, coordinates and persistence claims. The screenshot of native Uranium Flats on the *default Planet map* remains the separate REND-005 visual reference. No save-specific statistics or coordinates from that withdrawn attachment are accepted.
 
+## Editor-painted native Uranium precedent — 7 November 2026
+
+**Correct reference save:** `uranium H'minee of the Caretakers, 2105.SAV`, user-supplied for REND-005 investigation. The *previously withdrawn 2101 SAV* remains excluded and must not be used as supporting evidence.
+
+Decoded the actual native MAP records and `THMIN001` extension for the **160×160** 2105 map:
+
+- At **(48,64)**, native `MAP::landmarks = 0x00400008` (including `LM_URANIUM=0x8`), while independent minor type/code is `0/0`; no explicitly placed `BIT_BONUS_RES` on that tile. User reports stamping Uranium using the Scenario Editor tile tool, not creating a **named Uranium Flats**.
+- The editor-painted `LM_URANIUM` area connected to (48,64) contains **225** tiles (x 34–62, y 50–78); the editor sets the original `LM_URANIUM` flag irrespective of whether a named landmark is created. Therefore, the distinction is **named major landmark versus tile-level native landmark flag**, *not* an alternative independent feature encoding.
+- At **(47,67)**, the MAP record simultaneously holds `LM_URANIUM=0x8` and an explicitly placed normal resource `BIT_BONUS_RES=0x400` (`items=0x00101403`); the native resource bonus lookup resolves **nutrient** for this tile. Independent minor type is `MINOR_NONE`. This is a precise **native Uranium + resource** regression location for checking the user's observed two-layer appearance.
+- **Implementation hypothesis, not yet confirmed:** existing native `LM_URANIUM` rendering may furnish an underlay stage separate from the ordinary resource icon. Investigate the supported executable's native landmark predicates/drawing and preserve original draw ordering before introducing a new draw call. The saved bytes alone prove coexistence of tile flags and resource data, *not* which functions drew each glyph.
+- Neither the SAV nor original game artwork is committed to the repository; evidence refers to the uploaded user-local save. REND-005 still needs an actual code implementation and a new Windows build for independent Uranium/Titanium.
+
 ## Verified sprite trace — 5 November 2026
 
 - **External Uranium mode 1:** `NECA SPRITE processed name=uranium_test corner=9 transparent=5635 visible=565 hash=24A1B67A expected=24A1B67A verified=1`. Extracted `100x62 offset=9,2 pitch=82 key=9`; native reported the same geometry, offsets, pitch and key, with `variant=0 swapped=1`. User confirmed visual equivalence.
