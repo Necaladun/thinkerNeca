@@ -22,6 +22,27 @@
 | Configuration | Parser/INI structural checks, mode 3 selected by user | Local overrides and experimental economic balance |
 | Release/PRACX | Release x86 DLL/launcher cross-compilation **passed** on `4809cb7`; custom Titanium/Inspector hooks remain Develop-only, PRACX unverified | Native art/Inspector parity, actual in-game checks, clean install and supported binaries |
 
+## Combined PR #4 + PR #5 Windows Develop smoke report — 7 November 2026
+
+**User-reported, not instrumented validation.** The user installed [Develop CI artifact for PR #5 head `3c08b52`](https://github.com/Necaladun/thinkerNeca/actions/runs/42293858129), which contains PR #4 terrain code plus PR #5 Empire Report UI. Both x86 Develop and Release cross-build jobs passed; only **Develop** was tested in the game. This user confirmation covers the six test areas previously supplied with the combined build:
+
+1. **Same-build fresh-game save / close / reload / advance:** reported passing.
+2. **Native Empire Report:** reported passing for tabs, base/production actions, scrolling and navigation; earlier explicit Queue Insert/Replace/Delete and Cancel/OK evidence remains valid.
+3. **Independent terrain graphics:** reported appearing correctly for Jungle, Uranium, Titanium, standard resource art and map redraw/fog situations in the tested session.
+4. **Tile Inspector:** reported displaying correctly in the tested session; previous intermittent BUG-002 has not been isolated or proven impossible.
+5. **New-map generation:** reported satisfactory for the seeds/settings tried; exact seeds, sizes, climates and deposit counts were not supplied.
+6. **General compatibility/regressions:** reported passing, including the requested UI layout/interaction checks; the test report did not itemise exact colony counts, display modes, or probe capture scenarios.
+
+**Evidence boundaries:** No separate log, coordinate list, screenshots, exact map-seed matrix, independently inspected effective INI or isolated failure reproductions accompany this confirmation. This is strong positive broad *Windows Develop* acceptance, not source-level proof of each original edge case or any Windows Release/PRACX validation. Specifically:
+- **BUG-003:** no visible problem was reported in this pass, but procedural resource icons on top of deposits require an explicitly identified overlap to close confidently.
+- **BUG-002:** no visible Inspector problem was reported; intermittent labels remain monitor/repro until isolated or sufficiently targeted to close.
+- **REND-001:** normal supported-game path passed at smoke-test level; forced mismatched-preimage, all-or-nothing patch negative test remains for an engineering harness.
+- **REND-004:** no variant-1 sprite geometry log or alternative artwork has been supplied. Variant 1 deliberately retains native Uranium art.
+- **REND-002:** Release binary still omits native Titanium artwork and Inspector hooks; build success is not feature parity.
+- **BUG-001:** a general regression pass does not prove `base_capture_fix=1` safe; keep `base_capture_fix=0` workaround until specific probe/mind-control tests.
+
+**Integration gate:** this is evidence for the *existing* PR #5 binary `3c08b52`, not for a future merged/rebased DLL. Rerun a short Windows regression on the final integrated commit before closing either PR.
+
 ## Verified sprite trace — 5 November 2026
 
 - **External Uranium mode 1:** `NECA SPRITE processed name=uranium_test corner=9 transparent=5635 visible=565 hash=24A1B67A expected=24A1B67A verified=1`. Extracted `100x62 offset=9,2 pitch=82 key=9`; native reported the same geometry, offsets, pitch and key, with `variant=0 swapped=1`. User confirmed visual equivalence.

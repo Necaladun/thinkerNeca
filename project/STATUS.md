@@ -14,7 +14,7 @@
 
 ## Parked Empire Report (unmerged draft PR #5)
 
-- [UI-001](WORK-QUEUE.md): Native Empire Report (12 views, Overview with grouped stats/native art, colony/production controls) remains on [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), **parked** after positive Windows user testing and latest visual approval. PR #5 remains stacked on draft PR #4. PR #4 integrated current `master` documentation in merge commit [`392fd66`](https://github.com/Necaladun/thinkerNeca/commit/392fd6655e69866f52b26daf4afad6d5998a2f76), clearing its documentation conflicts. Before merging PR #5: complete and merge PR #4 (or explicitly decouple PR #5), rebuild, and finish targeted Windows regression and same-build save/reload checks. See [testing](TESTING.md).
+- [UI-001](WORK-QUEUE.md): Draft [PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) remains **parked** and stacked on draft PR #4, whose master documentation conflicts were resolved in `392fd66`. The **combined Windows Develop test build `3c08b52`** has now passed the user's six-part broad smoke check including the native Empire Report, colony actions, same-build save/reload and layout/interaction. UI-001 is functionally accepted **for this tested build**, pending PR #4 completion and PR #5 ancestry reconciliation, rerun CI and short final integrated-binary regression. See [testing](TESTING.md).
 - [UI-002](WORK-QUEUE.md): Deferred **start-of-turn consolidated Turn Report** with 30+ actual production-completion events, post-upkeep finances/research, actionable colony orders and optional Secret Project movie choice. This is **not implemented** in PR #5 and is not a blocker for merging its manual report.
 
 ## Active test configuration
@@ -23,12 +23,16 @@ Distributed [test INI](../docs/thinker.ini): `minor_native_titanium=1` and `mino
 
 Other current test-profile values include `base_capture_fix=0` (probe workaround), `tile_output_limit=3,3,3` (balance trial), extra starting units, polar caps disabled and excluded events 13/17. See [configuration](technical/configuration.md).
 
+## Combined Windows Develop milestone — 7 November 2026
+
+- User reports all six requested combined PR #4 + PR #5 Develop checks passing with binary `3c08b52`: save/reload/advance, Empire Report, terrain graphics, Inspector, map generation and compatibility. The same build's Develop/Release cross-builds passed CI; **only Develop has in-game verification**. No exact seed list, detailed Inspector/resource-overlap trace or Release test was supplied. Details: [TESTING](TESTING.md).
+
 ## Remaining before PR #4 can merge
 
-- [TERR-001](WORK-QUEUE.md): new-game **same-build save→reload→continue**, unusual improvements, fog, unit/base drawing and Inspector checks.
+- [TERR-001](WORK-QUEUE.md): broad same-build save→reload→continue, fog/redraw and UI smoke now reported passing on combined Develop; finish any specifically identified edge-case evidence on the final integrated binary.
 - [REND-001/002/004](WORK-QUEUE.md): Jungle all-site preflight is implemented but needs Windows verification; Release/packaging parity and the second Uranium/Titanium sprite variant remain open (variant 1 still uses native Uranium).
-- [BUG-002](WORK-QUEUE.md): intermittent Inspector label. [BUG-003](WORK-QUEUE.md): naturally seeded resource icons were hidden by geology though yields stacked; resource-priority source fix now needs Windows retest. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
-- More map seeds/climates and landmark regressions remain open. PR #4 stays **draft**.
+- [BUG-002](WORK-QUEUE.md): Inspector currently looks correct but prior intermittent omission not isolated. [BUG-003](WORK-QUEUE.md): source-level procedural-resource precedence fix received broad positive smoke but still needs a clearly identified natural overlap. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
+- Generation looked good in the user's combined-build pass; reproducible multi-seed/climate/landmark coverage remains to record. PR #4 stays **draft**.
 
 
 ## Other development and design documentation
@@ -41,4 +45,4 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 
 Source inspection identified an existing ordinary-artillery-bombardment reactor-normalization mismatch under `ignore_reactor_power=1` ([BUG-004](WORK-QUEUE.md)); a reported late-game Spore Launcher weakness is consistent but lacks isolated Windows reproduction. Broader chassis, armour cost and artillery-duel changes are **unapproved exploration** ([BAL-004](WORK-QUEUE.md)). Neither changes the active terrain PR's merge criteria; [technical reference](technical/unit-combat-and-costs.md).
 
-**Next:** same-build save/reload, fog/unit/Inspector checks with the working mode-3 atlas; verify the new all-site Jungle preflight, then variant 1 and Release parity. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).
+**Next:** complete REND-001 negative preflight harness, REND-004 variant-1 sprite/geometry and REND-002 Release parity; keep targeted BUG-002/003 reproduction and BUG-001 probe capture investigation visible, then run a final integrated-binary regression. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).
