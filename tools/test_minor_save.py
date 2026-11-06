@@ -59,9 +59,9 @@ def invalid(data, reason):
     raise AssertionError(reason)
 
 invalid(raw[:offset+1], 'truncation must fail')
-invalid(raw[:offset-12] + struct.pack('<II', 2, count) + raw[offset:],
-        'v2 must fail')
-first = offset+8*(width//2)+10//2
+v2 = bytearray(raw)
+struct.pack_into('<I', v2, offset-8, 2)  # Version follows the 8-byte magic.
+invalid(bytes(v2), 'v2 must fail')
 # The first feature count in record array may shift; locate the target via a scan.
 p = offset
 for idx in range(count):

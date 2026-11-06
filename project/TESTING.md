@@ -28,7 +28,7 @@
 
 **REND-005 layering:** compare independent Uranium alone to editor-painted native `LM_URANIUM`; compare explicit natural and editor resource overlaps, with resource glyph always above geology. Check Jungle + Uranium, Jungle + Titanium, Uranium + Titanium and all three on **constructed** tiles for no crashes, corrupted draw state or resource-overdraw; **dual-geology artwork need not be pretty or both visible**, provided behaviour is deterministic and ordinary resource icons are preserved. Exercise fog, reveal, movement/units/bases, scrolling/zoom/clipping, optional/missing `neca_sprites.pcx` and same-build save/reload. Validate only after the native Uranium rendering stage/call contract has been established and a new Windows build is available.
 
-**Status:** TERR-004 code and v3 synthetic tests added to PR #4; CI is pending at commit creation and no Windows runtime pass has occurred on the new build. REND-005 still lacks its native rendering change. Existing Develop variant-0 and BUG-003 runtime evidence belongs to the previous single-type/v2 implementation.
+**Status:** TERR-004 source compiled successfully for both Windows x86 Develop and Release on `8952ebe`; the Develop static source contracts and synthetic v3 stacked-save parser test passed ([CI run 42314671873](https://github.com/Necaladun/thinkerNeca/actions/runs/42314671873)). A subsequent test-only correction exercises the actual obsolete-version field. **No Windows SMAC/X runtime pass has occurred on the v3 build.** REND-005 still lacks its native rendering change. Existing Develop variant-0 and BUG-003 runtime evidence belongs to the previous single-type/v2 implementation.
 
 ## Combined PR #4 + PR #5 Windows Develop smoke report — 7 November 2026
 

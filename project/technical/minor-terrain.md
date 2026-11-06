@@ -23,7 +23,7 @@ Independent minor terrain is now represented per map tile as `MinorTerrainTile {
 
 ## Multi-feature implementation and pending verification (TERR-004)
 
-The source-layer storage and consumers have been refactored to a **compositional** model; the following are acceptance requirements and boundaries still requiring CI and Windows runtime verification:
+The source-layer storage and consumers have been refactored to a **compositional** model. Windows x86 Develop and Release CI compilation and the synthetic v3 tests passed on `8952ebe` (run 42314671873); the following remain acceptance boundaries requiring actual in-game verification:
 
 - `minor_landmark_has(x,y,type)`, `minor_landmark_code_at(x,y,type)`, and add/remove/iterate operations are type-specific. Setting Titanium on Jungle must retain Jungle and its code. A tile may hold Jungle + Uranium + Titanium; the model must also retain native `LM_*` flags and ordinary resource bonuses unchanged.
 - Each present type contributes its registered N/M/E effects **once** through the existing live yield branches and resource caps, with future special-case restrictions made explicit. A tile with Jungle + Uranium + Titanium nominally has +1N/+1M/+1E before technology/improvement/cap rules; no double-counting or treating the extra geology as normal `bonus_at()` resources.
@@ -58,8 +58,8 @@ Thinker's worker selection, crawler logic and former scoring consume modified ac
 
 **User-verified Windows Develop:** all three minor types generated and +1 nutrient/energy/mineral effects appeared; native Jungle/Uranium art worked. A user-local `neca_sprites.pcx` in mode 3 now renders distinct blue-grey Titanium art with correct transparency, alignment and zoom-in/out. The custom sprite covers native variant 0 only; variant 1 retains Uranium. The Inspector name was previously intermittent on Titanium and still needs isolated testing.
 
-**Automated:** the Windows Develop CI compiles the DLL/launcher, checks static source invariants, generates/tests the indexed PCX fallback and parses synthetic `THMIN001` v3 stacked saves (once the new commit's CI finishes). These are **not** executable world-generation or full save/reload tests.
+**Automated:** Windows Develop/Release CI compiled the DLL/launcher, and Develop checked static source invariants, generated/tested the indexed PCX fallback and parsed synthetic `THMIN001` v3 stacked saves (workflow 42314671873). These are **not** executable world-generation or full save/reload tests.
 
-**Still to verify on the v3 DLL:** compilation/CI, new-game same-build save/reload/continue and stacked-structure synthetic tests; multiple seeds and map sizes; fragment/spacing statistics; complete fog, focus and partial redraw behaviour; resource and improvement combinations; native Inspector on standalone/composite features; real in-game save/reload; mirrored maps (currently excluded); Release and PRACX/reduced-mode behaviour.
+**Still to verify on the v3 DLL:** new-game same-build save/reload/continue and actual multi-feature behaviour (synthetic/compile evidence is not an in-game test); multiple seeds and map sizes; fragment/spacing statistics; complete fog, focus and partial redraw behaviour; resource and improvement combinations; native Inspector on standalone/composite features; real in-game save/reload; mirrored maps (currently excluded); Release and PRACX/reduced-mode behaviour.
 
 See [rendering.md](rendering.md) for graphics architecture and deployment, and [sprite-atlas.md](sprite-atlas.md) for the reproducible local indexed-artwork pipeline.
