@@ -1,5 +1,8 @@
 # Map generation and major landmarks
 
+> **Branch scope (2026-11-07):** This reference describes experimental terrain/rendering code on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), **not yet merged into `master`**. The default branch still has earlier Ironstone and map behaviour; verify implementation against the working branch.
+
+
 **Current code:** `src/mapgen.cpp`, `src/engine_enums.h`, `src/main.cpp`. **Settings:** [configuration](configuration.md) and [`docs/thinker.ini`](../../docs/thinker.ini). Outstanding regression work: [MAP-001/MAP-002](../WORK-QUEUE.md). This is the **implemented** arrangement, not a proposal for replacement landmarks.
 
 ## Generation paths

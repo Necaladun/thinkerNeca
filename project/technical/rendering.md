@@ -1,5 +1,8 @@
 # Independent minor-terrain rendering — implementation
 
+> **Branch scope (2026-11-07):** This reference describes experimental terrain/rendering code on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), **not yet merged into `master`**. The default branch still has earlier Ironstone and map behaviour; verify implementation against the working branch.
+
+
 **Code:** [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4). **Evidence:** [testing](../TESTING.md). **Open work:** [queue](../WORK-QUEUE.md). **Artwork:** [sprite atlas](sprite-atlas.md).
 
 ## Native renderer integration
