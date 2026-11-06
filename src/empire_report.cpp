@@ -19,6 +19,10 @@ int report_width = 0;
 int report_height = 0;
 int base_scroll = 0;
 int wheel_remainder = 0;
+// One-shot request consumed from the game's modal colony message pump.
+int pending_production_base_id = -1;
+uint32_t pending_production_ticket = 0;
+uint32_t next_production_ticket = 0;
 
 const int REPORT_DESIRED_WIDTH = 1350;  // 150% of the previous 900-pixel target
 const int REPORT_DESIRED_HEIGHT = 990;  // 150% of the previous 660-pixel target
@@ -338,22 +342,36 @@ void open_governor_options(int base_id) {
     }
 }
 
-// Show the actual colony screen before opening its native production
-// picker. Unlike soft_zoom, the full colony stays available when the picker
-// closes, so the player can examine yields, facilities and the entire queue.
-// Reuse the user-verified native picker call; do not change queue_items here.
+// BaseWin_zoom owns a modal event loop and does not return until the colony
+// closes. Calling BaseWin_production *after* it therefore opens the picker
+// too late. Post a one-shot private window message before entering the zoom:
+// the message is processed inside the colony's modal loop while it is open.
+// No production or queue fields are changed by this shortcut.
 void open_change_production(int base_id) {
-    if (base_id < 0 || base_id >= *BaseCount) return;
+    if (base_id < 0 || base_id >= *BaseCount
+        || Bases[base_id].faction_id != report_faction()
+        || pending_production_base_id >= 0) return;
+    const UINT message = empire_report_production_message();
+    HWND hwnd = *phWnd;
+    if (!message || !hwnd || !IsWindow(hwnd)) return;
+
+    uint32_t ticket = ++next_production_ticket;
+    if (!ticket) ticket = ++next_production_ticket;
+    pending_production_base_id = base_id;
+    pending_production_ticket = ticket;
+
     empire_report_hide();
-    BaseWin_zoom(BaseWin, base_id, 1);
-    if (*CurrentBaseID != base_id
-        || *CurrentBase != &Bases[base_id]
-        || BaseWin->cur_base_id != base_id) {
-        // Do not act on a different colony if the native zoom did not
-        // establish the requested context. No production action is issued.
+    if (!PostMessage(hwnd, message, (WPARAM)base_id, (LPARAM)ticket)) {
+        pending_production_base_id = -1;
+        pending_production_ticket = 0;
+        empire_report_show();
         return;
     }
-    BaseWin_production(BaseWin, 0, 0);
+    BaseWin_zoom(BaseWin, base_id, 1);
+    // The colony was closed without consumption, or the picker completed.
+    // Any still-queued stale message must never act on a later base.
+    pending_production_base_id = -1;
+    pending_production_ticket = 0;
 }
 
 // Pure, live-state warnings. No event recording or hidden unit scanning.
@@ -1445,6 +1463,32 @@ void __cdecl draw_report_window() {
 }
 
 } // namespace
+
+// A registered window message avoids colliding with the game's WM_USER
+// commands or those of another installed renderer/mod.
+UINT empire_report_production_message() {
+    static const UINT message = RegisterWindowMessageA(
+        "thinkerNeca.EmpireReport.OpenColonyProduction.v1");
+    return message;
+}
+
+// The engine's existing ModWinProc receives this within BaseWin_zoom's
+// modal message pump. Consume before entering the native picker, verify
+// that the requested colony is still the active and visible owned base,
+// and never process the same request twice.
+void empire_report_dispatch_production(int base_id, uint32_t ticket) {
+    if (base_id != pending_production_base_id
+        || ticket != pending_production_ticket) return;
+    pending_production_base_id = -1;
+    pending_production_ticket = 0;
+    if (*GameHalted || base_id < 0 || base_id >= *BaseCount
+        || !Win_is_visible(BaseWin)
+        || *CurrentBaseID != base_id
+        || *CurrentBase != &Bases[base_id]
+        || BaseWin->cur_base_id != base_id
+        || Bases[base_id].faction_id != MapWin->cOwner) return;
+    BaseWin_production(BaseWin, 0, 0);
+}
 
 bool empire_report_visible() {
     return report_window_initialized

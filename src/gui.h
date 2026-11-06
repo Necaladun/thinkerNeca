@@ -53,6 +53,7 @@ bool shift_key_down();
 bool ctrl_key_down();
 bool alt_key_down();
 bool win_has_focus();
+extern HWND* phWnd;  // Native SMAC/X top-level game window handle.
 int __thiscall Win_is_visible(Win* This);
 LRESULT WINAPI ModWinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 int __cdecl mod_Win_init_class(const char* lpWindowName);

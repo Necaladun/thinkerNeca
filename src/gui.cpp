@@ -616,6 +616,14 @@ LRESULT WINAPI ModWinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     POINT p;
     MAP* sq;
 
+    // Dispatch only our registered, one-shot production request. This
+    // message is queued before BaseWin_zoom enters its modal loop, so the
+    // picker opens *over* the colony, not after the colony is closed.
+    if (msg == empire_report_production_message()) {
+        empire_report_dispatch_production((int)wParam, (uint32_t)lParam);
+        return 0;
+    }
+
     // Experimental, deliberately independent of production/upkeep processing.
     if (msg == WM_KEYDOWN && empire_report_visible()) {
         if (wParam == VK_ESCAPE || wParam == VK_OEM_3) {
