@@ -4,7 +4,12 @@
 void __cdecl mod_enemy_turn(int faction_id) {
     debug("enemy_turn %d %d\n", *CurrentTurn, faction_id);
     for (int iter_type = 0; iter_type < 10; ++iter_type) {
+        autosim_collect_queued_keys();
         for (int veh_id = *VehCount - 1; veh_id >= 0; --veh_id) {
+            // Latch input during long AI movement loops, too. Nothing
+            // interrupts the current unit's order; F9/F10 are acted upon
+            // only by control_turn() after the full faction cycle.
+            if ((veh_id & 31) == 0) autosim_collect_queued_keys();
             VEH* veh = &Vehs[veh_id];
             if (veh_id >= *VehCount || veh->faction_id != faction_id) {
                 continue;
