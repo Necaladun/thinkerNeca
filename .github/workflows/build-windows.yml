@@ -49,6 +49,11 @@ jobs:
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic \
             tools/test_jungle_hook_preflight.cpp -o build/ci/test_jungle_hook_preflight
           build/ci/test_jungle_hook_preflight
+      - name: Test artillery bombardment ratios and reactor caps (host C++11)
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic \\
+            tools/test_artillery_damage.cpp -o build/ci/test_artillery_damage
+          build/ci/test_artillery_damage
       - name: Check independent terrain source contract
         run: python tools/test_minor_terrain_contract.py
       - name: Check reserved major-landmark slot 10

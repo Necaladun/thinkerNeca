@@ -1,5 +1,6 @@
 
 #include "veh_combat.h"
+#include "artillery_damage.h"
 
 
 static void reset_veh_draw() {
@@ -1728,18 +1729,21 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                 }
                 veh_skip(veh_id_atk);
                 mod_battle_compute(veh_id_atk, veh_id_def, &offense_out, &defense_out, 1);
-                int def_value = max(1, defense_out * Rules->artillery_dmg_denominator);
-                int damage_value = combat_rand(clamp(offense_out * Rules->artillery_dmg_numerator / def_value + 1, 1, 999));
-                int damage_limit;
-                if (base_id >= 0 || (sq_def->items & BIT_BUNKER)) {
-                    damage_limit = (veh_def->max_hitpoints() * (100 - Rules->max_dmg_percent_arty_base_bunker) + 99) / 100;
-                } else {
-                    int val = Rules->max_dmg_percent_arty_open;
-                    if (veh_def->triad() != TRIAD_LAND) {
-                        val = Rules->max_dmg_percent_arty_sea;
-                    }
-                    damage_limit = (veh_def->max_hitpoints() * (100 - val) + 99) / 100;
-                }
+                const int off_value = max(0, offense_out * Rules->artillery_dmg_numerator);
+                const int def_value = max(1, defense_out * Rules->artillery_dmg_denominator);
+                const ArtilleryDamageRoll roll = artillery_damage_roll(off_value, def_value);
+                int damage_value = roll.damage(combat_rand(roll.range));
+                // With ignore_reactor_power, 10 effective HP are stored as 10 * reactor.
+                // The final cap must use the same effective-to-stored conversion.
+                const int reactor_scale = conf.ignore_reactor_power && !veh_def->is_artifact()
+                    ? veh_def->reactor_type() : 1;
+                damage_value *= reactor_scale;
+                const int max_damage_percent = (base_id >= 0 || (sq_def->items & BIT_BUNKER))
+                    ? Rules->max_dmg_percent_arty_base_bunker
+                    : (veh_def->triad() == TRIAD_LAND
+                        ? Rules->max_dmg_percent_arty_open : Rules->max_dmg_percent_arty_sea);
+                const int damage_limit = artillery_damage_floor(
+                    veh_def->max_hitpoints(), reactor_scale, max_damage_percent);
                 damage_value = max(0, min(damage_value, veh_def->cur_hitpoints() - damage_limit));
                 if (render_battle) {
                     combat_type = 0;

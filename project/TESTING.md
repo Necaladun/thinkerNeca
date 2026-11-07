@@ -209,12 +209,17 @@ Prioritise one normal Windows Develop test game before changing INI options or a
 **Evidence handling:** `minor_terrain_render.log` is written beside the game executable and **truncated on DLL startup**; copy it before restarting when a repro occurs. Hover and append diagnostics are capped per process. For failures, supply DLL commit, effective INI (including `thinker_user.ini`), map size/seed/year, tile coordinates, what happened versus expected, and a screenshot or a copied log. Do not alter your original `terranx.exe` for negative hook tests.
 
 
-## Combat reactor normalization — source finding, Windows validation pending
+## Artillery bombardment reactor scaling and fractional weak hits — draft PR #10, Windows pending
 
-**BUG-004:** The existing `ignore_reactor_power=1` setting removes effective reactor endurance advantages in conventional direct combat and weapon-versus-weapon artillery duels. Ordinary bombardment still subtracts unscaled damage from `10 × reactor` stored HP; this is a source-confirmed discrepancy, **not yet** a Windows reproduction or fixed feature. A user separately reported poor Spore Launcher performance versus Fusion units; this is consistent with BUG-004 but its cause has not been isolated.
+**BUG-004:** The master baseline with `ignore_reactor_power=1` removes effective reactor endurance in conventional direct combat and artillery duels, but ordinary bombardment subtracts unscaled damage from `10 × reactor` stored HP. [Draft PR #10](https://github.com/Necaladun/thinkerNeca/pull/10) implements a source fix: multiply damage by the **defender reactor** and normalize the 50/99/100% floors to effective HP before converting to stored units. `ignore_reactor_power=0` preserves existing behaviour. The user's previously reported Spore Launcher weakness against Fusion is consistent with the source bug, but not proven causal in-game.
+
+**BAL-005 (experimental):** The same PR adds WTP-style `A/(A+D)` one-damage probability **only below 1:1**, while preserving the original uniform distribution at ratios ≥1 (no full-range stochastic rounding). The distributed `alphax.txt` uses **3/2**; Laser 2 vs Plasma 3 already has 50% 1-damage probability and is unchanged. Evaluate whether massed 10-mineral Gun Artillery becomes an excessive stack-bombardment strategy, including defender repairs and counterbattery risk. No AI preference change.
+
+**Automated test:** A pure C++11 helper regression is included in `tools/test_artillery_damage.cpp` and wired into the Windows Develop CI workflow. It enumerates strong/weak outcomes and reactor cap rounding for levels 1–4 under both reactor options. A passing CI test is **not a Windows game runtime test**. Run: `g++ -std=c++11 -Wall -Wextra -pedantic tools/test_artillery_damage.cpp -o /tmp/test_artillery && /tmp/test_artillery`.
 
 | Target/test | Expected evidence |
 | --- | --- |
+| Fractional 1/2 artillery vs 3–12 defence | Record per-shot hit rates, stack-wide damage, cost-efficiency of cheap Fission infantry batteries, and attrition/repair after 5–10 turns; compare strong guns to ensure unchanged ≥1:1 outcome distribution |
 | Otherwise identical Fission/Fusion/Quantum/Singularity defenders | Compare effective percentage HP loss and damage distribution under repeated identical artillery conditions |
 | Conventional land bombardment | Check armour, morale, terrain, repair and the correct target reactor conversion |
 | Spore Launcher vs conventional defenders | Ensure native psi-artillery attack does not inadvertently reward target reactor level |
@@ -226,6 +231,8 @@ Prioritise one normal Windows Develop test game before changing INI options or a
 | Save/reload, visual damage, healing | Correct stored damage and recovery using same DLL and effective INI |
 
 Record the exact unit prototypes, reactors, morale, tile, year, attack method, effective `thinker.ini`/`thinker_user.ini`, stored/effective HP before/after, DLL commit and screenshot/log. Source inspection, automated calculations, compilation and user observation are **distinct** evidence classes.
+
+**Runtime gate:** Compile a matching Windows Develop DLL and test a fresh game with the same build saved, reloaded and advanced. Include land/sea/base/bunker, Spore Launchers, other native units, fully damaged caps and artillery duels. Do not mark BUG-004 fixed or BAL-005 balance-accepted solely from host helper tests.
 
 **BAL-004 (future, not yet tested):** If chassis HP, armour-priced Tanks or armour-contributing artillery duels are approved, compare individual battle odds, sustained engagements, repair/replacement mineral costs, land terrain bonuses, sea defence, unit-design AI and new-game save/reload. Do not mark hypothetical formula results as Windows-verified.
 
