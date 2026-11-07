@@ -6,6 +6,21 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-001 first manual all-AI driver — implementation and acceptance (7 November 2026)
+
+**Branch:** `feature/auto-001-manual-ai-turn-driver` (stacked on unmerged TEL-001, no PR). `src/autosim.h` contains pure entry guards and completed-cycle counter, tested by the host C++11 `tools/test_autosim_policy.cpp`. The native `control_turn()` uses the unchanged AI path; it conditionally omits the between-turn native `Console_human_turn()` call only when all seven faction slots are AI-controlled, single-player, a living view owner is present and no endgame state is set. After `autosim_manual_turns` full cycles it sets `ControlTurnA=1` and `ControlTurnB=1` for the normal menu-return path. No forced game-state or save-format modifications. Config default: zero/off.
+
+**Windows Develop acceptance (pending):**
+
+1. Use a disposable recent saved game and back up DLL/exe. Set `telemetry_enabled=1`, `autosim_manual_turns=10` in local `[thinker]` overrides. Verify the flag is harmless during normal human play for at least one turn.
+2. Open Scenario Editor and use its **switch faction / keep AI control** path to hand off the formerly human faction; observe whether the runtime indeed clears the human-control bit. The implementation does **not** force-clear it. If the game remains human-controlled, do not claim the driver active; identify the exact native handover state.
+3. Verify at least ten full AI-only completed cycles without input *unless an unclassified modal blocks* (the latter is AUTO-002). Generate the campaign report and check all factions' `human` fields are false on participating turns, including the previously human faction; verify actual AI expansion/production/units.
+4. Verify exactly ten counted full post-handover cycles, consecutive mission years, and clean return to the main menu; check that any ordinary autosave is valid **if it was enabled**, rather than assuming a save at the stop. If loaded mid-turn, the first partial cycle must not count.
+5. Verify `autosim_manual_turns=0` keeps ordinary human-turn behaviour; human-control bit remaining set must prevent the auto fast path. Multiplayer/PBEM are guarded in policy, not runtime-tested. Check `debug.txt` remains separate and normal.
+6. Repeat from a loaded saved game using the same binary and inspect reporter state. Record popups, victory dialogs and animation stalls separately for AUTO-002.
+
+**Not verified until Windows test:** the Scenario Editor's exact handover semantics, native UI callbacks when skipping `Console_human_turn()`, speed/progress, serialised game state, end-of-turn modal coverage, and in-game cap/menu return. Compile or host policy test success cannot establish these.
+
 ## TEL-001 — first recorder/analyser code, unmerged branch (7 November 2026)
 
 **Branch:** `feature/tel-001-recorder-foundation`, no PR. **CI:** [run 42350976871](https://github.com/Necaladun/thinkerNeca/actions/runs/42350976871), Develop and Release x86 cross-compiles **passed**. The Develop job also ran `python -m py_compile tools/campaign_report.py tools/test_campaign_report.py` and `python tools/test_campaign_report.py` successfully on synthetic data; the game was **not** executed by CI.
