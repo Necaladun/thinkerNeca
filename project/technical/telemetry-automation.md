@@ -1,7 +1,7 @@
 # Campaign telemetry and automated AI games — design and implementation status
 
 
-> **Implementation status (7 November 2026):** `TEL-001` has an initial opt-in recorder and local HTML/CSV analyser on unmerged branch `feature/tel-001-recorder-foundation`. Windows x86 Develop/Release CI and synthetic analyser tests passed ([run 42350976871](https://github.com/Necaladun/thinkerNeca/actions/runs/42350976871)); **Windows game runtime, save/reload, RNG neutrality and error handling are unverified**. None of `AUTO-001+`, detailed AI event/decision history or watchdog features are implemented.
+> **Implementation status (7 November 2026):** `TEL-001` has an initial opt-in recorder and local HTML/CSV analyser on unmerged branch `feature/tel-001-recorder-foundation`. Windows x86 Develop/Release CI and synthetic analyser tests passed ([run 42350976871](https://github.com/Necaladun/thinkerNeca/actions/runs/42350976871)); **An initial Windows Develop 11-turn game session and offline HTML/CSV report are user-verified; uploaded exports passed consistency checks.** Save/reload, RNG neutrality and error handling remain unverified. None of `AUTO-001+`, detailed AI event/decision history or watchdog features are implemented.
 
 ### Initial TEL-001 usage (unmerged branch)
 
