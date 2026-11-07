@@ -93,7 +93,7 @@ def write_csv(path, fields, rows):
             writer.writerow(row)
 
 
-def render_html(campaign_name, session_name, manifest, status, turns, bases):
+def render_html(campaign_name, session_name, manifest, status, turns, bases, notices=None):
     title = html.escape(f"{campaign_name} / {session_name}")
     last_turn = turns[-1]["turn"] if turns else "none"
     state = html.escape(str(status["state"]))
@@ -108,6 +108,17 @@ def render_html(campaign_name, session_name, manifest, status, turns, bases):
             units=f["units"], credits=f["credits"], labs=f["labs"])
         for f in latest
     )
+    notices = notices or []
+    notice_rows = "\n".join(
+        "<tr><td>{turn}</td><td>{faction}</td><td>{source}</td><td>{label}</td><td>{action}</td></tr>".format(
+            turn=entry.get("turn", "?"), faction=entry.get("faction", "?"),
+            source=html.escape(str(entry.get("source", ""))),
+            label=html.escape(str(entry.get("label", ""))),
+            action=html.escape(str(entry.get("action", ""))))
+        for entry in notices
+    )
+    if not notice_rows:
+        notice_rows = '<tr><td colspan="5">No UI notices logged in this session</td></tr>'
     base_rows = ""
     if bases:
         for base in bases[-1]["bases"]:
@@ -144,7 +155,13 @@ th{color:#bec9d8} .scroll{overflow-x:auto}
 <h2>Latest base snapshot</h2><div class="scroll"><table><thead><tr>
 <th>Faction</th><th>Name</th><th>Population</th><th>Minerals (surplus)</th><th>Labs</th><th>Eco damage</th>
 </tr></thead><tbody>%s</tbody></table></div>
-<p><a href="factions.csv">Export faction history CSV</a> · <a href="bases.csv">Export base history CSV</a></p>
+<h2>AUTO-002 UI handling (%d recorded actions)</h2>
+<p class="muted">Only explicitly classified notices and optional human UI are suppressed.
+An unknown native modal can still interrupt simulation.</p>
+<div class="scroll"><table><thead><tr>
+<th>Turn</th><th>Faction</th><th>Source</th><th>Label</th><th>Handling</th>
+</tr></thead><tbody>%s</tbody></table></div>
+<p><a href="factions.csv">Export faction history CSV</a> · <a href="bases.csv">Export base history CSV</a> · <a href="ui_notices.csv">Export UI handling CSV</a></p>
 <p class="muted">These are recorded states, not reconstructed events or proven AI motivations.
 Engine base slots may be reused and are not persistent identities. Local/offline report.</p>
 <script id="turn-data" type="application/json">%s</script>
@@ -191,7 +208,7 @@ function draw(){
 }
 draw();
 </script></body></html>
-""" % (title, title, state, len(turns), last_turn, manifest["starting_turn"], body_rows, base_rows, data, metrics)
+""" % (title, title, state, len(turns), last_turn, manifest["starting_turn"], body_rows, base_rows, len(notices), notice_rows, data, metrics)
 
 
 def generate(campaign_dir, session_id=None, output_dir=None):
@@ -210,6 +227,13 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     manifest, status, turns, bases = load_session(session_dir)
     output = output_dir or campaign_dir / "reports" / session_dir.name
     output.mkdir(parents=True, exist_ok=True)
+    notices_file = session_dir / "ui_notices.jsonl"
+    notices = read_jsonl(notices_file) if notices_file.is_file() else []
+    for notice in notices:
+        if notice.get("schema") != SCHEMA:
+            raise ValueError("UI notice: unsupported record schema")
+    write_csv(output / "ui_notices.csv",
+              ("turn", "faction", "source", "label", "action"), notices)
     faction_rows = (
         {"turn": record["turn"], "mission_year": record["mission_year"], **f}
         for record in turns for f in record["factions"]
@@ -223,7 +247,7 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     base_rows = ({"turn": record["turn"], **base} for record in bases for base in record["bases"])
     write_csv(output / "bases.csv", BASE_FIELDS, base_rows)
     (output / "index.html").write_text(
-        render_html(campaign_dir.name, session_dir.name, manifest, status, turns, bases),
+        render_html(campaign_dir.name, session_dir.name, manifest, status, turns, bases, notices),
         encoding="utf-8")
     return output
 
