@@ -394,10 +394,10 @@ void __cdecl encounter(int faction_id_1, int faction_id_2, int x, int y, int fun
     if (!faction_id_2) {
         if (faction_id_1 == MapWin->cOwner && MFactions[faction_id_1].is_alien()) {
             if (fungal_tower) {
-                interlude(44, 0, 1, 0);
+                autosim_interlude(44, 0, 1, 0);
             }
             if (native_unit) {
-                interlude(43, 0, 1, 0);
+                autosim_interlude(43, 0, 1, 0);
             }
         }
         return;
@@ -409,17 +409,17 @@ void __cdecl encounter(int faction_id_1, int faction_id_2, int x, int y, int fun
         }
         if (!_stricmp(MFactions[faction_id_1].search_key, "CARETAKE")) {
             if (faction_id_1 == MapWin->cOwner) {
-                interlude(39, 0, 1, 0);
+                autosim_interlude(39, 0, 1, 0);
             }
             if (faction_id_2 == MapWin->cOwner) {
-                interlude(40, 0, 1, 0);
+                autosim_interlude(40, 0, 1, 0);
             }
         } else {
             if (faction_id_1 == MapWin->cOwner) {
-                interlude(40, 0, 1, 0);
+                autosim_interlude(40, 0, 1, 0);
             }
             if (faction_id_2 == MapWin->cOwner) {
-                interlude(39, 0, 1, 0);
+                autosim_interlude(39, 0, 1, 0);
             }
         }
         return;
@@ -431,18 +431,18 @@ void __cdecl encounter(int faction_id_1, int faction_id_2, int x, int y, int fun
                 treaty_on(faction_id_1, faction_id_2, DIPLO_UNK_40000000);
             }
             if (faction_id_1 == MapWin->cOwner) {
-                interlude(34, 0, 1, 0);
+                autosim_interlude(34, 0, 1, 0);
             }
             if (faction_id_2 == MapWin->cOwner) {
-                interlude(22, 0, 1, 0);
+                autosim_interlude(22, 0, 1, 0);
             }
             return;
         }
         if (faction_id_1 == MapWin->cOwner) {
-            interlude(35, 0, 1, 0);
+            autosim_interlude(35, 0, 1, 0);
         }
         if (faction_id_2 == MapWin->cOwner) {
-            interlude(23, 0, 1, 0);
+            autosim_interlude(23, 0, 1, 0);
         }
     }
     if (MFactions[faction_id_2].is_alien()) {
@@ -452,18 +452,18 @@ void __cdecl encounter(int faction_id_1, int faction_id_2, int x, int y, int fun
                 treaty_on(faction_id_1, faction_id_2, DIPLO_UNK_40000000);
             }
             if (faction_id_1 == MapWin->cOwner) {
-                interlude(22, 0, 1, 0);
+                autosim_interlude(22, 0, 1, 0);
             }
             if (faction_id_2 == MapWin->cOwner) {
-                interlude(34, 0, 1, 0);
+                autosim_interlude(34, 0, 1, 0);
             }
             return;
         }
         if (faction_id_1 == MapWin->cOwner) {
-            interlude(23, 0, 1, 0);
+            autosim_interlude(23, 0, 1, 0);
         }
         if (faction_id_2 == MapWin->cOwner) {
-            interlude(35, 0, 1, 0);
+            autosim_interlude(35, 0, 1, 0);
         }
     }
     if (*SunspotDuration <= 0) {
