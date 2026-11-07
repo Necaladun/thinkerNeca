@@ -3816,7 +3816,12 @@ int __cdecl mod_base_production() {
                 && !Sprite_init(&cur_popup.sprite, "secproj_sm.pcx", w, h)) {
                     cur_popup.sprite_icon = &cur_popup.sprite;
                 }
-                BasePop_exec_3(&cur_popup, 0, 0);
+                if (autosim_ui_active()) {
+                    telemetry_record_ui_notice("secret_project", StrBuffer,
+                        "suppressed_completion_popup");
+                } else {
+                    BasePop_exec_3(&cur_popup, 0, 0);
+                }
             }
         }
     }
