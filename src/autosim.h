@@ -40,6 +40,13 @@ struct AutoTurnDriver {
 // continue through existing code. Every unknown label remains native/modal.
 #include <cstring>
 
+inline bool auto_ui_eligible(bool configured, int requested_turns,
+    unsigned human_faction_mask, bool multiplayer, bool pbem, bool game_done,
+    int view_faction, bool view_alive) {
+    return configured && auto_turn_eligible(requested_turns, human_faction_mask,
+        multiplayer, pbem, game_done, view_faction, view_alive);
+}
+
 enum AutoUiAction {
     AUTO_UI_NATIVE,
     AUTO_UI_NOTICE,
