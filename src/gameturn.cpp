@@ -1442,7 +1442,7 @@ void __cdecl random_events(int flag) {
             draw_map(1);
         }
         *DustCloudDuration = 10;
-        popp(ScriptFile, "BIGFATVOLCANO", 0, "volc_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "BIGFATVOLCANO", "volc_sm.pcx");
         return;
     case 15:
         if (*PbemActive || *CurrentTurn < 75 || *GameState & STATE_IS_SCENARIO
@@ -1492,7 +1492,7 @@ void __cdecl random_events(int flag) {
             draw_map(1);
         }
         *DustCloudDuration = 10;
-        popp(ScriptFile, "EATTHIS", 0, "astp_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "EATTHIS", "astp_sm.pcx");
         return;
     case 16:
         if (has_tech(Facility[FAC_BIOLOGY_LAB].preq_tech, faction_id)) {
@@ -2096,9 +2096,9 @@ void __cdecl turn_upkeep() {
             world_climate();
             draw_map(1);
             if (alt_val > 0) {
-                popp(ScriptFile, "SEARISING", 0, "searis_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "SEARISING", "searis_sm.pcx");
             } else {
-                popp(ScriptFile, "SEAFALLING", 0, "seafal_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "SEAFALLING", "seafal_sm.pcx");
             }
         }
     }
@@ -2228,7 +2228,7 @@ void __cdecl faction_upkeep(int faction_id) {
                 parse_says(2, get_noun(faction_id), -1, -1);
                 parse_says(3, get_adjective(faction_id), -1, -1);
                 ParseNumTable[0] = game_year(f->corner_market_turn);
-                popp(ScriptFile, "CORNERWARNING", 0, "econwin_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "CORNERWARNING", "econwin_sm.pcx");
             }
         }
     }
@@ -2260,7 +2260,7 @@ void __cdecl faction_upkeep(int faction_id) {
         && !(*GameState & (STATE_COUNCIL_HAS_CONVENED | STATE_DISPLAYED_COUNCIL_AVAIL_MSG))
         && can_call_council(faction_id, 0) && !(*GameState & STATE_GAME_DONE)) {
             *GameState |= STATE_DISPLAYED_COUNCIL_AVAIL_MSG;
-            popp(ScriptFile, "COUNCILOPEN", 0, "council_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "COUNCILOPEN", "council_sm.pcx");
         }
         if (!is_human(faction_id)) {
             call_council(faction_id);
