@@ -350,8 +350,8 @@ void telemetry_record_completed_turn() {
                   << ",\"eco_damage\":" << b.eco_damage
                   << ",\"production_item\":" << b.queue_items[0]
                   << ",\"mineral_stock\":" << b.minerals_accumulated
-                  << ",\"rioting\":" << (b.drone_riots_active() ? "true" : "false")
-                  << ",\"golden_age\":" << (b.golden_age_active() ? "true" : "false")
+                  << ",\"rioting\":" << ((b.state_flags & BSTATE_DRONE_RIOTS_ACTIVE) ? "true" : "false")
+                  << ",\"golden_age\":" << ((b.state_flags & BSTATE_GOLDEN_AGE_ACTIVE) ? "true" : "false")
                   << "}";
     }
     base_line << "]}";
