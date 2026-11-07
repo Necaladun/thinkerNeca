@@ -17,13 +17,16 @@ int __thiscall Popup_load_icon(Popup* This, Sprite* a2, int a3, char* a4) {
 // This is a runtime guard: no user-controlled input is bypassed unless
 // Scenario Editor has actually handed every faction to AI. No preferences
 // or native game-mode flags are changed.
-bool autosim_ui_active() {
+bool autosim_control_active() {
     const int owner = MapWin->cOwner;
-    return auto_ui_eligible(conf.autosim_suppress_notices != 0,
-        conf.autosim_manual_turns,
-            (unsigned)FactionStatus[0], *MultiplayerActive != 0,
-            *PbemActive != 0, (*GameState & STATE_GAME_DONE) != 0,
-            owner, owner >= 1 && owner < MaxPlayerNum && is_alive(owner));
+    return auto_turn_eligible(conf.autosim_manual_turns,
+        (unsigned)FactionStatus[0], *MultiplayerActive != 0,
+        *PbemActive != 0, (*GameState & STATE_GAME_DONE) != 0,
+        owner, owner >= 1 && owner < MaxPlayerNum && is_alive(owner));
+}
+
+bool autosim_ui_active() {
+    return conf.autosim_suppress_notices && autosim_control_active();
 }
 
 int autosim_notice_netmsg(NetMessage* msg, const char* label, int delay,
@@ -63,7 +66,7 @@ int autosim_notice_diplomacy(NetMessage* msg, const char* label, int delay,
 // a completed turn, never inside combat, diplomacy or base upkeep.
 static AutosimControlRequest autosim_control_request = AUTOSIM_CTL_NONE;
 void autosim_request_control(AutosimControlRequest request) {
-    if (!autosim_ui_active()) return;
+    if (!autosim_control_active()) return;
     if (request == AUTOSIM_CTL_STOP || autosim_control_request != AUTOSIM_CTL_STOP)
         autosim_control_request = request;
 }
