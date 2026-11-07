@@ -53,6 +53,15 @@ inline bool autosim_suppress_monument(bool ui_active, int is_new_event) {
     return ui_active && is_new_event != 0;
 }
 
+// AI-controlled observer units must use the existing AI hasty-move
+// threshold, not the human-owned confirmation path. This does not authorize
+// an attack: order_veh still decides whether to proceed.
+inline bool autosim_use_ai_hasty_rule(bool ui_active, bool human_controlled,
+    bool observed_faction, bool direct_attack, bool moving_with_delay) {
+    return ui_active && !human_controlled && observed_faction
+        && direct_attack && !moving_with_delay;
+}
+
 enum AutoUiAction {
     AUTO_UI_NATIVE,
     AUTO_UI_NOTICE,
