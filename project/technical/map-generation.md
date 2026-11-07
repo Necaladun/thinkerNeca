@@ -37,7 +37,7 @@ Original slot ordering is retained; **new independent minor types consume none o
 | 15 | U.N.S. Unity Wreckage | `unity=1` (expansion context) |
 | 16 | Fossil Field Ridge | `fossil=1`; modified shelf placement |
 
-Additional modified features include changed Great Dunes geometry, resource distribution and a freshwater oasis. **Great Dunes have a positive user visual test**, while full regression on other landmarks remains outstanding.
+Additional modified features include changed Great Dunes geometry, resource distribution and a freshwater oasis. **Great Dunes and Sunny Mesa have positive user visual/yield tests.** A complete other-major landmark interaction matrix remains unverified, but is not a PR #4 merge gate.
 
 **Sunny Mesa (MAP-005, MAP-006):** the generator marks the full `TableRange[3]` (7×7, 49-tile) area as `LM_MESA`. The earlier generator raised the **central 5×5** (`TableRange[2]`, 25 tiles) to the 1,000–1,999 m band and left the outer 24 tiles below 1,000 m; the +1 energy effect was separately restricted to `code_at() < 9` (central 3×3), which the user verified in-game on 2026-11-04. **Current elevation (restored):** the central 5×5 (indices 0–24) is generated in the 1,000–1,999 m band and the outer 7×7 rim (indices 25–48) in the 0–999 m band. The engine's normal `world_alt_set(..., true)` slope adjustments remain. **Discarded MAP-006 experiment:** raising the 3×3 core to the 2,000–2,999 m band caused the native Mesa surface to look domed/bulging in a user screenshot (2026-11-04); reverted without changing the sprite or the confirmed +1E centre-only effect. No guaranteed energy resource was added.
 
