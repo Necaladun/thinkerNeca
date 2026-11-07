@@ -1,5 +1,6 @@
 
 #include "veh_action.h"
+#include "autosim.h"
 
 
 int __cdecl terrain_avail(FormerItem frm_id, int ocean, int faction_id) {
