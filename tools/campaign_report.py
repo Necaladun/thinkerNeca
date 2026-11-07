@@ -111,7 +111,7 @@ def render_html(campaign_name, session_name, manifest, status, turns, bases, not
     notices = notices or []
     notice_rows = "\n".join(
         "<tr><td>{turn}</td><td>{faction}</td><td>{source}</td><td>{label}</td><td>{action}</td></tr>".format(
-            turn=entry.get("turn", "?"), faction=entry.get("faction", "?"),
+            turn=entry.get("turn", "?"), faction=entry.get("processing_faction", "?"),
             source=html.escape(str(entry.get("source", ""))),
             label=html.escape(str(entry.get("label", ""))),
             action=html.escape(str(entry.get("action", ""))))
