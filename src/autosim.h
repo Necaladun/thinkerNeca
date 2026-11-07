@@ -75,6 +75,34 @@ struct AutoTemporaryPrefFlag {
     AutoTemporaryPrefFlag& operator=(const AutoTemporaryPrefFlag&) = delete;
 };
 
+// Temporary native combat presentation profile. All original preference
+// bits are restored at scope exit, including early combat returns. This is
+// not a permanent configuration change, save format change, or battle rule.
+struct AutoScopedCombatPrefs {
+    int* const basic;
+    int* const more;
+    const int saved_basic;
+    const int saved_more;
+    const bool enabled;
+    AutoScopedCombatPrefs(bool active, int* basic_prefs, int* more_prefs,
+        int set_basic, int clear_basic, int set_more, int clear_more)
+        : basic(basic_prefs), more(more_prefs), saved_basic(*basic_prefs),
+          saved_more(*more_prefs), enabled(active) {
+        if (enabled) {
+            *basic = (*basic | set_basic) & ~clear_basic;
+            *more = (*more | set_more) & ~clear_more;
+        }
+    }
+    ~AutoScopedCombatPrefs() {
+        if (enabled) {
+            *basic = saved_basic;
+            *more = saved_more;
+        }
+    }
+    AutoScopedCombatPrefs(const AutoScopedCombatPrefs&) = delete;
+    AutoScopedCombatPrefs& operator=(const AutoScopedCombatPrefs&) = delete;
+};
+
 enum AutoUiAction {
     AUTO_UI_NATIVE,
     AUTO_UI_NOTICE,
