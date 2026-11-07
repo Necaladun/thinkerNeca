@@ -1685,10 +1685,12 @@ bool can_mine(int x, int y, int faction_id, int bonus, MAP* sq) {
             <= mod_mine_yield(faction_id, -1, x, y, 0)) {
             return false;
         }
-        // Flat tiles must retain food and existing nutrient infrastructure.
-        if (!sq->is_rolling()
-        && (projected_mine_nutrients(x, y, faction_id) < 1
-            || sq->items & (BIT_FARM | BIT_CONDENSER | BIT_SOIL_ENRICHER))) {
+        // Don't replace established nutrient improvements on any
+        // non-rocky tile; Flat land also needs at least 1N after mining.
+        if (sq->items & (BIT_FARM | BIT_CONDENSER | BIT_SOIL_ENRICHER)) {
+            return false;
+        }
+        if (!sq->is_rolling() && projected_mine_nutrients(x, y, faction_id) < 1) {
             return false;
         }
     }
