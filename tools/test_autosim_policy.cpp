@@ -96,6 +96,23 @@ static void test_ai_observer_hasty_attack_policy() {
     assert(!autosim_use_ai_hasty_rule(true, false, true, true, true));
 }
 
+static void test_transient_interlude_preferences() {
+    const int flag = 0x40000;
+    int prefs = 0xA125;
+    {
+        AutoTemporaryPrefFlag scoped(&prefs, flag);
+        assert((prefs & flag) != 0);
+        assert((prefs & ~flag) == 0xA125);
+    }
+    assert(prefs == 0xA125);
+    prefs = flag | 0x82;
+    {
+        AutoTemporaryPrefFlag scoped(&prefs, flag);
+        assert(prefs == (flag | 0x82));
+    }
+    assert(prefs == (flag | 0x82));
+}
+
 int main() {
     test_entry_guards();
     test_full_turn_limit_and_reset();
@@ -104,6 +121,7 @@ int main() {
     test_popup_allowlist_fails_closed();
     test_monument_new_event_only();
     test_ai_observer_hasty_attack_policy();
+    test_transient_interlude_preferences();
     std::puts("AUTO-001 host policy tests passed");
     return 0;
 }
