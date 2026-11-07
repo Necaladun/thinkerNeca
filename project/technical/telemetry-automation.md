@@ -21,6 +21,10 @@ The experimental all-AI presentation layer now bypasses confirmed return-ignored
 
 **Turn-boundary controls** (requires a valid `autosim_manual_turns=N>0` all-AI session; independent of `autosim_suppress_notices`): **F9** queues pause at the next completed turn and presents a **Yes = Resume / No = native Save Game, then menu** dialog. **F10** queues native Save Game then main menu at the next completed turn. No partial-turn save/stop is attempted. The UI must receive the key event during simulation; check responsiveness in Windows. The timer, user preferences and normal human controls are not otherwise changed. The existing automatic turn cap continues to use the Save Game prompt.
 
+### AUTO-002 probe notification follow-up (source audit, Windows unverified)
+
+An observed-AI infiltration popup (`DETECTINFILTRATE`) exposed that `NetMsg_pop_2` post-action result coverage was not the complete probe UI surface. The current unmerged feature branch now bypasses the remaining return-unused `src/probe.cpp` NetMsg/spy/portrait/genetic/mind-control presentation calls, and the optional observer-only intelligence panel. `src/veh_action.cpp` similarly bypasses passive probe encounter reports and human confirmation prompts erroneously shown for an observed AI; the existing non-observed-AI operation path is retained. Actual AI operation selection, treaty flags, infiltration, side effects and human choice dialogs must not be bypassed. Suppressed or AI-path notices are recorded in `ui_notices.jsonl` when telemetry is active. This revision requires Windows gameplay testing; it does not establish exhaustive probe UI or BUG-001 capture correctness.
+
 ### Initial TEL-001 usage (unmerged branch)
 
 1. Build the branch Develop DLL/launcher; install them into the same supported game directory and retain the normal game files/configuration.
