@@ -9,7 +9,7 @@
 
 | Feature | Current path | Status |
 | --- | --- | --- |
-| Jungle | Native map terrain/texture stage using three guarded hooks | All-site preflight implemented on `b76feed`; Windows failure-path validation pending (REND-001) |
+| Jungle | Native map terrain/texture stage using three guarded hooks | All-site preflight implemented on `b76feed`; shared native installation helper and host negative-path harness passed 18/18 simulated preimage mismatches with zero writes on `add333b` (REND-001). Unsupported live executable not modified/tested |
 | Uranium | Original native resource glyph through renderer-only `bonus_at()==4` | User-tested, +1 energy separate |
 | Titanium | Same native resource draw, with guarded `Sprite*` substitution | **Blue-grey custom art verified in-game for native variant 0**, with +1 mineral separate |
 | Tile Inspector | Narrow native feature-line append (`strlen` callsite hook) | Develop tested, intermittent Titanium label still to investigate (BUG-002) |
