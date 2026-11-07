@@ -1928,7 +1928,12 @@ static bool neca_sprites_attempted = false;
 
 // Native original LM_URANIUM underlay draw calls the same Sprite_draw_3
 // routine from an earlier stage, independently of ordinary resource icons.
-extern "C" { uintptr_t minor_geology_underlay_draw_target = 0; }
+extern "C" {
+uintptr_t minor_geology_underlay_draw_target = 0;
+int minor_geology_underlay_current_type = MINOR_NONE;
+int minor_geology_underlay_current_x = -1;
+int minor_geology_underlay_current_y = -1;
+}
 
 void minor_graphics_underlay_hook_result(int mask_site, int draw_site, bool active)
 {
@@ -2314,47 +2319,76 @@ Sprite* and key; all position, zoom, clip and normal resources stay native.
 extern "C" Sprite* __cdecl minor_select_geology_underlay_sprite(
     Sprite* original, Buffer* canvas, const int* frame)
 {
-    if (!minor_native_geology_underlay_installed || !conf.minor_native_titanium
-        || !original || !canvas || !canvas->palette || !frame) {
-        return original;
-    }
-    const int x = frame[8], y = frame[9];
-    if (!minor_landmark_has(x, y, MINOR_TITANIUM)
-        || reinterpret_cast<uintptr_t>(original) != 0x78A72Cu) {
-        return original;
-    }
+    // On the prior build, all of these silent guards could return native
+    // Uranium without reaching the first diagnostic. The mask hook already
+    // knows the actual tile at EBP+0x20/+0x24. Use that cached classification
+    // for this *earlier* landmark draw rather than copying assumptions from
+    // the later resource-sprite call.
+    const int type = minor_geology_underlay_current_type;
+    const int x = minor_geology_underlay_current_x;
+    const int y = minor_geology_underlay_current_y;
+    const bool valid_original = original
+        && reinterpret_cast<uintptr_t>(original) == 0x78A72Cu;
+    const bool valid_canvas = canvas && canvas->palette;
+    // Sprite extraction only needs a valid palette-bearing canvas as a
+    // readiness guard. The user's main map canvas is the fallback if the
+    // native landmark call passes a different Buffer than the resource pass.
+    Buffer* loader_canvas = valid_canvas ? canvas : &MapWin->oMainWin.oCanvas;
+    const bool loader_ready = loader_canvas && loader_canvas->palette;
     const int mode = conf.minor_titanium_sprite_mode;
+
     Sprite* selected = original;
-    if (mode == 1 || mode == 3) {
-        load_neca_test_sprites(canvas);
-        const NecaSpriteId id = mode == 3
-            ? NECA_SPRITE_TITANIUM_TEST : NECA_SPRITE_URANIUM_TEST;
-        if (neca_sprite_ready[id]) {
-            selected = &neca_sprites[id];
-        }
-    } else if (mode == 2) {
-        load_minor_terrain_sprites(canvas);
-        if (minor_sprite_ready[MINOR_TITANIUM]) {
-            selected = &minor_sprites[MINOR_TITANIUM];
+    if (minor_native_geology_underlay_installed && conf.minor_native_titanium
+        && type == MINOR_TITANIUM && valid_original && loader_ready) {
+        if (mode == 1 || mode == 3) {
+            load_neca_test_sprites(loader_canvas);
+            const NecaSpriteId id = mode == 3
+                ? NECA_SPRITE_TITANIUM_TEST : NECA_SPRITE_URANIUM_TEST;
+            if (neca_sprite_ready[id]) {
+                selected = &neca_sprites[id];
+            }
+        } else if (mode == 2) {
+            load_minor_terrain_sprites(loader_canvas);
+            if (minor_sprite_ready[MINOR_TITANIUM]) {
+                selected = &minor_sprites[MINOR_TITANIUM];
+            }
         }
     }
-    // Native underlay uses variant 1; prior Titanium tests covered
-    // variant 0. Capture the real geometry and fallback behaviour.
-    static int reports = 0;
-    if (reports < 8) {
-        ++reports;
+
+    // Log selector ENTRY, not just successful substitutions. Bounded
+    // separately for Titanium and control draws; no huge per-tile scan.
+    static int titanium_reports = 0, control_reports = 0;
+    const bool report_titanium = type == MINOR_TITANIUM
+        && titanium_reports++ < 12;
+    const bool report_control = type != MINOR_TITANIUM
+        && control_reports++ < 3;
+    if (report_titanium || report_control) {
         FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
         if (fp) {
-            fprintf(fp, "REND005 UNDERLAY SPRITE x=%d y=%d mode=%d swapped=%d "
-                "native=%p key=%u geometry=%dx%d offset=%d,%d pitch=%d "
-                "selected=%p key=%u geometry=%dx%d offset=%d,%d pitch=%d\n",
-                x, y, mode, selected != original ? 1 : 0,
-                (void*)original, (unsigned)original->color_index[0],
-                original->width, original->height, original->offset_x,
-                original->offset_y, original->pitch,
-                (void*)selected, (unsigned)selected->color_index[0],
-                selected->width, selected->height, selected->offset_x,
-                selected->offset_y, selected->pitch);
+            const int frame_x = frame ? frame[8] : -1;
+            const int frame_y = frame ? frame[9] : -1;
+            fprintf(fp, "REND005 UNDERLAY SELECT cached=%d x=%d y=%d "
+                "frame_x=%d frame_y=%d original=%p expected=%d canvas=%p "
+                "canvas_palette=%d loader_palette=%d enabled=%d mode=%d "
+                "atlas_attempted=%d atlas_ready=%d swapped=%d\n",
+                type, x, y, frame_x, frame_y, (void*)original,
+                valid_original ? 1 : 0, (void*)canvas,
+                valid_canvas ? 1 : 0, loader_ready ? 1 : 0,
+                minor_native_geology_underlay_installed ? 1 : 0, mode,
+                neca_sprites_attempted ? 1 : 0,
+                neca_sprite_ready[NECA_SPRITE_TITANIUM_TEST] ? 1 : 0,
+                selected != original ? 1 : 0);
+            if (original && type == MINOR_TITANIUM) {
+                fprintf(fp, "REND005 UNDERLAY GEOMETRY native_key=%u "
+                    "native=%dx%d offset=%d,%d pitch=%d "
+                    "selected_key=%u selected=%dx%d offset=%d,%d pitch=%d\n",
+                    (unsigned)original->color_index[0], original->width,
+                    original->height, original->offset_x, original->offset_y,
+                    original->pitch,
+                    (unsigned)selected->color_index[0], selected->width,
+                    selected->height, selected->offset_x, selected->offset_y,
+                    selected->pitch);
+            }
             fclose(fp);
         }
     }

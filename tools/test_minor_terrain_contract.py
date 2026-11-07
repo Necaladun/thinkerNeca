@@ -164,10 +164,18 @@ def main() -> None:
             and 'minor_landmark_has(x, y, MINOR_TITANIUM)' in patches,
             'Underlay trampoline must preserve LM_DISABLE, not mutate stored LM')
     require('minor_select_geology_underlay_sprite' in renderer
-            and 'minor_landmark_has(x, y, MINOR_TITANIUM)' in renderer
+            and 'minor_geology_underlay_current_type' in renderer
+            and 'minor_geology_underlay_current_x' in renderer
+            and 'minor_geology_underlay_current_y' in renderer
+            and 'minor_geology_underlay_current_type =' in patches
+            and 'minor_geology_underlay_current_x = x;' in patches
+            and 'minor_geology_underlay_current_y = y;' in patches
+            and 'REND005 UNDERLAY SELECT cached=' in renderer
+            and 'REND005 UNDERLAY GEOMETRY native_key=' in renderer
+            and 'type == MINOR_TITANIUM && valid_original && loader_ready' in renderer
             and 'jmp *_minor_geology_underlay_draw_target' in renderer
             and '0x78A72Cu' in renderer,
-            'Underlay Titanium must substitute the earlier native sprite call')
+            'Underlay Titanium must use native mask tile context and log early selector exits')
     require('MATCH("minor_geology_underlay")' in cfg
             and 'int minor_geology_underlay = 0;' in config
             and 'minor_geology_underlay=1' in ini,

@@ -149,10 +149,18 @@ the original AND and returns with exactly the same stack shape.
 #ifndef BUILD_REL
 extern "C" int __cdecl minor_render_geology_xy(int x, int y)
 {
-    return (conf.minor_native_uranium
-            && minor_landmark_has(x, y, MINOR_URANIUM))
-        || (conf.minor_native_titanium
-            && minor_landmark_has(x, y, MINOR_TITANIUM));
+    // Store the specific type for the subsequent earlier-stage Uranium
+    // Sprite_draw_3 callback. Its arguments are not interchangeable with
+    // those of the later type-4 resource-sprite call.
+    const bool titanium = conf.minor_native_titanium
+        && minor_landmark_has(x, y, MINOR_TITANIUM);
+    const bool uranium = conf.minor_native_uranium
+        && minor_landmark_has(x, y, MINOR_URANIUM);
+    minor_geology_underlay_current_type =
+        titanium ? MINOR_TITANIUM : uranium ? MINOR_URANIUM : MINOR_NONE;
+    minor_geology_underlay_current_x = x;
+    minor_geology_underlay_current_y = y;
+    return titanium || uranium;
 }
 
 // Replay original 6-byte AND ESI,0x80000008 on return. The helper

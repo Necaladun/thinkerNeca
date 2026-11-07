@@ -78,6 +78,12 @@ void minor_graphics_titanium_hook_result(int bonus_site, int draw_site,
 extern "C" uintptr_t minor_titanium_native_draw_target;
 #if defined(__GNUC__) && defined(__i386__)
 extern "C" int __cdecl minor_render_geology_xy(int x, int y);
+// The native landmark-mask hook knows the tile. Carry that classification
+// to its immediately following Sprite_draw_3 call rather than assuming
+// the later resource-sprite callback shares the same frame arguments.
+extern "C" int minor_geology_underlay_current_type;
+extern "C" int minor_geology_underlay_current_x;
+extern "C" int minor_geology_underlay_current_y;
 extern "C" void minor_native_geology_underlay_mask_hook();
 extern "C" Sprite* __cdecl minor_select_geology_underlay_sprite(
     Sprite* original, Buffer* canvas, const int* frame);
