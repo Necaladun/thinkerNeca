@@ -47,6 +47,12 @@ inline bool auto_ui_eligible(bool configured, int requested_turns,
         multiplayer, pbem, game_done, view_faction, view_alive);
 }
 
+// Source-owned monuments record history before presenting a new-event screen.
+// Keep explicit monument browsing (is_new_event == 0) intact.
+inline bool autosim_suppress_monument(bool ui_active, int is_new_event) {
+    return ui_active && is_new_event != 0;
+}
+
 enum AutoUiAction {
     AUTO_UI_NATIVE,
     AUTO_UI_NOTICE,
