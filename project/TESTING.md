@@ -6,6 +6,10 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 full-turn fast-presentation CI checkpoint (7 November 2026)
+
+[Windows x86 Develop + Release GitHub Actions run 42365101769](https://github.com/Necaladun/thinkerNeca/actions/runs/42365101769) **passed** at source head `b6e8a6f`. Develop/Release compilation, the C++11 host preference restoration suite (including nested full-turn guards), `tools/test_autosim_presentation_contract.py` (full-turn flags plus ordinary autosave boundary), probe UI contract and remaining CI checks passed. The downloadable Develop artifact `thinker-develop-win32` contains `thinker.dll` and `thinker.exe`. A prior run `42364984284` failed compilation because the old combat animation bypass still referenced `fast_autosim_combat`; restored the missing guard before the passing run. **No Windows game execution or autosave file round-trip was performed by CI.** The Council modal and 100+/200-turn unattended acceptance remain unresolved.
+
 ## AUTO-002 full-turn fast-presentation implementation (7 November 2026)
 
 **User-approved settings:** Fast Battle Resolution ON; quick movement for enemy and allied units ON; Quick Move All Vehicles and Quick Move Vehicle Orders ON; Pause After Battles OFF; Map Animations OFF, **only** for eligible fully AI-controlled single-player simulations. Sound/music unchanged. Existing `autosim_fast_combat=1` option now enables the entire phase-scoped fast-presentation profile (historic option name retained); `0` opts out, `autosim_manual_turns=0` or any human control retains native settings.
