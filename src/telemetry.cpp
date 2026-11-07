@@ -212,6 +212,7 @@ void telemetry_begin_session(const char* source_save) {
     } else {
         manifest << "null";
     }
+    manifest << ",\"autosim_manual_turns\":" << conf.autosim_manual_turns;
     manifest << ",\"mod_version\":" << json_string(MOD_VERSION)
              << ",\"mod_date\":" << json_string(MOD_DATE)
              << ",\"build_kind\":";
