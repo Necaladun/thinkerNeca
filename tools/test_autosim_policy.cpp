@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <initializer_list>
 
 static void test_entry_guards() {
     assert(!auto_turn_eligible(0, 0, false, false, false, 3, true));
