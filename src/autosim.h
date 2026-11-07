@@ -62,6 +62,19 @@ inline bool autosim_use_ai_hasty_rule(bool ui_active, bool human_controlled,
         && direct_attack && !moving_with_delay;
 }
 
+// Restore the user's in-memory setting even if native UI code unwinds.
+// Does not persist to INI or SAV; designed for one synchronous native call.
+struct AutoTemporaryPrefFlag {
+    int* const field;
+    const int before;
+    AutoTemporaryPrefFlag(int* value, int flag) : field(value), before(*value) {
+        *field |= flag;
+    }
+    ~AutoTemporaryPrefFlag() { *field = before; }
+    AutoTemporaryPrefFlag(const AutoTemporaryPrefFlag&) = delete;
+    AutoTemporaryPrefFlag& operator=(const AutoTemporaryPrefFlag&) = delete;
+};
+
 enum AutoUiAction {
     AUTO_UI_NATIVE,
     AUTO_UI_NOTICE,
