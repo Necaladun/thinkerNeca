@@ -38,7 +38,7 @@ The older major-landmark options `jungle=0` and `uranium=0` **are distinct** fro
 
 See [unit combat and costs](unit-combat-and-costs.md) for current code paths and [BUG-004/BAL-004](../WORK-QUEUE.md) for correctness versus balance design. This section explains *existing* settings; no parser, compiled-default or distribution-profile changes are proposed.
 
-**Telemetry trial (unmerged TEL-001 branch):** `telemetry_enabled=0` is the shipped and compiled default. Set `1` in the local `thinker_user.ini` to write optional per-session JSONL under `campaigns/`. The separate offline analyser is `tools/campaign_report.py`. See [telemetry design](telemetry-automation.md); do not confuse this with `debug.txt` or developer Debug mode.
+**Telemetry trial (unmerged TEL-001 branch):** `telemetry_enabled=0` is the shipped and compiled default. Set `1` in the local `thinker_user.ini` to write optional per-session JSONL under `campaigns/`. The separate offline analyser is `tools/campaign_report.py`, with a Tkinter GUI at `tools/Campaign Analyzer.pyw` (copy both beside one another to the game's `campaigns/` directory). See [telemetry design](telemetry-automation.md); do not confuse this with `debug.txt` or developer Debug mode.
 
 ## Config maintenance
 
