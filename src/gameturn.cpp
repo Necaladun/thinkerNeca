@@ -326,10 +326,14 @@ void __cdecl control_turn() {
                 conf.autosim_manual_turns, autosim_ready(), !first_cycle_partial);
             first_cycle_partial = false;
             if (action == AUTO_CYCLE_STOP) {
-                // Return to the normal main menu after the specified number
-                // of complete AI-only turns. No forced endgame or save rewrite.
-                // Any normal game autosave is handled by faction_upkeep().
-                OutputDebugStringA("thinkerNeca AUTO-001: configured turn limit reached\n");
+                // AUTO-002: offer the same native Save Game dialog used by
+                // the normal turn controller. Save/cancel both lead to menu.
+                // We do not silently overwrite an autosave or change the
+                // selected filename. A saved all-AI game must be reloaded
+                // and advanced on Windows before treating this as verified.
+                OutputDebugStringA("thinkerNeca AUTO-002: turn cap reached; offering Save Game\n");
+                telemetry_record_ui_notice("autosim", "TURN_LIMIT", "save_dialog");
+                save_game(0);
                 *ControlTurnA = 1;
                 *ControlTurnB = 1;
                 return;
