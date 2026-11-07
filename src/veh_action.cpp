@@ -1,6 +1,7 @@
 
 #include "veh_action.h"
 #include "autosim.h"
+#include "telemetry.h"
 
 
 int __cdecl terrain_avail(FormerItem frm_id, int ocean, int faction_id) {
@@ -1979,7 +1980,13 @@ int __cdecl order_veh(int veh_id, int offset, int flag) {
                 Vehs[veh_id].flags &= ~VFLAG_PROBE_PACT_OPERATIONS;
                 if (Factions[veh_fc_id].diplo_status[tgt_fc_id] & DIPLO_PACT) {
                     if (!move_delay && veh_fc_id == MapWin->cOwner) {
-                        if (base_id < 0) {
+                        if (autosim_ui_active()) {
+                            // An observed AI should take the same probe path as any
+                            // unobserved AI, without a human permission dialog.
+                            telemetry_record_ui_notice("probe_choice",
+                                base_id < 0 ? "PROBEPACTTEAM" : "PROBEPACT",
+                                "use_unobserved_ai_path");
+                        } else if (base_id < 0) {
                             if (stack_check(stack_veh_id, 2, PLAN_PROBE, tgt_fc_id, -1)) {
                                 parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                                 if (X_pop("PROBEPACTTEAM", 0)) {
@@ -2324,8 +2331,13 @@ MOV_SPOT:
                         parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                         parse_says(1, Vehs[stack_veh_id].name(), -1, -1);
                         parse_says(2, get_title(veh_fc_id), -1, -1);
-                        int choice;
-                        if (!MFactions[tgt_fc_id].is_alien()) {
+                        int choice = 1;
+                        if (autosim_ui_active()) {
+                            // AI already chose to attack: match the native path when
+                            // its faction is not the observed MapWin owner.
+                            telemetry_record_ui_notice("probe_choice",
+                                "ENEMYPROBE2", "use_unobserved_ai_path");
+                        } else if (!MFactions[tgt_fc_id].is_alien()) {
                             choice = popp(ScriptFile, "ENEMYPROBE2", 0, "capture_sm.pcx", 0);
                         } else {
                             choice = popp(ScriptFile, "ENEMYPROBE2", 0, "al_cap_sm.pcx", 0);
@@ -2372,11 +2384,11 @@ MOV_SPOT:
                         if (tgt_fc_id == MapWin->cOwner) {
                             parse_says(0, get_adjective(veh_fc_id), -1, -1);
                             parse_says(1, get_title(tgt_fc_id), -1, -1);
-                            NetMsg_pop(NetMsg, "GOTMYPROBE", 5000, 0, 0);
+                            autosim_notice_netmsg(NetMsg, "GOTMYPROBE", 5000, 0, 0);
                         } else if (veh_fc_id == MapWin->cOwner) {
                             parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                             parse_says(1, get_title(veh_fc_id), -1, -1);
-                            NetMsg_pop(NetMsg, "GOTYOURPROBE", 5000, 0, 0);
+                            autosim_notice_netmsg(NetMsg, "GOTYOURPROBE", 5000, 0, 0);
                         }
                         goto MOV_END;
                     }
