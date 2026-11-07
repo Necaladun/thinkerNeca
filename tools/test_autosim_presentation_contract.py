@@ -32,6 +32,7 @@ upkeep_start = turn.index("void __cdecl faction_upkeep(")
 upkeep_end = turn.index("void __cdecl repair_phase(", upkeep_start)
 upkeep = turn[upkeep_start:upkeep_end]
 assert "AutoScopedAutosimFastPrefs fast_presentation;" in upkeep
+assert upkeep.index("init_save_game(faction_id);") < upkeep.index("AutoScopedAutosimFastPrefs fast_presentation;")
 assert upkeep.index("} // Restore all preference bits before the ordinary autosave call.") < upkeep.index("auto_save();")
 assert "PREF_BSC_AUTOSAVE_EACH_TURN" in upkeep
 assert "autosave_interval=1" in ini
