@@ -32,7 +32,7 @@ The user previously completed the requested basic smoke, cap, qualitative multi-
 
 ## AUTO-001 — manual-handover AI-only turn driver (experimental branch)
 
-**Branch:** `feature/auto-001-manual-ai-turn-driver` is stacked on unmerged `feature/tel-001-recorder-foundation`; neither feature is on `master`. Initial code is opt-in and source-implemented, with Windows runtime validation pending.
+**Branch:** `feature/auto-001-manual-ai-turn-driver` is stacked on unmerged `feature/tel-001-recorder-foundation`; neither feature is on `master`. Initial code is opt-in and source-implemented; [Develop/Release plus host tests passed CI](https://github.com/Necaladun/thinkerNeca/actions/runs/42355116603). Windows SMAC/X runtime validation is pending.
 
 `autosim_manual_turns=N` (default `0`): following a **manual** Scenario Editor handover of every faction to AI, the single-player `control_turn()` loop continues to use its normal `turn_upkeep()`, `faction_upkeep()` and `mod_enemy_turn()` paths. It skips the native between-turn `Console_human_turn()` only when **no playable faction's human-control bit is set**, there is a valid living map-view owner, no game-over state, and the game is neither multiplayer nor PBEM. Human play continues unchanged unless this condition actually becomes true. The driver counts complete post-handover faction cycles, excludes a partial resumed first cycle, and returns to the normal main menu after N cycles. Telemetry snapshots continue at each completed cycle. The configured limit is written into the telemetry manifest.
 
