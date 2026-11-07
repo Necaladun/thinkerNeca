@@ -88,7 +88,7 @@ class CampaignReportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             campaign, session = fixture(Path(tmp))
             notices = [
-                {"schema": 1, "turn": 2, "faction": 3,
+                {"schema": 1, "turn": 2, "processing_faction": 3,
                  "source": "netmsg", "label": "GOODYRESOURCE",
                  "action": "suppressed_notice"},
                 {"schema": 1, "turn": 2, "faction": 3,
