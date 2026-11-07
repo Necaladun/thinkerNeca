@@ -307,6 +307,8 @@ void __cdecl control_turn() {
             }
         }
         if (++current_id >= 8) {
+            // All faction phases have completed for this turn.
+            telemetry_record_completed_turn();
             if (!skip_human_turn) {
                 Console_human_turn(MapWin);
             }
