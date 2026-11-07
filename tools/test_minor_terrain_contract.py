@@ -147,6 +147,47 @@ def main() -> None:
             and 'BIT_MINERAL_RES alone' in geology,
             'Titanium generation must reject both flagged and procedural mineral resources')
 
+    # A mineral-resource supply-pod discovery on independent Titanium
+    # is the single permitted reroll path; normal Uranium, unrelated pods,
+    # and natural resources must retain their existing outcomes.
+    veh = source('src/veh.cpp')
+    pod = body_between(veh, 'int __cdecl goody_box(', 'int __cdecl study_artifact(')
+    resource_pod = body_between(pod,
+        'bit_set(x, y, BIT_BONUS_RES, 1);', 'site_radius(x, y);')
+    require('int bonus_val = bonus_at(x, y);' in resource_pod
+            and 'if (bonus_val == RES_MINERAL' in resource_pod
+            and 'minor_landmark_has(x, y, MINOR_TITANIUM)' in resource_pod
+            and 'const bool choose_energy = goody_rand(2) != 0;' in resource_pod
+            and 'bit_set(x, y, BIT_NUTRIENT_RES | BIT_MINERAL_RES' in resource_pod
+            and '| BIT_ENERGY_RES, false);' in resource_pod
+            and 'bit_set(x, y, BIT_NUTRIENT_RES' in resource_pod
+            and '| (choose_energy ? BIT_ENERGY_RES : 0), true);' in resource_pod
+            and resource_pod.count('bonus_val = bonus_at(x, y);') == 2,
+            'Only Titanium mineral pod rewards may become 50/50 nutrient/energy')
+    # The current coordinate/resource decoder ignores energy/mineral bias
+    # flags for nonzero coordinate-derived ret unless NUTRIENT_RES is set.
+    # Test the forced flag combinations against every land coordinate class.
+    require('if (!ret || bit & BIT_NUTRIENT_RES)' in yields
+            and 'if (bit & BIT_ENERGY_RES)' in yields
+            and 'return ((bit & BIT_MINERAL_RES) != 0) + 1;' in yields,
+            'Pod resource override must match the live coordinate decoder')
+    for chk in range(16):
+        ret = (chk % 5) & 3
+        for energy_choice in (False, True):
+            # Both forced choices set NUTRIENT_RES, so the live decoder
+            # selects energy iff ENERGY_RES is also present, for all chk.
+            forced = 3 if energy_choice else 1
+            forced_nutrient_flag = True
+            forced_mineral_flag = False
+            forced_energy_flag = energy_choice
+            if not ret or forced_nutrient_flag:
+                resolved = (3 if forced_energy_flag
+                            else 2 if forced_mineral_flag else 1)
+            else:
+                resolved = ret
+            require(resolved == forced,
+                'Forced Titanium pod nutrient/energy bias must override coordinate class')
+
     move = source('src/move.cpp')
     require('minor_landmark_at(' not in move
             and 'minor_landmark_at(' not in patches

@@ -29,6 +29,8 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 
 ## Pending revised geology distribution and extraction trial
 
+- [BAL-003](WORK-QUEUE.md): new PR #4 code handles the **post-generation Unity pod loophole**: a mineral-resource reward on independent Titanium becomes nutrient or energy (50/50), forced through explicit resource-selection flags. Ordinary resources and Uranium+energy remain legal. Source/CI and a live Windows pod reward test are distinct; the latter remains outstanding.
+
 - [BAL-003](WORK-QUEUE.md): source now prevents independent Uranium/Titanium bonuses from benefiting Forests (actual and projected yields) and prevents new Titanium patches overlapping actual native mineral-resource squares. Nutrient/energy resource overlaps remain possible. Existing Mine +1 interaction is kept for the 3–5-tile distribution trial; Windows validation of the new rules remains outstanding. No save-format or artwork changes.
 
 - [TERR-002](WORK-QUEUE.md): after user approval, new experimental Uranium/Titanium generator settings shrink each patch to 3–5 tiles and increase per-type patch attempts ~50% (3–9), maintaining roughly the same expected total geological area. Existing fungus is retained. **Source/CI and fresh-map Windows verification are distinct:** a new game with the trial build is needed before accepting the resulting distribution and fungus/yield interactions. No new INI options or save changes.

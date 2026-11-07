@@ -4,6 +4,8 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unreleased — draft PR #4 (2026-11-05)
 
+- **BAL-003 targeted pod resource reward:** when a Unity pod awards an ordinary mineral resource on independent Titanium, reroll the award to nutrient or energy (equal chance) by forcing the existing explicit resource-bias flag path. The underlying Titanium remains; all other pod outcomes and Uranium+energy are unchanged. No global resource suppression or save-format change; Windows gameplay validation pending.
+
 - **BAL-003 experimental geological extraction restriction:** independent Titanium's +1 mineral and Uranium's +1 energy no longer improve Forests in live or projected worker-yield calculations. Titanium new-map generation avoids ordinary mineral resources (both flagged and procedural) without excluding nutrient/energy overlaps; existing saves are unaffected. The existing single Mine enhancement remains while testing smaller 3–5-tile deposits. Windows runtime validation pending.
 
 - **TERR-002 experimental geology dispersion (fresh-game Windows validation pending):** Uranium and Titanium patches shrink to 3–5 tiles (weights 1:3:1; mean 4 rather than 6), with 50% more target patches (3–9 per type instead of 2–6), preserving roughly the previous expected total geological coverage when placement succeeds. Leave naturally occurring fungus in place; players can clear it to activate the otherwise fungus-suppressed geological yield. Retain the two-tile buffer, existing bias/eligibility, no minor-feature stacking, and bounded failed-patch skipping. This is a balance trial, not yet an accepted distribution.

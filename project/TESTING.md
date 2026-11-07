@@ -22,6 +22,14 @@
 | Configuration | Parser/INI structural checks, mode 3 selected by user | Local overrides and experimental economic balance |
 | Release/PRACX | Release x86 DLL/launcher cross-compilation **passed** on `4809cb7`; custom Titanium/Inspector hooks remain Develop-only, PRACX unverified | Native art/Inspector parity, actual in-game checks, clean install and supported binaries |
 
+## BAL-003 Titanium Unity pod mineral-resource reroll — Windows pending, 7 November 2026
+
+**Confirmed source loophole:** `goody_box()` can award a resource by setting `BIT_BONUS_RES` **after** new-map geological placement has finished. That award is resolved by `bonus_at(x,y)` using explicit bias flags and coordinate/seed-derived classification. The geological placement rule cannot prevent a later mineral-resource discovery on an already-present Titanium tile.
+
+**Approved source fix on PR #4:** after the pod first sets `BIT_BONUS_RES` and determines its proposed resource, **only** `RES_MINERAL` on **independent** `MINOR_TITANIUM` is converted to 50/50 nutrient or energy via `goody_rand(2)`. Clear the three resource-type bias flags, then set `BIT_NUTRIENT_RES` for either replacement, adding `BIT_ENERGY_RES` only for energy. This specific combination is required by the existing `underlying_resource_bonus_at()`: `BIT_NUTRIENT_RES` forces the explicit selection path regardless of coordinate-derived `ret`, and that path returns energy when `BIT_ENERGY_RES` is also set, otherwise nutrient. Requery `bonus_at()` before reporting/redrawing. This does not affect Uranium+energy, a pod's non-mineral outcomes, regular natural resources, editor bonuses or existing save data. It uses an additional RNG draw **only** for that targeted mineral-on-Titanium pod case.
+
+**Verification:** source contract/synthetic decoder-class checks and Develop/Release builds are required; **actual Windows pod reward reroll has not been tested**. Check nutrient and energy outcomes on eligible Titanium pod tiles, confirm no mineral after reroll, verify correct visual glyph, Inspector/yields and same-build save/reload. The one-in-two distribution is a RNG specification, not a statistically measured claim. Force-pod testing requires a constructed fixture or enough normal pod discoveries; user-deferred independent minor stacking is unrelated.
+
 ## BAL-003 geology-versus-Forest and mineral-resource exclusion — Windows pending, 7 November 2026
 
 **New source behaviour on PR #4:** actual `mod_mine_yield()` suppresses independent Titanium minerals on a `BIT_FOREST` tile, actual `mod_energy_yield()` suppresses independent Uranium energy on that tile, and the AI `item_yield(..., BIT_FOREST)` forecast suppresses both while retaining any Jungle nutrient contribution. Stored independent features are never deleted when building/removing Forests; after removal, their bonuses can contribute again. The standard Forest N/M/E baseline and normal resource bonuses are unchanged.
