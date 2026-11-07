@@ -1634,7 +1634,8 @@ bool can_solar(int x, int y, int faction_id, int bonus, MAP* sq) {
         return false;
     }
     if (!has_tech(Rules->tech_preq_allow_3_energy_sq, faction_id)
-    && bonus != RES_ENERGY && mod_energy_yield(faction_id, -1, x, y, 0) >= 2) {
+    && bonus != RES_ENERGY
+    && mod_energy_yield(faction_id, -1, x, y, 0) >= conf.tile_output_limit[2]) {
         return false;
     }
     if (!sea && has_terra(FORMER_FOREST, sea, faction_id) && ResInfo->forest_sq.energy > 0
@@ -1651,22 +1652,47 @@ bool can_solar(int x, int y, int faction_id, int bonus, MAP* sq) {
     return !(sq->items & (BIT_MINE | BIT_FOREST | BIT_SOLAR | BIT_ADVANCED));
 }
 
+// Model the actual conditional Mine food penalty without touching tile state.
+static int projected_mine_nutrients(int x, int y, int faction_id) {
+    int nutrients = mod_crop_yield(faction_id, -1, x, y, 0);
+    if (nutrients > 1) {
+        nutrients = max(0, nutrients + Rules->nutrient_effect_mine_sq);
+    }
+    return nutrients;
+}
+
 bool can_mine(int x, int y, int faction_id, int bonus, MAP* sq) {
     bool sea = is_ocean(sq);
-    if (!has_terra(FORMER_MINE, sea, faction_id) || bonus == RES_NUTRIENT) {
+    if (!has_terra(FORMER_MINE, sea, faction_id) || bonus == RES_NUTRIENT
+    || (sq->items & (BIT_MINE | BIT_FOREST | BIT_SOLAR | BIT_ADVANCED))) {
         return false;
     }
-    if (!sea && !sq->is_rocky()) {
+    const bool titanium = !sea && minor_landmark_has(x, y, MINOR_TITANIUM);
+    if (!sea && !sq->is_rocky() && !titanium) {
         return false;
     }
     if (!has_tech(Rules->tech_preq_allow_3_minerals_sq, faction_id)
-    && bonus != RES_MINERAL && mod_mine_yield(faction_id, -1, x, y, 0) >= 2) {
+    && bonus != RES_MINERAL
+    && mod_mine_yield(faction_id, -1, x, y, 0) >= conf.tile_output_limit[1]) {
         return false;
     }
     if (sq->items & BIT_SENSOR && nearby_items(x, y, 0, 9, BIT_SENSOR) < 2) {
         return false;
     }
-    return !(sq->items & (BIT_MINE | BIT_FOREST | BIT_SOLAR | BIT_ADVANCED));
+    if (titanium && !sq->is_rocky()) {
+        // Non-rocky Titanium needs a genuine mineral gain with a Road.
+        if (mod_mine_yield(faction_id, -1, x, y, 1)
+            <= mod_mine_yield(faction_id, -1, x, y, 0)) {
+            return false;
+        }
+        // Flat tiles must retain food and existing nutrient infrastructure.
+        if (!sq->is_rolling()
+        && (projected_mine_nutrients(x, y, faction_id) < 1
+            || sq->items & (BIT_FARM | BIT_CONDENSER | BIT_SOIL_ENRICHER))) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool can_forest(int x, int y, int faction_id, MAP* sq) {
@@ -1910,7 +1936,30 @@ int select_item(int x, int y, int faction_id, FormerMode mode, MAP* sq) {
     int crop_val = (bonus == RES_NUTRIENT) + skip_val
         + (!(items & BIT_CONDENSER) && allow_farm && sq->is_rainy_or_moist() && sq->is_rolling());
 
-    for (int v : {farm_val, forest_val, fungus_val, borehole_val}) {
+    // Only Titanium has a new non-rocky Mine candidate. Compare the
+    // Road-enabled Mine with other former options rather than forcing it.
+    int titanium_mine_val = 0;
+    if (!sea && !is_fungus && minor_landmark_has(x, y, MINOR_TITANIUM)
+    && !(items & (BIT_FARM | BIT_CONDENSER | BIT_SOIL_ENRICHER))
+    && can_mine(x, y, faction_id, bonus, sq)) {
+        int mine_n = projected_mine_nutrients(x, y, faction_id);
+        int mine_m = mod_mine_yield(faction_id, -1, x, y, 1);
+        int mine_e = mod_energy_yield(faction_id, -1, x, y, 0);
+        int mine_total = mine_n + mine_m + mine_e;
+        int solar_need = (condenser ? 0 : 1) + (forest ? 0 : 2)
+            + (borehole ? 0 : 3)
+            + 2*max(0, sq->alt_level()-ALT_ONE_ABOVE_SEA)
+            - nearby_items(x, y, 0, 25, BIT_SOLAR);
+        int solar_total = mod_crop_yield(faction_id, -1, x, y, 0)
+            + mod_mine_yield(faction_id, -1, x, y, 0)
+            + mod_energy_yield(faction_id, -1, x, y, 1);
+        if (solar_need <= 0 || !can_solar(x, y, faction_id, bonus, sq)
+        || mine_total > solar_total) {
+            titanium_mine_val = 2*mine_total;
+        }
+    }
+
+    for (int v : {farm_val, forest_val, fungus_val, borehole_val, titanium_mine_val}) {
         max_val = max(v, max_val);
     }
     if (farm_val == max_val && sea && max_val > 0) {
@@ -1950,6 +1999,10 @@ int select_item(int x, int y, int faction_id, FormerMode mode, MAP* sq) {
         if (borehole_val/2 > current && allow_borehole) {
             return FORMER_THERMAL_BORE;
         }
+    }
+    if (titanium_mine_val == max_val && titanium_mine_val > 0
+    && titanium_mine_val/2 > current + skip_val) {
+        return FORMER_MINE;
     }
     if (is_fungus) {
         if (keep_fungus(x, y, faction_id, sq)) {
@@ -2023,6 +2076,12 @@ int former_tile_score(int x, int y, int faction_id, MAP* sq) {
     int alt = sq->alt_level();
     int bonus = bonus_at(x, y);
     int score = (sq->lm_items() & ~(LM_DUNES|LM_SARGASSO|LM_UNITY|LM_NEXUS) ? 4 : 0);
+    // Prioritise only Titanium tiles that currently have an eligible Mine.
+    if (!sq->is_fungus() && minor_landmark_has(x, y, MINOR_TITANIUM)
+    && !(sq->items & (BIT_FARM | BIT_CONDENSER | BIT_SOIL_ENRICHER))
+    && can_mine(x, y, faction_id, bonus, sq)) {
+        score += 4;
+    }
 
     if (bonus != RES_NONE && !(sq->items & BIT_ADVANCED)) {
         score += ((sq->items & BIT_SIMPLE) ? 3 : 5) * (bonus == RES_NUTRIENT ? 3 : 2);
