@@ -84,6 +84,18 @@ static void test_monument_new_event_only() {
     assert(!autosim_suppress_monument(false, 1)); // normal human game
 }
 
+static void test_ai_observer_hasty_attack_policy() {
+    // Observed AI attack in a running automated game uses the AI move rule.
+    assert(autosim_use_ai_hasty_rule(true, false, true, true, false));
+    // Other sources of attacks, human-controlled play and non-autosim
+    // games keep their previous native code paths.
+    assert(!autosim_use_ai_hasty_rule(false, false, true, true, false));
+    assert(!autosim_use_ai_hasty_rule(true, true, true, true, false));
+    assert(!autosim_use_ai_hasty_rule(true, false, false, true, false));
+    assert(!autosim_use_ai_hasty_rule(true, false, true, false, false));
+    assert(!autosim_use_ai_hasty_rule(true, false, true, true, true));
+}
+
 int main() {
     test_entry_guards();
     test_full_turn_limit_and_reset();
@@ -91,6 +103,7 @@ int main() {
     test_notice_suppression_guards();
     test_popup_allowlist_fails_closed();
     test_monument_new_event_only();
+    test_ai_observer_hasty_attack_policy();
     std::puts("AUTO-001 host policy tests passed");
     return 0;
 }
