@@ -115,7 +115,7 @@ class CampaignReportTests(unittest.TestCase):
             output = generate(campaign)
             self.assertEqual(
                 (output / "ui_notices.csv").read_text(encoding="utf-8").splitlines(),
-                ["turn,faction,source,label,action"],
+                ["turn,processing_faction,source,label,action"],
             )
 
     def test_ui_notice_log_bad_schema_fails_report(self):
