@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 probe = (ROOT / "src/probe.cpp").read_text(encoding="utf-8")
 action = (ROOT / "src/veh_action.cpp").read_text(encoding="utf-8")
+faction = (ROOT / "src/faction.cpp").read_text(encoding="utf-8")
 
 def require(condition, message):
     if not condition:
@@ -40,4 +41,7 @@ for label in ("GOTMYPROBE", "GOTYOURPROBE"):
             f"{label} must not block as an information message")
 require('choice = popp(ScriptFile, "ENEMYPROBE"' in action,
         "actual human probe decision path must remain")
+for label in ("SPYRENEW", "STOLETECH"):
+    require(f'autosim_notice_netmsg(NetMsg, "{label}"' in faction,
+            f"{label} must not block all-AI simulation")
 print("AUTO-002 probe source contract passed (not a Windows runtime test)")
