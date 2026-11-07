@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - feature/auto-001-manual-ai-turn-driver
 
 # One build per live PR revision; cancel superseded CI jobs.
 concurrency:
@@ -59,6 +60,10 @@ jobs:
         run: python tools/test_reserved_landmark_slot.py
       - name: Check Sunny Mesa centre-only energy bonus
         run: python tools/test_mesa_energy.py
+      - name: Test AUTO-001 AI-only turn driver policy (host C++11)
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic tools/test_autosim_policy.cpp -o build/ci/test_autosim_policy
+          build/ci/test_autosim_policy
       - name: Validate distributed thinker.ini options
         run: python tools/test_thinker_ini_contract.py
       - name: Test offline TEL-001 campaign report
