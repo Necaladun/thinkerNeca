@@ -42,6 +42,8 @@ int autosim_notice_diplomacy(NetMessage* msg, const char* label, int delay,
     int style, const char* image);
 enum AutosimControlRequest { AUTOSIM_CTL_NONE, AUTOSIM_CTL_PAUSE, AUTOSIM_CTL_STOP };
 void autosim_request_control(AutosimControlRequest request);
+void autosim_collect_queued_keys();
+bool autosim_fast_combat_active();
 AutosimControlRequest autosim_take_control_request();
 void autosim_notice_pop2(const char* label, const char* image, int recipient);
 void autosim_interlude(int event_id, const char* text, int a3, int a4);
