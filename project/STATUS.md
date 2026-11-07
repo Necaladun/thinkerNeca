@@ -21,7 +21,7 @@
 
 Distributed [test INI](../docs/thinker.ini): `minor_native_titanium=1` and `minor_titanium_sprite_mode=3`, matching the user's successful local art test. Compiled absent-option default is mode 0 (native Uranium). Mode 3 needs a separately prepared 1024×1024 indexed `neca_sprites.pcx` next to the executable; neither Git nor public CI provides that art. Missing art falls back to native Uranium. `thinker_user.ini` may override the distributed profile, and the complete user's installed INI is not independently inspected.
 
-Other current test-profile values include `base_capture_fix=0` (probe workaround), `tile_output_limit=3,3,3` (balance trial), extra starting units, polar caps disabled and excluded events 13/17. See [configuration](technical/configuration.md).
+Other current test-profile values include `base_capture_fix=0` (probe workaround), `tile_output_limit=3,4,4` (N/M/E balance trial), extra starting units, polar caps disabled and excluded events 13/17. See [configuration](technical/configuration.md).
 
 ## Combined Windows Develop milestone — 7 November 2026
 
@@ -36,6 +36,11 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 - [TERR-002](WORK-QUEUE.md): after user approval, new experimental Uranium/Titanium generator settings shrink each patch to 3–5 tiles and increase per-type patch attempts ~50% (3–9), maintaining roughly the same expected total geological area. Existing fungus is retained. **Source/CI and fresh-map Windows verification are distinct:** a new game with the trial build is needed before accepting the resulting distribution and fungus/yield interactions. No new INI options or save changes.
 
 ## Remaining before PR #4 can merge
+## AI-002 Titanium Mine automation trial — 7 November
+
+- Source now lets normal automated Formers consider Mines on independent Rolling/Flat Titanium without enabling nonrocky Mines on other tiles. Flat needs projected food ≥1 after the conditional Mine penalty and a positive mineral gain; Mine forecasts compete with Forest/Fungus/Borehole and eligible Solar. Eligible Titanium gets +4 Former tile priority. Former mineral/energy eligibility reads configured caps. **Distributed experimental INI: 3/4/4 N/M/E; parser defaults unchanged.** No Windows AI selection test yet; see [AI-002](WORK-QUEUE.md).
+
+
 
 - [TERR-001](WORK-QUEUE.md): broad same-build save→reload→continue, fog/redraw and UI smoke now reported passing on combined Develop; finish any specifically identified edge-case evidence on the final integrated binary.
 - [REND-001/002/004](WORK-QUEUE.md): Jungle positive-path rendering and missing-PCX Uranium fallback pass Windows Develop. REND-001 negative-path C++11 host harness now passes 1 valid and all 18 one-byte mismatch cases with zero writes on rejection; Develop/Release CI are green at `add333b` ([run 42328264052](https://github.com/Necaladun/thinkerNeca/actions/runs/42328264052)). This validates shared preflight control flow on synthetic instruction buffers, not a modified live executable. Release runtime parity remains deferred; the supplied log only encountered Titanium sprite variant 0 (variant 1 not characterised).
