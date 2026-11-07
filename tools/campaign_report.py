@@ -159,7 +159,7 @@ th{color:#bec9d8} .scroll{overflow-x:auto}
 <p class="muted">Only explicitly classified notices and optional human UI are suppressed.
 An unknown native modal can still interrupt simulation.</p>
 <div class="scroll"><table><thead><tr>
-<th>Turn</th><th>Faction</th><th>Source</th><th>Label</th><th>Handling</th>
+<th>Turn</th><th>Processing faction</th><th>Source</th><th>Label</th><th>Handling</th>
 </tr></thead><tbody>%s</tbody></table></div>
 <p><a href="factions.csv">Export faction history CSV</a> · <a href="bases.csv">Export base history CSV</a> · <a href="ui_notices.csv">Export UI handling CSV</a></p>
 <p class="muted">These are recorded states, not reconstructed events or proven AI motivations.
