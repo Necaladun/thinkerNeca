@@ -228,6 +228,159 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     return output
 
 
+
+def _first_snapshot(path):
+    """Read only the first complete JSONL record for fast GUI discovery."""
+    with path.open("rb") as stream:
+        for raw in stream:
+            if not raw.strip():
+                continue
+            try:
+                return json.loads(raw.decode("utf-8"))
+            except (UnicodeError, json.JSONDecodeError) as exc:
+                raise ValueError(f"{path}: invalid first snapshot: {exc}") from exc
+    return None
+
+
+def _last_committed_snapshot(path, committed_turn):
+    """Read backwards in chunks; ignore an uncommitted partial last line.
+
+    The UI only needs a compact preview, not the full multi-year log. A bound
+    prevents scanning an enormous corrupted recording in the UI thread.
+    """
+    if committed_turn < 0:
+        return None
+    with path.open("rb") as stream:
+        stream.seek(0, 2)
+        remaining = stream.tell()
+        tail = b""
+        examined = 0
+        while remaining and examined < 2 * 1024 * 1024:
+            chunk = min(65536, remaining)
+            remaining -= chunk
+            examined += chunk
+            stream.seek(remaining)
+            tail = stream.read(chunk) + tail
+            lines = tail.split(b"\n")
+            # The leading line is incomplete until we reach offset zero.
+            candidates = lines if remaining == 0 else lines[1:]
+            for raw in reversed(candidates):
+                if not raw.strip():
+                    continue
+                try:
+                    record = json.loads(raw.decode("utf-8"))
+                except (UnicodeError, json.JSONDecodeError):
+                    continue  # Partial uncommitted tail or interrupted write.
+                turn = record.get("turn")
+                if (record.get("schema") == SCHEMA and isinstance(turn, int)
+                        and turn <= committed_turn):
+                    return record
+            tail = lines[0]
+    return None
+
+
+def summarize_session(session_dir):
+    """Metadata for the campaign picker. Never writes/changes recorder data.
+
+    Returns a row even for malformed sessions so the GUI can show the fault.
+    This does not validate every turn; generate() performs full validation.
+    """
+    campaign_dir = session_dir.parent.parent
+    info = {
+        "campaign_dir": campaign_dir,
+        "session_id": session_dir.name,
+        "folder": campaign_dir.name,
+        "player": "Unknown",
+        "years": "No snapshots",
+        "turns": "0",
+        "bases": "—",
+        "units": "—",
+        "status": "Unreadable",
+        "started": "Unknown",
+        "updated": "Unknown",
+        "source_save": "Not recorded",
+        "factions": "",
+        "error": None,
+    }
+    try:
+        manifest = json.loads((session_dir / "manifest.json").read_text(encoding="utf-8"))
+        status = json.loads((session_dir / "status.json").read_text(encoding="utf-8"))
+        if manifest.get("schema") != SCHEMA or status.get("schema") != SCHEMA:
+            raise ValueError("Unsupported telemetry schema")
+        committed = status.get("last_committed_turn")
+        if not isinstance(committed, int):
+            raise ValueError("Missing last_committed_turn")
+        first = _first_snapshot(session_dir / "turns.jsonl")
+        last = _last_committed_snapshot(session_dir / "turns.jsonl", committed)
+
+        def local_time(value):
+            if not value:
+                return "Unknown"
+            from datetime import datetime, timezone
+            value = datetime.strptime(value, "%Y%m%dT%H%M%SZ")
+            return value.replace(tzinfo=timezone.utc).astimezone().strftime("%d %b %Y %H:%M")
+
+        info["started"] = local_time(manifest.get("started_utc"))
+        info["updated"] = local_time(status.get("updated_utc"))
+        info["source_save"] = manifest.get("source_save") or "Not recorded"
+        info["status"] = str(status.get("state", "unknown")).replace("_", " ").title()
+        if last:
+            if first and first.get("turn", 999999999) <= committed:
+                info["turns"] = str(last["turn"] - first["turn"] + 1) + " span"
+                first_year = first.get("mission_year")
+            else:
+                info["turns"] = "Unknown"
+                first_year = None
+            last_year = last.get("mission_year")
+            if first_year is not None and last_year is not None:
+                info["years"] = f"MY {first_year}–{last_year}"
+            else:
+                info["years"] = f"Turn {last['turn']}"
+            world = last.get("world", {})
+            info["bases"] = str(world.get("base_count", "—"))
+            info["units"] = str(world.get("vehicle_count", "—"))
+            factions = last.get("factions", [])
+            info["factions"] = ", ".join(
+                faction.get("name", f"Faction {faction.get('id', '?')}")
+                for faction in factions if faction.get("alive", False)
+            )
+            humans = [f.get("name", f"Faction {f.get('id', '?')}")
+                      for f in factions if f.get("human")]
+            info["player"] = ", ".join(humans) if humans else "All AI / observer"
+        elif committed >= 0:
+            raise ValueError("Committed turn not found in turns.jsonl")
+        else:
+            # A game can still be running before its first completed turn.
+            info["player"] = "Awaiting first turn"
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        info["error"] = str(exc)
+        info["status"] = "Error"
+    return info
+
+
+def scan_campaigns(root):
+    """Discover recorded sessions below a campaigns/ directory."""
+    root = Path(root)
+    if not root.is_dir():
+        return []
+    rows = []
+    for campaign_dir in root.iterdir():
+        if not campaign_dir.is_dir():
+            continue
+        sessions_dir = campaign_dir / "sessions"
+        if not sessions_dir.is_dir():
+            continue
+        for session_dir in sessions_dir.iterdir():
+            if session_dir.is_dir():
+                rows.append(summarize_session(session_dir))
+    # Filesystem mtime is used for sorting only, never for game chronology.
+    rows.sort(key=lambda item: (item["campaign_dir"] / "sessions"
+              / item["session_id"] / "status.json").stat().st_mtime
+              if (item["campaign_dir"] / "sessions" / item["session_id"]
+                  / "status.json").exists() else -1, reverse=True)
+    return rows
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("campaign", type=Path, help="Campaign directory")
