@@ -1060,10 +1060,10 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
     tech_effects(faction_id);
     if (faction_id == MapWin->cOwner) {
         if (tech_id == Facility[FAC_BIOLOGY_LAB].preq_tech) {
-            interlude(1, 0, 1, 0);
+            autosim_interlude(1, 0, 1, 0);
         }
         if (tech_id == TECH_CentMed) {
-            interlude(2, 0, 1, 0);
+            autosim_interlude(2, 0, 1, 0);
         }
         if (project_base(FAC_VOICE_OF_PLANET) != SP_Unbuilt && faction_id > 0
         && Tech[TECH_HAL9000].preq_tech1 >= -1
@@ -1072,8 +1072,8 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
             && (Tech[TECH_Matter].preq_tech2 >= -1 || Tech[TECH_Matter].preq_tech1 == -1)) {
                 if (tech_owner(TECH_HAL9000, faction_id)
                 && tech_owner(TECH_Matter, faction_id)) {
-                    interlude(15, 0, 1, 0);
-                    interlude(16, 0, 0, 0);
+                    autosim_interlude(15, 0, 1, 0);
+                    autosim_interlude(16, 0, 0, 0);
                 }
             }
         }
@@ -1081,7 +1081,7 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
             for (int i = 1; i < MaxPlayerNum; ++i) {
                 if (faction_id != i && !MFactions[i].is_alien()
                 && (plr->diplo_status[i] & DIPLO_COMMLINK)) {
-                    interlude(36, 0, 1, 0);
+                    autosim_interlude(36, 0, 1, 0);
                 }
             }
         }
