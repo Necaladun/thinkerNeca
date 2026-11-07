@@ -294,10 +294,10 @@ void __cdecl pact_of_brotherhood(int faction_id, int faction_id_2) {
     parse_says(3, get_pact(faction_id), -1, -1);
     parse_says(4, get_phrase(faction_id, 0), -1, -1);
     parse_says(5, get_phrase(faction_id_2, 0), -1, -1);
-    X_dialog("MAKEPACT", faction_id_2);
+    autosim_notice_dialog("MAKEPACT", faction_id_2);
     net_maps(faction_id, faction_id_2, 1);
     parse_says(0, get_pact(faction_id), -1, -1);
-    X_dialog("HERESTHEMAP", faction_id_2);
+    autosim_notice_dialog("HERESTHEMAP", faction_id_2);
     scan_prototypes(faction_id, faction_id_2);
     mention_prototypes(faction_id, faction_id_2);
     if ((*DiffLevel <= 1 || tut_check2(0x1000)) && !*MultiplayerActive) {
@@ -327,7 +327,7 @@ void __cdecl make_treaty(int faction_id, int faction_id_2) {
     parse_says(6, get_noun_phrase(faction_id, 9), -1, -1);
     parse_says(7, get_noun_phrase(faction_id_2, 9), -1, -1);
     snprintf(StrBuffer, StrBufLen, "MAKETREATY%d", random_val(0, 2));
-    X_dialog(StrBuffer, faction_id_2);
+    autosim_notice_dialog(StrBuffer, faction_id_2);
     if ((*DiffLevel <= 1 || tut_check2(0x800)) && !*MultiplayerActive) {
         parse_says(0, get_noun(faction_id_2), -1, -1);
         X_pop_2(TutorFile, "COMMERCE", 0);
@@ -354,7 +354,7 @@ void __cdecl pledge_truce(int faction_id, int faction_id_2, int flag) {
         parse_says(3, get_title(faction_id_2), -1, -1);
         parse_says(4, get_name(faction_id_2), -1, -1);
         parse_says(5, get_noun(faction_id_2), -1, -1);
-        X_dialog("MAKETRUCE", faction_id_2);
+        autosim_notice_dialog("MAKETRUCE", faction_id_2);
     }
 }
 
