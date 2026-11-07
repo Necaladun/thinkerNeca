@@ -2219,7 +2219,8 @@ int __cdecl order_veh(int veh_id, int offset, int flag) {
                     FX_play(Sounds, 13);
                     parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                     parse_says(1, Vehs[stack_veh_id].name(), -1, -1);
-                    NetMsg_pop(NetMsg, tgt_at_sea ? "ISLESPOTTED" : "WORMSSPOTTED", 5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg,
+                        tgt_at_sea ? "ISLESPOTTED" : "WORMSSPOTTED", 5000, 0, 0);
                 }
                 goto MOV_END;
             }
@@ -2245,7 +2246,8 @@ MOV_SPOT:
                 FX_play(Sounds, 13);
                 parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                 parse_says(1, Vehs[stack_veh_id].name(), -1, -1);
-                NetMsg_pop(NetMsg, tgt_fc_id ? "SPOTTED" : "SPOTTED0", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg,
+                    tgt_fc_id ? "SPOTTED" : "SPOTTED0", 5000, 0, 0);
             }
             goto MOV_END;
         }
@@ -2260,7 +2262,8 @@ MOV_SPOT:
                 FX_play(Sounds, 13);
                 parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                 parse_says(1, Vehs[stack_veh_id].name(), -1, -1);
-                NetMsg_pop(NetMsg, tgt_fc_id ? "SPOTTED" : "SPOTTED0", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg,
+                    tgt_fc_id ? "SPOTTED" : "SPOTTED0", 5000, 0, 0);
                 goto MOV_END;
             }
         }
