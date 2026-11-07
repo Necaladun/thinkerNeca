@@ -3,6 +3,7 @@
 #include "patchdata.h"
 #include "patchveh.h"
 #include "savegame.h"
+#include "jungle_hook_preflight.h"
 
 
 // From the user's supported terranx.exe inspection:
@@ -273,26 +274,29 @@ static bool install_minor_native_jungle()
     const byte redirect[6] = {0xE9, 0, 0, 0, 0, 0x90};
     // Fail closed if the executable or another mod changed these
     // instructions; write_jump itself does not validate original bytes.
-    const struct { int addr; int target; } locations[] = {
+    struct JungleHookSite { int addr; int target; };
+    const JungleHookSite locations[] = {
         {0x463CC5, (int)minor_native_jungle_current_hook},
         {0x463D93, (int)minor_native_jungle_neighbour_hook_1},
         {0x464E78, (int)minor_native_jungle_neighbour_hook_2},
     };
-    // All three predicates are required for coherent Jungle edges. Validate
-    // every preimage before changing any instruction; an alternate executable
-    // or another patch must not leave only part of the Jungle hook installed.
-    for (const auto& site : locations) {
-        if (memcmp((const void*)site.addr, original, sizeof(original))) {
-            debug("minor Jungle native hook skipped: byte mismatch at 0x%08X\n",
-                site.addr);
-            return false;
-        }
-    }
-    for (const auto& site : locations) {
-        write_bytes(site.addr, original, redirect, sizeof(original));
-        write_jump(site.addr, site.target);
-    }
-    return true;
+    // All three predicates are required for coherent Jungle edges.
+    // Shared two-phase helper is exercised by a host-only negative-path
+    // harness: no write callback fires until *all* preimages match.
+    return jungle_hook_preflight::validate_then_apply(
+        locations,
+        [&](const JungleHookSite& site) -> bool {
+            if (memcmp((const void*)site.addr, original, sizeof(original))) {
+                debug("minor Jungle native hook skipped: byte mismatch at 0x%08X\n",
+                    site.addr);
+                return false;
+            }
+            return true;
+        },
+        [&](const JungleHookSite& site) {
+            write_bytes(site.addr, original, redirect, sizeof(original));
+            write_jump(site.addr, site.target);
+        });
 }
 #endif
 

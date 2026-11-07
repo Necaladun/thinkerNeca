@@ -196,14 +196,23 @@ def main() -> None:
                     ('463CC5', '463D93', '464E78')),
             'Expected three stage-native Jungle flag checks')
     jungle_install = body_between(patches, 'static bool install_minor_native_jungle()', '#endif')
+    helper = source('src/jungle_hook_preflight.h')
+    harness = source('tools/test_jungle_hook_preflight.cpp')
+    workflow = source('.github/workflows/build-windows.yml')
     require('const byte original[6] = {0x81, 0xE2, 0x04, 0, 0, 0x80};' in jungle_install
-            and jungle_install.count('for (const auto& site : locations)') == 2
+            and 'JungleHookSite locations[]' in jungle_install
+            and 'jungle_hook_preflight::validate_then_apply(' in jungle_install
             and 'if (memcmp((const void*)site.addr, original, sizeof(original)))' in jungle_install
-            and jungle_install.index('if (memcmp(') < jungle_install.index('write_bytes(site.addr')
-            and 'return false;' in jungle_install
-            and 'return true;' in jungle_install
-            and 'write_bytes(site.addr, original, redirect' in jungle_install,
-            'Jungle native hooks must preflight all three sites before any write')
+            and 'write_bytes(site.addr, original, redirect' in jungle_install
+            and 'write_jump(site.addr, site.target);' in jungle_install
+            and 'validate_then_apply' in helper
+            and 'for (std::size_t i = 0; i < N; ++i)' in helper
+            and 'if (!verify(sites[i]))' in helper
+            and 'apply(sites[i]);' in helper
+            and 'for (int changed_site = 0; changed_site < 3; ++changed_site)' in harness
+            and 'for (int changed_byte = 0; changed_byte < 6; ++changed_byte)' in harness
+            and 'Test native Jungle three-site preflight (host harness)' in workflow,
+            'Jungle native hook must share an all-sites-before-any-write helper with CI harness')
     require(renderer.count('&& (!conf.minor_native_jungle || !conf.minor_native_uranium') == 2
             and '|| !conf.minor_native_titanium))' in renderer,
             'Do not scan every tile when all native types are enabled')

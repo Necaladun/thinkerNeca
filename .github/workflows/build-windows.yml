@@ -44,6 +44,11 @@ jobs:
           python tools/test_minor_terrain_atlas.py
           python tools/test_titanium_sprite_mask.py
           python tools/make_minor_terrain.py assets/minor_terrain.pcx build/ci/minor_terrain.pcx
+      - name: Test native Jungle three-site preflight (host harness)
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic \
+            tools/test_jungle_hook_preflight.cpp -o build/ci/test_jungle_hook_preflight
+          build/ci/test_jungle_hook_preflight
       - name: Check independent terrain source contract
         run: python tools/test_minor_terrain_contract.py
       - name: Check reserved major-landmark slot 10
