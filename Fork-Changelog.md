@@ -4,7 +4,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unmerged AUTO-002 — full-turn fast presentation (7 November 2026)
 
-- Reuses the existing `autosim_fast_combat=1` option for fast battle resolution, quick allied/enemy/all-unit/order movement, no pause after combat and no Map Animations during all-AI turn processing (upkeep, faction phase, AI unit moves, fights). Preferences are temporarily scoped and restored before autosave and manual Save Game. Native autosave behaviour is unchanged; additional crash checkpoints are deferred by user. This is a source change, **not yet Windows-runtime verified**. Native Planetary Council modal remains a separate AUTO-002 blocker.
+- Reuses the existing `autosim_fast_combat=1` option for fast battle resolution, quick allied/enemy/all-unit/order movement, no pause after combat and no Map Animations during all-AI turn processing (upkeep, faction phase, AI unit moves, fights). Preferences are temporarily scoped and restored before autosave and manual Save Game. Native autosave implementation and filename/interval are unchanged; eligible all-AI simulations now request the native autosave even if the saved checkbox was disabled. Additional crash checkpoints are deferred by user. This is a source change, **not yet Windows-runtime verified**. Native Planetary Council modal remains a separate AUTO-002 blocker.
 
 ## Unmerged AUTO-002 — Council modal blocker (7 November 2026)
 
