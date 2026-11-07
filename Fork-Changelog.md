@@ -2,6 +2,10 @@
 
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
+## Unmerged AUTO-002 — Council modal blocker (7 November 2026)
+
+- Windows user report: a Deirdre-called Governor election opens a convening popup and native Council voting window despite all factions being AI. Only result notices were already suppressed. Source traced native `call_council` and pending `council` entrypoints; voting/finalization semantics remain unverified. **No code fix yet**: cannot safely skip a potentially gameplay-processing Council call or auto-confirm ballots. Noninteractive AI Council execution and Windows acceptance remain AUTO-002 work.
+
 ## Unmerged AUTO-002 — probe notification audit (7 November 2026)
 
 - An observed-AI `DETECTINFILTRATE` popup exposed a gap beyond the earlier 24 `NetMsg_pop_2` result wrappers. On `feature/auto-002-noninteractive-ui`, classified and wrapped all remaining return-unused `src/probe.cpp` NetMsg, counter-spy, genetic/mind-control and portrait reports; suppress only the optional on-success intelligence panel. Observed-AI `PROBEPACT*`/`ENEMYPROBE2` human prompts now take the normal unobserved-AI path in opt-in simulation; passive probe clash alerts are wrapped. Choice-returning human dialogs and game state remain intact by source intent. **Source-only; Windows build, simulation and unchanged state/choices require verification.** Separate from BUG-001.
