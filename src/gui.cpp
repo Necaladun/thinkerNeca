@@ -962,6 +962,13 @@ void __cdecl amovie_project(int movie_id)
 
 void __cdecl mod_amovie_project(const char* name)
 {
+    // Cinematic presentation only. Do not change the player's movie
+    // preference or the project's production/achievement processing.
+    if (autosim_ui_active()) {
+        telemetry_record_ui_notice("movie", name ? name : "",
+            "suppressed_project_movie");
+        return;
+    }
     if (!strlen(name) || !conf.video_player) {
         return;
     } else if (conf.video_player == 1) {
