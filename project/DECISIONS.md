@@ -1,6 +1,6 @@
 # Decisions and working assumptions
 
-> **Status boundary:** Decisions about independent terrain/rendering refer to experimental [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4) until it merges. Design approval does not mean default-branch implementation.
+> **Status boundary:** The independent terrain/rendering implementation from [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4) is **merged into `master`**. Design approval and merge status are not proof of untested AI behaviour, Release art parity or constructed-stack compatibility.
 
 Record choices that materially constrain implementation. **Established** means intentional and current; **Trial** means subject to gameplay testing. A proposal remains in [IDEAS](IDEAS.md), not here, unless adopted. Updated 2026-11-07.
 
@@ -32,4 +32,4 @@ Record choices that materially constrain implementation. **Established** means i
 
 **Not decided:** reducing Forest to 1/1/1; making geological bonuses Mine-only; a replacement for major slot 10; reworking Former scoring. Those are tracked as TBD in [WORK-QUEUE](WORK-QUEUE.md) or exploratory [IDEAS](IDEAS.md).
 
-**Versioning:** PR #3 merged the type/code foundation; draft PR #4 carries the present generation, native rendering, slot-10 and test-INI changes. See [Fork changelog](../Fork-Changelog.md). Git is the precise implementation history, not these summaries.
+**Versioning:** PR #3 merged the type/code foundation; PR #4 merged generation, native Develop rendering, slot-10 retirement, v3 minor storage and the experimental test INI. See [Fork changelog](../Fork-Changelog.md). Git is the precise implementation history, not these summaries.

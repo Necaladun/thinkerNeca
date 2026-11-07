@@ -2,7 +2,7 @@
 
 This repository is **Necaladun's fork of Thinker Mod for Sid Meier's Alpha Centauri: Alien Crossfire (SMAC/X)**. It builds on [Induktio's Thinker](https://github.com/induktio/thinker); it is not an upstream release. The fork primarily targets **fresh single-player games**; ongoing experimental work includes independent minor terrain, map generation, native rendering and UI changes. See [Readme.md](Readme.md) for an introduction.
 
-> **Branch status (7 November 2026):** The `project/` documentation is maintained on `master`, but the independent-terrain renderer and its test profile remain in [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), and the native Empire Report remains in [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5). References to those changes describe **unmerged work**, not default-branch functionality. The legacy Ironstone docs remain in `docs/` until the terrain implementation is integrated.
+> **Branch status (7 November 2026):** Independent Jungle/Uranium/Titanium generation, rendering and the experimental test profile **merged to `master` in [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4)** ([`0f05fdb`](https://github.com/Necaladun/thinkerNeca/commit/0f05fdbd5509616cb5fea598a68ab74d3fd13d8b)). The native Empire Report is **still unmerged**, parked on [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), which requires ancestry reconciliation. Release/PRACX native-art parity, long-game AI acceptance and selected rare compatibility cases remain deferred; merging is not runtime certification.
 
 ## Where to start
 

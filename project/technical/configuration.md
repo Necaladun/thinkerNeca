@@ -1,6 +1,6 @@
 # Configuration — current fork test profile
 
-> **Branch scope (2026-11-07):** This reference documents experimental terrain/rendering/configuration work on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4). The corresponding engine and game-data changes are **not merged into `master`**. The default-branch files retain earlier behaviour; consult the PR branch for the implementation and test profile.
+> **Merge status (7 November 2026):** The terrain/rendering implementation documented here was **merged into `master` via [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4)**. Windows Develop gameplay smoke was user-verified; Release/PRACX art parity, long-run AI decisions and selected edge-case tests remain deferred. Historical branch-stage notes below are retained as development context.
 
 
 **Authoritative shipped example:** [`docs/thinker.ini`](../../docs/thinker.ini). **Parser/defaults:** `src/main.cpp` / `src/main.h`. **Status:** user-selected test configuration, not upstream Thinker defaults or a settled balance release.

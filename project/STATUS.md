@@ -1,6 +1,6 @@
 # Current status
 
-**Updated:** 2026-11-07. **Authority:** `master` is the published branch; terrain/rendering changes remain on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), `feature/minor-terrain-generation-migration`. [Draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), the native Empire Report, is parked on an older PR #4 ancestry and is not part of this PR.
+**Updated:** 2026-11-07. **Authority:** [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4) has **merged to `master`** at [`0f05fdb`](https://github.com/Necaladun/thinkerNeca/commit/0f05fdbd5509616cb5fea598a68ab74d3fd13d8b). [Draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), the native Empire Report, remains unmerged on an older PR #4 ancestry and must be reconciled separately.
 
 ## PR #4 — current Develop scope
 
@@ -11,12 +11,12 @@
 - **Configuration:** distributed trial `docs/thinker.ini` uses **`tile_output_limit=3,4,4` N/M/E**; user confirms those caps applied throughout previous Windows tests. Their complete installed `thinker.ini`/`thinker_user.ini` was not independently inspected. Core native graphics/Inspector support is **Develop-only**; Release cross-builds pass, but Release/PRACX parity is not claimed.
 - **AI-002:** scoped automatic Titanium Mine selection implemented and source/CI checked, but the user deferred behavioural testing until multiple longer logged AI-only games are possible.
 
-## PR #4 merge disposition
+## PR #4 merged — outstanding limitations
 
-The user has **already completed** the requested basic smoke, cap, qualitative multi-seed patch-size/resource and Canyon checks and does not need to repeat them. Develop and Release CI passed at the last audited PR head. A final merge review must check that the latest head is still green, the intended experimental/Develop-specific scope and differences against `master`. CI cannot establish Windows gameplay correctness. [Evidence](TESTING.md), [work queue](WORK-QUEUE.md) and [decisions](DECISIONS.md) retain the detailed qualifications.
+The user previously completed the requested basic smoke, cap, qualitative multi-seed patch-size/resource and Canyon checks. Develop and Release **PR-head CI passed** before merging; `master` now contains the feature code and experimental INI. This is **Windows Develop user-tested functionality**, not full Release/PRACX parity or exhaustive in-game verification. The separate post-merge `master` CI checkpoint must be reported by its actual result, not inferred from PR CI. [Evidence](TESTING.md), [work queue](WORK-QUEUE.md) and [decisions](DECISIONS.md) retain the detailed qualifications.
 
 **Explicitly deferred, non-blocking:** Release/PRACX native features (REND-002), native sprite variant 1 (REND-004), constructed multi-minor tiles (TERR-004), optional editor/invalid-art/fog edge cases (REND-005), intermittent Inspector recurrence (BUG-002), probe capture under the current workaround (BUG-001), quantitative geology and economy studies (TERR-002/BAL-001/BAL-003), and multi-game AI-002 behavioural acceptance (TEL/AUTO dependency). Other major-landmark regression (MAP-001) and alternate generation-switch policy (CFG-001) are outside the accepted normal-world test scope.
 
 **Separate backlog:** projected-vs-live yield discrepancies (TERR-003), general Former AI (AI-001), Forest balance (BAL-002), combat/arty BUG-004 and BAL-004, telemetry/automation, and prototype renderer retirement (MAINT-001). Do not fold these into PR #4 merge acceptance.
 
-**After PR #4:** reconcile PR #5 against updated `master`, rerun its CI, then perform its final integrated Empire Report regression. Neither its UI code nor UI-002's future Turn Report should be merged through PR #4.
+**Next integration:** reconcile the still-draft PR #5 against current `master`, rerun its Develop/Release CI, then perform the final Empire Report runtime regression. UI-002's future Turn Report stays deferred.

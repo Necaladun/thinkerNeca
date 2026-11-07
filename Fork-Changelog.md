@@ -2,7 +2,7 @@
 
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
-## Unreleased — draft PR #4 (2026-11-05)
+## Merged PR #4 — minor terrain and native rendering (7 November 2026)
 
 - **7 November closeout review:** user reconfirmed prior 3/4/4 N/M/E, repeated save/quit/reload/advance and multi-seed mineral-overlap/geological patch-size tests. Qualitative Windows Develop Forest/fungus extraction, resource underlay, Unity pod reroll and ordinary save/Inspector/graphics behaviour are positively reported. Canyon source removal/slot reservation is CI-verified (its old `canyon=0` default already suppressed placement). Longer AI simulations, quantitative patch counts/economy, constructed minor stacks, variant-1 sprite and Release/PRACX native feature parity remain deferred, not accepted; PR #4 remains unmerged.
 
@@ -34,7 +34,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 - Replaced duplicate Uranium/Titanium deposit generators with a single interleaved routine: same eligible tiles, lowland preference, 3–9 patch sizes, fungus clearing, two-tile inter-patch buffer, and independent RNG streams. Uranium patches are attempted first each round, then Titanium.
 - Retired the older hand-positioned Titanium thunk. Both geological minerals use the native `bonus_at()==4` draw stage, with separate +1E/+1M yields; the verified narrow Sprite-pointer hook now provides distinct Titanium art in supported Develop mode.
 
-[PR #4: independent minor-terrain generation/rendering](https://github.com/Necaladun/thinkerNeca/pull/4) — **draft, not merged**.
+[PR #4: independent minor-terrain generation/rendering](https://github.com/Necaladun/thinkerNeca/pull/4) — **merged into `master`** as [`0f05fdb`](https://github.com/Necaladun/thinkerNeca/commit/0f05fdbd5509616cb5fea598a68ab74d3fd13d8b).
 
 - Migrated Jungle, Uranium and Titanium world generation to independent minor type/code records rather than native major-landmark flags. Jungle uses climate-sensitive early patches; Uranium and Titanium use dispersed late geological deposits.
 - Integrated native-stage Jungle/Uranium rendering, later replacing the hand-positioned Titanium overlay with a guarded native resource Sprite-pointer substitution.

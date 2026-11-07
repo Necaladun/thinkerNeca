@@ -1,8 +1,8 @@
 # Testing and verification
 
-> **Branch scope:** Most terrain evidence below relates to draft PR #4, **not** a merged feature on `master`. PR #5's Empire Report is also unmerged. Documentation-only integration has no Windows runtime test requirement; code changes still do.
+> **Branch scope:** The terrain implementation described here **merged into `master` via PR #4** (`0f05fdb`); its Windows runtime evidence remains specific to the prior user-tested Develop builds. PR #5's Empire Report is **still unmerged**. Passing CI and merging code do not automatically verify in-game Release/PRACX behaviour.
 
-**Updated 2026-11-07.** Runtime evidence is from draft [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), Windows 32-bit **Develop**. The user installed a matching DLL and a local 1024×1024 `neca_sprites.pcx`, with `minor_native_titanium=1` and `minor_titanium_sprite_mode=3`. The user's entire installed `thinker.ini`/`thinker_user.ini` has **not** been inspected; [docs/thinker.ini](../docs/thinker.ini) is the distributed test profile.
+**Updated 2026-11-07.** Runtime evidence is from Windows 32-bit **Develop** builds of the implementation later merged in [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4). The user installed a matching DLL and a local 1024×1024 `neca_sprites.pcx`, with `minor_native_titanium=1` and `minor_titanium_sprite_mode=3`. The user's entire installed `thinker.ini`/`thinker_user.ini` has **not** been inspected; [docs/thinker.ini](../docs/thinker.ini) is the distributed test profile.
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 

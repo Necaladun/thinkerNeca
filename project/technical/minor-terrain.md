@@ -1,11 +1,11 @@
 # Independent minor terrain — current implementation
 
-> **Branch scope (2026-11-07):** This reference describes experimental terrain/rendering code on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), **not yet merged into `master`**. The default branch still has earlier Ironstone and map behaviour; verify implementation against the working branch.
+> **Merge status (7 November 2026):** The terrain/rendering implementation documented here was **merged into `master` via [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4)**. Windows Develop gameplay smoke was user-verified; Release/PRACX art parity, long-run AI decisions and selected edge-case tests remain deferred. Historical branch-stage notes below are retained as development context.
 
 
 **Reference document.** Work items: [queue](../WORK-QUEUE.md); runtime evidence: [testing](../TESTING.md).
 
-**Status:** Implemented on draft PR #4; initial Windows Develop gameplay checks have passed, but full regression coverage and Release parity are outstanding. This document describes the implemented rules, **not** proposed forest/cap/deposit balance changes.
+**Status:** Implemented and merged through PR #4; Windows Develop gameplay smoke is user-positive, but full regression coverage and Release/PRACX parity remain outstanding. This document describes the implemented rules, **not** proposed forest/cap/deposit balance changes.
 
 ## Data model
 
@@ -47,7 +47,7 @@ For the intended independent-feature maps, use `new_world_builder=1`, `modified_
 
 1. The early phase generates Jungle before the native-major landmark placement loop and final climate/rainfall pass. Major landmarks can overwrite parts of those patches; the post-placement cleanup removes overlapping independent minor tiles.
 2. The modified world generator then finalises climate and rockiness.
-3. The late phase uses **one shared geological generator**, alternating Uranium then Titanium for each round (when enabled). In the approved **new distribution trial on draft PR #4**, patch sizes are **3–5 tiles** weighted 1:3:1 (mean 4, down from 6); targets scale from the old 2–6 deposits to **3–9 patches per type**, depending on map area. Both retain the same lowland preference, two-tile separation from existing patches/landmarks, independent RNG streams, shared centre-spacing score and land eligibility. **Existing fungus is preserved**, not cleared. The generator still makes at most eight attempts to complete each patch and discards incomplete candidate patches; actual successful counts can fall below targets on crowded maps. This modifies new-map RNG outcomes but not saves, yields, or current terrain overlap policy.
+3. The late phase uses **one shared geological generator**, alternating Uranium then Titanium for each round (when enabled). In the merged **experimental distribution trial**, patch sizes are **3–5 tiles** weighted 1:3:1 (mean 4, down from 6); targets scale from the old 2–6 deposits to **3–9 patches per type**, depending on map area. Both retain the same lowland preference, two-tile separation from existing patches/landmarks, independent RNG streams, shared centre-spacing score and land eligibility. **Existing fungus is preserved**, not cleared. The generator still makes at most eight attempts to complete each patch and discards incomplete candidate patches; actual successful counts can fall below targets on crowded maps. This modifies new-map RNG outcomes but not saves, yields, or current terrain overlap policy.
 4. Mirrored map modes skip independent minor generation (symmetry is not implemented).
 
 **Configuration:** all three minor types currently require `modified_landmarks=1` and the `new_world_builder=1` path. Geological types can be switched independently with `minor_uranium` and `minor_titanium`; the same shared routine handles either one alone. Mirrored worlds remain unsupported.

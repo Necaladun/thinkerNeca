@@ -1,6 +1,6 @@
 # Map generation and major landmarks
 
-> **Branch scope (2026-11-07):** This reference describes experimental terrain/rendering code on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), **not yet merged into `master`**. The default branch still has earlier Ironstone and map behaviour; verify implementation against the working branch.
+> **Merge status (7 November 2026):** The terrain/rendering implementation documented here was **merged into `master` via [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4)**. Windows Develop gameplay smoke was user-verified; Release/PRACX art parity, long-run AI decisions and selected edge-case tests remain deferred. Historical branch-stage notes below are retained as development context.
 
 
 **Current code:** `src/mapgen.cpp`, `src/engine_enums.h`, `src/main.cpp`. **Settings:** [configuration](configuration.md) and [`docs/thinker.ini`](../../docs/thinker.ini). Outstanding regression work: [MAP-001/MAP-002](../WORK-QUEUE.md). This is the **implemented** arrangement, not a proposal for replacement landmarks.
@@ -51,7 +51,7 @@ Further balance decision during the 3–5-tile geological trial: **new Titanium 
 
 ## Geological distribution trial — 7 November 2026
 
-Approved for draft PR #4: Uranium and Titanium deposits shrink from the old weighted 3–9 tiles (mean 6) to **3–5** (weights 1:3:1, mean 4), while per-type deposit attempts increase by approximately 50% from **2–6** to **3–9** based on map area. The mathematical expected number of geological tiles remains approximately constant where all attempts succeed; realised values can be lower because the existing 2-tile exclusion buffer can reject centres or shapes. Existing fungus is **not cleared** by geology generation. A fungus-covered deposit normally produces fungus-specific yields until clearing, even while its hidden geology is stored and Inspector-visible. Other generation rules, natural overlap exclusions, resource bonuses, saving and rendering remain unchanged. This is a **balance experiment** until representative fresh maps are compared; previous successful Develop graphics and save/reload tests do not verify this revised distribution.
+Merged as an experimental PR #4 configuration: Uranium and Titanium deposits shrink from the old weighted 3–9 tiles (mean 6) to **3–5** (weights 1:3:1, mean 4), while per-type deposit attempts increase by approximately 50% from **2–6** to **3–9** based on map area. The mathematical expected number of geological tiles remains approximately constant where all attempts succeed; realised values can be lower because the existing 2-tile exclusion buffer can reject centres or shapes. Existing fungus is **not cleared** by geology generation. A fungus-covered deposit normally produces fungus-specific yields until clearing, even while its hidden geology is stored and Inspector-visible. Other generation rules, natural overlap exclusions, resource bonuses, saving and rendering remain unchanged. This is a **balance experiment** until representative fresh maps are compared; previous successful Develop graphics and save/reload tests do not verify this revised distribution.
 
 ## Testing and balance
 
