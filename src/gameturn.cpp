@@ -2130,7 +2130,7 @@ void __cdecl turn_upkeep() {
         }
         if (aliens_arrive) {
             popp(ScriptFile, "ALIENSARRIVE", 0, "al_land_sm.pcx", 0);
-            interlude(21, 0, 1, 0);
+            autosim_interlude(21, 0, 1, 0);
         }
     }
     int caretake_id = 0;
@@ -2171,7 +2171,7 @@ void __cdecl turn_upkeep() {
     }
     random_events(0);
     if (*CurrentTurn == 75 && has_tech(Facility[FAC_BIOLOGY_LAB].preq_tech, *CurrentPlayerFaction)) {
-        interlude(1, 0, 1, 0);
+        autosim_interlude(1, 0, 1, 0);
     }
     if (voice_of_planet()) {
         Faction& plr = Factions[*CurrentPlayerFaction];
