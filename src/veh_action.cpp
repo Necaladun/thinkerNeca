@@ -765,14 +765,14 @@ void __cdecl action_destroy(int veh_id, int tgt_item, int tgt_x, int tgt_y) {
                     Console_focus(MapWin, tx, ty, 0);
                     if (is_forest_destroy) {
                         if (unit_id == BSC_SPORE_LAUNCHER) {
-                            popp(ScriptFile, "SPOREFOREST", 0, "sporlnch_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "SPOREFOREST", "sporlnch_sm.pcx");
                         } else {
-                            NetMsg_pop(NetMsg, "ATEFOREST", 5000, 0, 0);
+                            autosim_notice_netmsg(NetMsg, "ATEFOREST", 5000, 0, 0);
                         }
                     } else if (unit_id == BSC_SPORE_LAUNCHER) {
-                        popp(ScriptFile, "SPORESLAUNCHED", 0, "sporlnch_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "SPORESLAUNCHED", "sporlnch_sm.pcx");
                     } else {
-                        NetMsg_pop(NetMsg, "ATESTUFF", 5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ATESTUFF", 5000, 0, 0);
                     }
                 }
             }
@@ -2384,7 +2384,13 @@ MOV_SPOT:
         if (moves_avail < Rules->move_rate_roads
         && Vehs[veh_id].unit_id != BSC_SPORE_LAUNCHER
         && Vehs[veh_id].unit_id != BSC_MIND_WORMS) {
-            if (veh_fc_id == MapWin->cOwner && !move_delay && *VehAttackFlags & 1) {
+            const bool observed_attack = veh_fc_id == MapWin->cOwner
+                && !move_delay && (*VehAttackFlags & 1);
+            const bool ai_hasty = autosim_use_ai_hasty_rule(
+                autosim_ui_active(), is_human(veh_fc_id),
+                veh_fc_id == MapWin->cOwner, (*VehAttackFlags & 1) != 0,
+                move_delay != 0);
+            if (observed_attack && !ai_hasty) {
                 parse_says(0, Vehs[veh_id].name(), -1, -1);
                 parse_num(0, moves_avail);
                 parse_num(1, Rules->move_rate_roads);
@@ -2392,7 +2398,11 @@ MOV_SPOT:
                     goto MOV_END;
                 }
             } else if (!is_human(veh_fc_id)) {
-                // TODO this condition could be adjusted
+                // Preserve the existing AI short-movement cutoff; do not
+                // blindly confirm an otherwise disallowed hasty attack.
+                if (ai_hasty) {
+                    telemetry_record_ui_notice("order_veh", "HASTY", "ai_movement_rule");
+                }
                 if (moves_avail <= Rules->move_rate_roads / 2) {
                     goto MOV_END;
                 }
@@ -2417,7 +2427,7 @@ MOV_SPOT:
                         || (fc_base_id >= 0 && Bases[fc_base_id].eco_damage)) {
                             // log_say_2("Agitated", 0, 0, 0);
                             if (veh_fc_id == MapWin->cOwner) {
-                                NetMsg_pop(NetMsg, "WORMSAGITATED", 5000, 0, 0);
+                                autosim_notice_netmsg(NetMsg, "WORMSAGITATED", 5000, 0, 0);
                             }
                         } else {
                             // log_say_2("Precapture who, enemy", veh_fc_id, stack_veh_id, 0);
@@ -2455,21 +2465,21 @@ MOV_SPOT:
                                         parse_says(0, Vehs[stack_veh_id].name(), -1, -1);
                                         if (tgt_unit_id == BSC_SPORE_LAUNCHER) {
                                             if (plr->units_active[BSC_SPORE_LAUNCHER]) {
-                                                NetMsg_pop(NetMsg, "WORMCAPTURE", 5000, 0, 0);
+                                                autosim_notice_netmsg(NetMsg, "WORMCAPTURE", 5000, 0, 0);
                                             } else {
-                                                popp(ScriptFile, "WORMCAPTURE", 0, "sporlnch_sm.pcx", 0);
+                                                autosim_notice_popp(ScriptFile, "WORMCAPTURE", "sporlnch_sm.pcx");
                                             }
                                         } else if (tgt_unit_id == BSC_SEALURK) {
                                             if (plr->units_active[BSC_SEALURK]) {
-                                                NetMsg_pop(NetMsg, "WORMCAPTURE", 5000, 0, 0);
+                                                autosim_notice_netmsg(NetMsg, "WORMCAPTURE", 5000, 0, 0);
                                             } else {
-                                                popp(ScriptFile, "WORMCAPTURE", 0, "sealrk_sm.pcx", 0);
+                                                autosim_notice_popp(ScriptFile, "WORMCAPTURE", "sealrk_sm.pcx");
                                             }
                                         } else if (plr->units_active[tgt_unit_id]) {
-                                            NetMsg_pop(NetMsg, "WORMCAPTURE", 5000, 0, 0);
+                                            autosim_notice_netmsg(NetMsg, "WORMCAPTURE", 5000, 0, 0);
                                         } else {
                                             bool sea = is_ocean(mapsq(tgt_x, tgt_y));
-                                            popp(ScriptFile, "WORMCAPTURE", 0, sea ? "isle_sm.pcx" : "mindworm_sm.pcx", 0);
+                                            autosim_notice_popp(ScriptFile, "WORMCAPTURE", sea ? "isle_sm.pcx" : "mindworm_sm.pcx");
                                         }
                                     }
                                     // log_say_2("Captured", 0, 0, 0);
@@ -2478,7 +2488,7 @@ MOV_SPOT:
                             }
                             Vehs[stack_veh_id].flags |= VFLAG_UNK_2000;
                             if (veh_fc_id == MapWin->cOwner) {
-                                NetMsg_pop(NetMsg, "WORMNOCAPTURE", 5000, 0, 0);
+                                autosim_notice_netmsg(NetMsg, "WORMNOCAPTURE", 5000, 0, 0);
                             }
                             // log_say_2("No Capture", 0, 0, 0);
                         }
