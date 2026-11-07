@@ -1,5 +1,6 @@
 
 #include "gameturn.h"
+#include "autosim.h"
 
 fp_1int sub_51E530 = (fp_1int)0x51E530;
 
@@ -21,6 +22,9 @@ void __cdecl control_turn() {
     int current_id = 0;
     int load_iter = 0;
     int skip_human_turn = 0;
+    AutoTurnDriver auto_driver;
+    // A game loaded mid-cycle resumes remaining factions first.
+    bool first_cycle_partial = (*ControlTurnMove != 0);
     RECT rc;
     Popup cur_popup;
     Popup_ctor(&cur_popup);
@@ -32,7 +36,16 @@ void __cdecl control_turn() {
         draw_map(1);
     }
     *dword_93A940 = 1;
-    if (*ControlTurnMove && !is_human(MapWin->cOwner)) {
+    // The manual AI handover keeps the original view owner. Do not enter
+    // the native human console if all factions have already been handed off.
+    auto autosim_ready = [&]() {
+        const int owner = MapWin->cOwner;
+        return auto_turn_eligible(conf.autosim_manual_turns,
+            (unsigned)FactionStatus[0], *MultiplayerActive != 0,
+            *PbemActive != 0, (*GameState & STATE_GAME_DONE) != 0,
+            owner, owner >= 1 && owner < MaxPlayerNum && is_alive(owner));
+    };
+    if (*ControlTurnMove && !is_human(MapWin->cOwner) && !autosim_ready()) {
         Console_human_turn(MapWin);
     }
     bool run_upkeep = true;
@@ -309,7 +322,19 @@ void __cdecl control_turn() {
         if (++current_id >= 8) {
             // All faction phases have completed for this turn.
             telemetry_record_completed_turn();
-            if (!skip_human_turn) {
+            const AutoCycleAction action = auto_driver.on_cycle(
+                conf.autosim_manual_turns, autosim_ready(), !first_cycle_partial);
+            first_cycle_partial = false;
+            if (action == AUTO_CYCLE_STOP) {
+                // Return to the normal main menu after the specified number
+                // of complete AI-only turns. No forced endgame or save rewrite.
+                // Any normal game autosave is handled by faction_upkeep().
+                OutputDebugStringA("thinkerNeca AUTO-001: configured turn limit reached\n");
+                *ControlTurnA = 1;
+                *ControlTurnB = 1;
+                return;
+            }
+            if (!skip_human_turn && action != AUTO_CYCLE_ADVANCE) {
                 Console_human_turn(MapWin);
             }
             if (*ControlTurnA) {
