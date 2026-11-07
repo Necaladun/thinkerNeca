@@ -59,7 +59,10 @@ void __cdecl control_turn() {
                 rankings(1);
             } else {
                 *ControlTurnC = 1;
-                turn_upkeep();
+                {
+                    AutoScopedAutosimFastPrefs fast_presentation;
+                    turn_upkeep();
+                }
                 if (end_of_game(1)) {
                     return;
                 }
@@ -310,6 +313,7 @@ void __cdecl control_turn() {
                     }
                 }
             } else {
+                AutoScopedAutosimFastPrefs fast_presentation;
                 mod_enemy_turn(current_id);
             }
             if (!restart) {
@@ -2215,7 +2219,10 @@ void __cdecl faction_upkeep(int faction_id) {
     Faction* f = &Factions[faction_id];
     debug("faction_upkeep %d %d\n", *CurrentTurn, faction_id);
 
-    init_save_game(faction_id);
+    // Keep all visual processing fast without saving temporary pref bits.
+    {
+        AutoScopedAutosimFastPrefs fast_presentation;
+        init_save_game(faction_id);
     plans_upkeep(faction_id);
     reset_netmsg_status();
     *ControlUpkeepA = 1;
@@ -2293,6 +2300,7 @@ void __cdecl faction_upkeep(int faction_id) {
             call_council(faction_id);
         }
     }
+    } // Restore all preference bits before the ordinary autosave call.
     if (!*MultiplayerActive && *GamePreferences & PREF_BSC_AUTOSAVE_EACH_TURN
     && faction_id == MapWin->cOwner) {
         auto_save();
