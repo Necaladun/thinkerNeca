@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - feature/tel-001-recorder-foundation
 
 # One build per live PR revision; cancel superseded CI jobs.
 concurrency:
@@ -63,7 +64,7 @@ jobs:
         run: python tools/test_thinker_ini_contract.py
       - name: Test offline TEL-001 campaign report
         run: |
-          python -m py_compile tools/campaign_report.py tools/test_campaign_report.py
+          python -m py_compile tools/campaign_report.py tools/test_campaign_report.py "tools/Campaign Analyzer.pyw"
           python tools/test_campaign_report.py
       - name: Validate fork docs and local links
         run: python tools/test_project_docs.py
