@@ -268,20 +268,20 @@ void __cdecl control_turn() {
                             parse_says(3, get_noun(*GovernorFaction), -1, -1);
                         }
                         if (CouncilVoteState[MapWin->cOwner] == 1) {
-                            popp(ScriptFile, "COUNCILHOTGOVWIN", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTGOVWIN", "council_sm.pcx");
                         } else if (*GovernorFaction > 0) {
-                            popp(ScriptFile, "COUNCILHOTGOVLOSE", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTGOVLOSE", "council_sm.pcx");
                         } else {
-                            popp(ScriptFile, "COUNCILHOTGOVNONE", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTGOVNONE", "council_sm.pcx");
                         }
                     } else if (CouncilVoteState[MapWin->cOwner] != 1) {
                         if (CouncilVoteState[MapWin->cOwner] == -2) {
-                            popp(ScriptFile, "COUNCILHOTVETO", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTVETO", "council_sm.pcx");
                         } else {
-                            popp(ScriptFile, "COUNCILHOTFAIL", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTFAIL", "council_sm.pcx");
                         }
                     } else {
-                        popp(ScriptFile, "COUNCILHOTPASS", 0, "council_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "COUNCILHOTPASS", "council_sm.pcx");
                     }
                     clear_council_notify(MapWin->cOwner);
                 }
@@ -325,7 +325,23 @@ void __cdecl control_turn() {
             const AutoCycleAction action = auto_driver.on_cycle(
                 conf.autosim_manual_turns, autosim_ready(), !first_cycle_partial);
             first_cycle_partial = false;
-            if (action == AUTO_CYCLE_STOP) {
+            const AutosimControlRequest user_request = autosim_take_control_request();
+            bool stop_requested = (user_request == AUTOSIM_CTL_STOP);
+            if (user_request == AUTOSIM_CTL_PAUSE && action == AUTO_CYCLE_ADVANCE) {
+                telemetry_record_ui_notice("autosim", "PAUSE", "requested_completed_turn");
+                // Explicit user-requested pause: no game phase is in progress.
+                // A native Win32 two-choice prompt avoids running the game
+                // loop or accepting AI orders while the operator decides.
+                const int choice = MessageBoxA(*phWnd,
+                    "AI simulation paused after a completed turn.\n\n"
+                    "Yes: Resume simulation\n"
+                    "No: Open Save Game, then return to main menu",
+                    "thinkerNeca AI Simulation", MB_YESNO | MB_ICONINFORMATION);
+                stop_requested = (choice != IDYES);
+                telemetry_record_ui_notice("autosim", "PAUSE",
+                    stop_requested ? "save_and_stop" : "resume");
+            }
+            if (action == AUTO_CYCLE_STOP || stop_requested) {
                 // AUTO-002: offer the same native Save Game dialog used by
                 // the normal turn controller. Save/cancel both lead to menu.
                 // We do not silently overwrite an autosave or change the
@@ -995,7 +1011,7 @@ void __cdecl random_events(int flag) {
         }
         *SunspotDuration = max(*SunspotDuration, -1000) - 1;
         if (!*SunspotDuration) {
-            POP2("NOMORESPOTS", "space_sm.pcx", -1);
+            autosim_notice_pop2("NOMORESPOTS", "space_sm.pcx", -1);
         }
         for (int i = 1; i < MaxPlayerNum; i++) {
             for (int j = 1; j < MaxPlayerNum; j++) {
@@ -1006,7 +1022,7 @@ void __cdecl random_events(int flag) {
             }
         }
         if (*DustCloudDuration > 0 && !--(*DustCloudDuration)) {
-            POP2("NOMOREDUST", "stars_sm.pcx", -1);
+            autosim_notice_pop2("NOMOREDUST", "stars_sm.pcx", -1);
         }
         for (int i = *BaseCount - 1; i >= 0; --i) {
             BASE* base = &Bases[i];
@@ -1071,7 +1087,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("BUMPER", "bump_sm.pcx", base_id);
+                autosim_notice_pop2("BUMPER", "bump_sm.pcx", base_id);
             }
         }
         return;
@@ -1083,9 +1099,9 @@ void __cdecl random_events(int flag) {
             }
             if (is_player || *PbemActive) {
                 if (!is_alien(faction_id)) {
-                    POP2("FAMINE", "starv_sm.pcx", base_id);
+                    autosim_notice_pop2("FAMINE", "starv_sm.pcx", base_id);
                 } else {
-                    POP2("FAMINE", "al_starv_sm.pcx", base_id);
+                    autosim_notice_pop2("FAMINE", "al_starv_sm.pcx", base_id);
                 }
             }
         }
@@ -1099,7 +1115,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("INDUSTRY", "indbm_sm.pcx", base_id);
+                autosim_notice_pop2("INDUSTRY", "indbm_sm.pcx", base_id);
             }
         }
         return;
@@ -1110,7 +1126,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("BUST", "genwarning_sm.pcx", base_id);
+                autosim_notice_pop2("BUST", "genwarning_sm.pcx", base_id);
             }
         }
         return;
@@ -1123,7 +1139,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("HEATWAVE", "heat_sm.pcx", base_id);
+                autosim_notice_pop2("HEATWAVE", "heat_sm.pcx", base_id);
             }
         }
         return;
@@ -1134,7 +1150,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("CLOUDCOVER", "cloud_sm.pcx", base_id);
+                autosim_notice_pop2("CLOUDCOVER", "cloud_sm.pcx", base_id);
             }
         }
         return;
@@ -1150,9 +1166,9 @@ void __cdecl random_events(int flag) {
             }
             if (is_player) {
                 Console_focus(MapWin, base->x, base->y, *CurrentPlayerFaction);
-                POP2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
+                autosim_notice_pop2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
             } else if (*PbemActive) {
-                POP2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
+                autosim_notice_pop2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
             }
             return;
         }
@@ -1187,7 +1203,7 @@ void __cdecl random_events(int flag) {
                     }
                 }
                 if (base_id_tgt >= 0) {
-                    POP2("PROMETHEUS0", "biohazd_sm.pcx", base_id_tgt);
+                    autosim_notice_pop2("PROMETHEUS0", "biohazd_sm.pcx", base_id_tgt);
                 }
             }
             return;
@@ -1201,9 +1217,9 @@ void __cdecl random_events(int flag) {
         }
         if (is_player) {
             Console_focus(MapWin, base->x, base->y, *CurrentPlayerFaction);
-            POP2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
+            autosim_notice_pop2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
         } else if (*PbemActive) {
-            POP2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
+            autosim_notice_pop2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
         }
         return;
     case 7:
@@ -1256,7 +1272,7 @@ void __cdecl random_events(int flag) {
                             if (!shift_key_down() && !*MultiplayerActive) {
                                 clock_wait(100);
                             }
-                            POP2("PETERSOUT", resource_icon(value, ocean, 0), -1);
+                            autosim_notice_pop2("PETERSOUT", resource_icon(value, ocean, 0), -1);
                         }
                     }
                 } else if (!value) { // Fix: always check that no resource exists before
@@ -1283,7 +1299,7 @@ void __cdecl random_events(int flag) {
                             }
                         }
                         parse_says(1, ResName[value - 1].name_plural, -1, -1);
-                        POP2("NEWRESOURCE", resource_icon(value, ocean, 1), -1);
+                        autosim_notice_pop2("NEWRESOURCE", resource_icon(value, ocean, 1), -1);
                     }
                 }
             }
@@ -1301,9 +1317,9 @@ void __cdecl random_events(int flag) {
             }
             *SolarFlaresEvent = 1;
             if (found) {
-                POP2("SOLARSTORM", "sun_sm.pcx", -1);
+                autosim_notice_pop2("SOLARSTORM", "sun_sm.pcx", -1);
             } else {
-                POP2("SOLARFLARE", "heat_sm.pcx", -1);
+                autosim_notice_pop2("SOLARFLARE", "heat_sm.pcx", -1);
             }
         }
         return;
@@ -1317,7 +1333,7 @@ void __cdecl random_events(int flag) {
                 }
             }
             if (found) {
-                POP2("ASTEROID", "astm_sm.pcx", -1);
+                autosim_notice_pop2("ASTEROID", "astm_sm.pcx", -1);
             }
         }
         return;
@@ -1326,7 +1342,7 @@ void __cdecl random_events(int flag) {
         && (*SunspotDuration <= -80 || *CurrentTurn < 80 || !map_rand.get(0, 3))) {
             *SunspotDuration = map_rand.get(0, 11) + 10;
             parse_num(0, 20);
-            POP2("SUNSPOTS", "solar_sm.pcx", -1);
+            autosim_notice_pop2("SUNSPOTS", "solar_sm.pcx", -1);
         }
         return;
     case 12:
@@ -1338,10 +1354,10 @@ void __cdecl random_events(int flag) {
                 if (is_player) {
                     parse_num(0, plr->energy_credits);
                     Console_update_data(MapWin, 0);
-                    POP2("INFLATION", "genwarning_sm.pcx", -1);
+                    autosim_notice_pop2("INFLATION", "genwarning_sm.pcx", -1);
                 } else if (*PbemActive) {
                     parse_num(0, plr->energy_credits);
-                    POP2("INFLATION", "genwarning_sm.pcx", -1 - faction_id);
+                    autosim_notice_pop2("INFLATION", "genwarning_sm.pcx", -1 - faction_id);
                 }
             }
         } else if (plr->ranking <= 4 && plr->energy_credits <= 500) {
@@ -1349,7 +1365,7 @@ void __cdecl random_events(int flag) {
             if (is_player) {
                 parse_num(0, plr->energy_credits);
                 Console_update_data(MapWin, 0);
-                POP2("ENERGYBOOM", "markbm_sm.pcx", -1);
+                autosim_notice_pop2("ENERGYBOOM", "markbm_sm.pcx", -1);
             }
         }
         return;
@@ -1386,7 +1402,7 @@ void __cdecl random_events(int flag) {
                 }
             }
             if (show_event) {
-                POP2("HAIL", "hail_sm.pcx", base_id);
+                autosim_notice_pop2("HAIL", "hail_sm.pcx", base_id);
             }
         }
         return;
@@ -1539,7 +1555,7 @@ void __cdecl random_events(int flag) {
                         }
                     }
                     if (is_player || *PbemActive) {
-                        POP2(has_lab ? "BLIGHT1" : "BLIGHT", "biohazd_sm.pcx", base_id);
+                        autosim_notice_pop2(has_lab ? "BLIGHT1" : "BLIGHT", "biohazd_sm.pcx", base_id);
                     }
                 }
             }
@@ -1589,7 +1605,7 @@ void __cdecl random_events(int flag) {
                     }
                 }
                 if (is_player || *PbemActive) {
-                    POP2(has_bank ? "SURGE1" : "SURGE", "markbm_sm.pcx", base_id);
+                    autosim_notice_pop2(has_bank ? "SURGE1" : "SURGE", "markbm_sm.pcx", base_id);
                 }
             }
         }
@@ -1603,7 +1619,7 @@ void __cdecl random_events(int flag) {
                         Console_focus(MapWin, base->x, base->y, faction_id);
                     }
                     if (is_player || *PbemActive) {
-                        POP2("NETBONUS", "markbm_sm.pcx", base_id);
+                        autosim_notice_pop2("NETBONUS", "markbm_sm.pcx", base_id);
                     }
                 } else if (plr->ranking >= (*CurrentTurn >= 150) + 4) {
                     plr->tech_accumulated = 0;
@@ -1612,7 +1628,7 @@ void __cdecl random_events(int flag) {
                         Console_focus(MapWin, base->x, base->y, faction_id);
                     }
                     if (is_player || *PbemActive) {
-                        POP2("NETCRASH", "netcr_sm.pcx", base_id);
+                        autosim_notice_pop2("NETCRASH", "netcr_sm.pcx", base_id);
                     }
                 }
             }
@@ -1636,9 +1652,9 @@ void __cdecl random_events(int flag) {
                     }
                     if (is_player || *PbemActive) {
                         if (!is_alien(faction_id)) {
-                            POP2("CRECHE1", "pop_sm.pcx", base_id);
+                            autosim_notice_pop2("CRECHE1", "pop_sm.pcx", base_id);
                         } else {
-                            POP2("CRECHE1", "al_pop_sm.pcx", base_id);
+                            autosim_notice_pop2("CRECHE1", "al_pop_sm.pcx", base_id);
                         }
                     }
                 }
@@ -1649,9 +1665,9 @@ void __cdecl random_events(int flag) {
                 }
                 if (is_player || *PbemActive) {
                     if (!is_alien(faction_id)) {
-                        POP2("CRECHE", "pop_sm.pcx", base_id);
+                        autosim_notice_pop2("CRECHE", "pop_sm.pcx", base_id);
                     } else {
-                        POP2("CRECHE", "al_pop_sm.pcx", base_id);
+                        autosim_notice_pop2("CRECHE", "al_pop_sm.pcx", base_id);
                     }
                 }
             }
@@ -1690,7 +1706,7 @@ void __cdecl random_events(int flag) {
             }
             if (show_event) {
                 // Added event icon since previously there was none defined
-                POP2("KELPWIPE", "kelp_sm.pcx", is_player ? base_id : -1);
+                autosim_notice_pop2("KELPWIPE", "kelp_sm.pcx", is_player ? base_id : -1);
             }
         }
         return;
@@ -1727,7 +1743,7 @@ void __cdecl random_events(int flag) {
             }
             if (show_event) {
                 // Added event icon since previously there was none defined
-                POP2("PLATFORMWIPE", "subbase_sm.pcx", is_player ? base_id : -1);
+                autosim_notice_pop2("PLATFORMWIPE", "subbase_sm.pcx", is_player ? base_id : -1);
             }
         }
         return;
@@ -2524,7 +2540,7 @@ void __cdecl production_phase(int faction_id) {
             f->sanction_turns--;
             if (!f->sanction_turns && faction_id == MapWin->cOwner) {
                 if (!is_alien(faction_id)) {
-                    popp(ScriptFile, "SANCTIONSEND", 0, "council_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "SANCTIONSEND", "council_sm.pcx");
                 } else {
                     popp(ScriptFile, "SANCTIONSENDALIEN", 0, "Alopdir.pcx", 0);
                 }
