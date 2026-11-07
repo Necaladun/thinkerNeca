@@ -1094,7 +1094,7 @@ void __cdecl mod_base_change(int base_id, int item_id) {
                 } else {
                     wave_it(38);
                 }
-                popp(ScriptFile, "BEGINPROJECT", 0, "secproj_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "BEGINPROJECT", "secproj_sm.pcx");
                 plr->secret_project_intel[bm_word] |= bm_val;
             }
             if (abs(item_id) == FAC_VOICE_OF_PLANET) {
@@ -1113,7 +1113,7 @@ void __cdecl mod_base_change(int base_id, int item_id) {
                 parse_says(1, Facility[abs(old_item)].name, -1, -1);
                 parse_says(2, get_noun(faction_id), -1, -1);
                 parse_says(3, Facility[abs(item_id)].name, -1, -1);
-                popp(ScriptFile, "CHANGEPROJECT", 0, "secproj_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "CHANGEPROJECT", "secproj_sm.pcx");
                 plr->secret_project_intel[bm_word] |= bm_val;
                 bitmask((FacilityId)(abs(old_item) - SP_ID_First), &bm_word, &bm_val);
                 plr->secret_project_intel[bm_word] &= ~bm_val;
