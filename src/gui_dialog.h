@@ -35,6 +35,12 @@ bool autosim_ui_active();
 int autosim_notice_netmsg(NetMessage* msg, const char* label, int delay,
     int style, const char* image);
 int autosim_notice_popp(const char* filename, const char* label, const char* image);
+int autosim_notice_netmsg2(const char* label, const char* image);
+int autosim_notice_diplomacy(NetMessage* msg, const char* label, int delay,
+    int style, const char* image);
+enum AutosimControlRequest { AUTOSIM_CTL_NONE, AUTOSIM_CTL_PAUSE, AUTOSIM_CTL_STOP };
+void autosim_request_control(AutosimControlRequest request);
+AutosimControlRequest autosim_take_control_request();
 void autosim_notice_pop2(const char* label, const char* image, int recipient);
 void autosim_interlude(int event_id, const char* text, int a3, int a4);
 int __cdecl X_pop(const char* label, fp_none fn);
