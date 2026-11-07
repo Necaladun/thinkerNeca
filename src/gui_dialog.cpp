@@ -49,6 +49,36 @@ int autosim_notice_popp(const char* filename, const char* label,
     return popp(filename, label, 0, image, 0);
 }
 
+// Only wrap explicitly audited one-way POP2 call sites; the global POP2
+// routine is also used by gameplay events whose behaviour is unclassified.
+void autosim_notice_pop2(const char* label, const char* image, int recipient) {
+    if (autosim_ui_active()) {
+        telemetry_record_ui_notice("pop2", label, "suppressed_notice");
+        return;
+    }
+    POP2(label, image, recipient);
+}
+
+// Native interlude() handles event-history as well as presentation. Run the
+// native handler with its *existing* disabled-interludes preference enabled
+// only for this synchronous call, then restore exactly the previous flags.
+// The option is not written to any preference file or SAV by this wrapper.
+// Whether the native handler maintains its event flags with this preference
+// enabled still needs same-build Windows save/reload inspection.
+void autosim_interlude(int event_id, const char* text, int a3, int a4) {
+    if (!autosim_ui_active()) {
+        interlude(event_id, text, a3, a4);
+        return;
+    }
+    const int original_prefs = *GamePreferences;
+    *GamePreferences = original_prefs | PREF_AV_INTERLUDES_DISABLED;
+    interlude(event_id, text, a3, a4);
+    *GamePreferences = original_prefs;
+    char label[40];
+    snprintf(label, sizeof(label), "INTERLUDE_%d", event_id);
+    telemetry_record_ui_notice("interlude", label, "native_disable_requested");
+}
+
 int __cdecl X_pop(const char* label, fp_none fn)
 {
     if (autosim_ui_active()) {
