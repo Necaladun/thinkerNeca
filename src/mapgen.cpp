@@ -1254,8 +1254,13 @@ static bool place_minor_geology_patch(MinorLandmark type, GameRandom& rng,
     const int patch_sizes[5] = {3, 4, 4, 4, 5};
     auto eligible = [&](int tx, int ty) -> bool {
         MAP* tile = mapsq(tx, ty);
+        // Titanium is a dispersed, weaker mineral deposit: do not stack it
+        // with a normal mineral resource. mod_bonus_at resolves both flagged
+        // and procedural resource squares, unlike BIT_MINERAL_RES alone.
+        // Nutrient/energy resource overlaps and Uranium are unchanged.
         return tile && !is_ocean(tile) && !tile->lm_items()
-            && !minor_landmark_any_at(tx, ty);
+            && !minor_landmark_any_at(tx, ty)
+            && (type != MINOR_TITANIUM || mod_bonus_at(tx, ty) != RES_MINERAL);
     };
     auto separated = [&](int tx, int ty) -> bool {
         // Same two-tile buffer around completed minor/major patches.

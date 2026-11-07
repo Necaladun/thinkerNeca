@@ -22,6 +22,14 @@
 | Configuration | Parser/INI structural checks, mode 3 selected by user | Local overrides and experimental economic balance |
 | Release/PRACX | Release x86 DLL/launcher cross-compilation **passed** on `4809cb7`; custom Titanium/Inspector hooks remain Develop-only, PRACX unverified | Native art/Inspector parity, actual in-game checks, clean install and supported binaries |
 
+## BAL-003 geology-versus-Forest and mineral-resource exclusion — Windows pending, 7 November 2026
+
+**New source behaviour on PR #4:** actual `mod_mine_yield()` suppresses independent Titanium minerals on a `BIT_FOREST` tile, actual `mod_energy_yield()` suppresses independent Uranium energy on that tile, and the AI `item_yield(..., BIT_FOREST)` forecast suppresses both while retaining any Jungle nutrient contribution. Stored independent features are never deleted when building/removing Forests; after removal, their bonuses can contribute again. The standard Forest N/M/E baseline and normal resource bonuses are unchanged.
+
+**New-world generation:** a candidate for Titanium is rejected when `mod_bonus_at(tx,ty)==RES_MINERAL`, covering explicit `BIT_BONUS_RES` and procedural map-seed resources. Uranium and Titanium+nutrient/energy resource candidates remain eligible. There is no automatic relocation/deletion of an ordinary mineral bonus, and existing saves are not rewritten. The Mine's current single extra modifier when Titanium is present is deliberately unchanged for the 3–5-tile distribution trial.
+
+**Windows tests outstanding:** on a new map, confirm Titanium has no natural mineral-resource overlap but normal nutrient/energy overlap remains possible; place Forest on independent Uranium and Titanium and check the +1E/+1M disappears, then remove Forest to confirm restoration. Check ordinary Forest base yields and Jungle nutrient, normal resource bonuses, build/reload/revisit tile, and (if observable) AI projected future Forest yields. These are source/CI contracts until actual game verification.
+
 ## TERR-002 geology distribution change — new Windows validation pending, 7 November 2026
 
 **Source change proposed/implemented on PR #4 after REND-001 acceptance:** geological patch target sizes now weighted `{3,4,4,4,5}` (mean four instead of six), per-type attempt targets are old 2–6 formula multiplied by 1.5 and rounded to nearest integer (3–9). The generator no longer clears `BIT_FUNGUS` when committing a geology patch, but keeps the original eligibility, two-tile buffer, retries, alternation, separate type RNG seeds, per-tile codes and full-patch-only commitment. A candidate patch that does not reach its target is discarded before any tile is marked. The live yield code applies fungus-specific values until fungus is removed, so a fungus-covered geology deposit is a later exploitation opportunity rather than an immediate +1 production tile.

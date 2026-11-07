@@ -123,9 +123,27 @@ def main() -> None:
                 f'Expected central minor {metric} bonus in {func}')
     require('const MinorTerrainYield minor = minor_terrain_yields_at(x, y);' in yields
             and 'N += minor.nutrient;' in yields
+            and 'if (item != BIT_FOREST) {' in yields
             and 'M += minor.mineral;' in yields
             and 'E += minor.energy;' in yields,
-            'Thinker AI yield estimator must include all three types')
+            'Thinker AI forecast must suppress geological bonuses in Forests, not Jungle nutrients')
+    mine = body_between(yields, 'int __cdecl mod_mine_yield(', 'int __cdecl mod_energy_yield(')
+    energy = body_between(yields, 'int __cdecl mod_energy_yield(', 'int __cdecl mod_hex_cost(')
+    forecast = body_between(yields, 'int item_yield(', 'static void find_reset(')
+    require('const int minor_minerals = (sq->items & BIT_FOREST)' in mine
+            and '? 0 : minor_terrain_yields_at(x, y).mineral;' in mine
+            and 'const int minor_energy = (sq->items & BIT_FOREST)' in energy
+            and '? 0 : minor_terrain_yields_at(x, y).energy;' in energy
+            and forecast.index('if (item != BIT_FOREST) {')
+                < forecast.index('M += minor.mineral;')
+            and forecast.index('if (item != BIT_FOREST) {')
+                < forecast.index('E += minor.energy;'),
+            'Actual and AI future Forest yields must not benefit from independent geology')
+    require('if (bonus_mineral || bonus_landmark || minor_minerals)' in mine,
+            'Keep existing single Mine enhancement for the 3–5-tile balance trial')
+    require('(type != MINOR_TITANIUM || mod_bonus_at(tx, ty) != RES_MINERAL)' in geology
+            and 'BIT_MINERAL_RES alone' in geology,
+            'Titanium generation must reject both flagged and procedural mineral resources')
 
     move = source('src/move.cpp')
     require('minor_landmark_at(' not in move

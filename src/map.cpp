@@ -947,8 +947,11 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
     if (!sq) {
         return 0;
     }
-    // Minor minerals use the same cap/mine interaction as a landmark bonus.
-    const int minor_minerals = minor_terrain_yields_at(x, y).mineral;
+    // A Forest exploits its normal forest output, not underground Titanium.
+    // Keep the underlying minor feature in storage for later terraforming.
+    // Other improvements (including Mines) still get the existing bonus.
+    const int minor_minerals = (sq->items & BIT_FOREST)
+        ? 0 : minor_terrain_yields_at(x, y).mineral;
     bool has_limit = true;
     bool bonus_landmark = false;
     bool bonus_mineral = bonus_at(x, y) == RES_MINERAL;
@@ -1068,7 +1071,10 @@ int __cdecl mod_energy_yield(int faction_id, int base_id, int x, int y, int flag
     bool is_fungus = false;
     bool has_limit = true;
     bool bonus_energy = bonus_at(x, y) == RES_ENERGY;
-    const int minor_energy = minor_terrain_yields_at(x, y).energy;
+    // Uranium is not an additional Forest energy yield. The deposit persists
+    // on the tile and becomes exploitable after forest removal.
+    const int minor_energy = (sq->items & BIT_FOREST)
+        ? 0 : minor_terrain_yields_at(x, y).energy;
     bool is_base = sq->is_base();
     int economy = Factions[faction_id].SE_economy_pending
         + (base_id >= 0 && Bases[base_id].golden_age_active() ? 1 : 0);
@@ -1613,8 +1619,12 @@ int item_yield(int x, int y, int faction_id, int bonus, MapItem item) {
         }
         const MinorTerrainYield minor = minor_terrain_yields_at(x, y);
         N += minor.nutrient;
-        M += minor.mineral;
-        E += minor.energy;
+        // The AI must not prefer a future Forest because of buried geology.
+        // Preserve Jungle's nutrient contribution and ordinary bonus icons.
+        if (item != BIT_FOREST) {
+            M += minor.mineral;
+            E += minor.energy;
+        }
         if (sq->landmarks & LM_CRATER && sq->code_at() < 9) { M++; }
         if (sq->landmarks & LM_VOLCANO && sq->code_at() < 9) { M++; E++; }
         if (sq->landmarks & LM_JUNGLE) { N++; }

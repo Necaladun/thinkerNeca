@@ -27,7 +27,9 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 
 - User reports all six requested combined PR #4 + PR #5 Develop checks passing with binary `3c08b52`: save/reload/advance, Empire Report, terrain graphics, Inspector, map generation and compatibility. The same build's Develop/Release cross-builds passed CI; **only Develop has in-game verification**. No exact seed list, detailed Inspector/resource-overlap trace or Release test was supplied. Details: [TESTING](TESTING.md).
 
-## Pending revised geology distribution trial
+## Pending revised geology distribution and extraction trial
+
+- [BAL-003](WORK-QUEUE.md): source now prevents independent Uranium/Titanium bonuses from benefiting Forests (actual and projected yields) and prevents new Titanium patches overlapping actual native mineral-resource squares. Nutrient/energy resource overlaps remain possible. Existing Mine +1 interaction is kept for the 3–5-tile distribution trial; Windows validation of the new rules remains outstanding. No save-format or artwork changes.
 
 - [TERR-002](WORK-QUEUE.md): after user approval, new experimental Uranium/Titanium generator settings shrink each patch to 3–5 tiles and increase per-type patch attempts ~50% (3–9), maintaining roughly the same expected total geological area. Existing fungus is retained. **Source/CI and fresh-map Windows verification are distinct:** a new game with the trial build is needed before accepting the resulting distribution and fungus/yield interactions. No new INI options or save changes.
 
