@@ -30,6 +30,11 @@ enum DiploCounter {
 };
 
 int __thiscall Popup_load_icon(Popup* This, Sprite* a2, int a3, char* a4);
+// AUTO-002 classified, opt-in source-side presentation wrappers.
+bool autosim_ui_active();
+int autosim_notice_netmsg(NetMessage* msg, const char* label, int delay,
+    int style, const char* image);
+int autosim_notice_popp(const char* filename, const char* label, const char* image);
 int __cdecl X_pop(const char* label, fp_none fn);
 int __cdecl X_pop_2(const char* filename, const char* label, fp_none fn);
 int __cdecl X_pop_6(const char* label, int a2, fp_none fn);
