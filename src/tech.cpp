@@ -906,12 +906,20 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
         if (faction_id == MapWin->cOwner) {
             if (*MultiplayerActive && (*DiploWinState || *DiploWinCommlink || *ControlWaitLoop)) {
                 parse_says(0, Tech[tech_id].name, -1, -1);
-                NetMsg_pop(NetMsg, "TECHOBTAINED", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "TECHOBTAINED", 5000, 0, 0);
             } else {
-                NewTechWin_exec(NewTechWin, tech_id, faction_id_2);
+                if (autosim_ui_active()) {
+                    telemetry_record_ui_notice("new_tech_window", Tech[tech_id].name, "suppressed_notice");
+                } else {
+                    NewTechWin_exec(NewTechWin, tech_id, faction_id_2);
+                }
             }
         } else if (!*MultiplayerActive) {
-            BasePop_exec_3(&cur_popup, 0, 0);
+            if (autosim_ui_active()) {
+                telemetry_record_ui_notice("tech_popup", Tech[tech_id].name, "suppressed_notice");
+            } else {
+                BasePop_exec_3(&cur_popup, 0, 0);
+            }
         }
     }
     int has_freefac = 0;
@@ -927,7 +935,7 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
             if (faction_id == MapWin->cOwner) {
                 parse_says(0, Tech[tech_id].name, -1, -1);
                 parse_says(1, Facility[fac->faction_bonus_val1[i]].name, -1, -1);
-                NetMsg_pop(NetMsg, "FREEFACTECH", -5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "FREEFACTECH", -5000, 0, 0);
             }
         }
     }
@@ -940,7 +948,7 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
         && faction_id == MapWin->cOwner) {
             parse_says(0, Tech[tech_id].name, -1, -1);
             parse_says(1, Ability[fac->faction_bonus_val1[i]].name, -1, -1);
-            NetMsg_pop(NetMsg, "FREEABILTECH", -5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "FREEABILTECH", -5000, 0, 0);
         }
     }
     if (Tech[tech_id].flags & TFLAG_SECRETS) {
@@ -1039,7 +1047,7 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
         plr->player_flags |= PFLAG_MAP_REVEALED;
         if (*CurrentTurn && faction_id == MapWin->cOwner) {
             parse_says(0, Tech[tech_id].name, -1, -1);
-            popp(ScriptFile, "SEEMAP2", 0, "native_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "SEEMAP2", "native_sm.pcx");
             draw_map(1);
             set_dirty();
             GraphicWin_redraw(WorldWin);
