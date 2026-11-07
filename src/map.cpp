@@ -1422,8 +1422,13 @@ int __cdecl mod_bonus_at(int x, int y) {
     const bool native_geology =
         (minor_landmark_has(x, y, MINOR_URANIUM) && conf.minor_native_uranium)
         || (minor_landmark_has(x, y, MINOR_TITANIUM) && conf.minor_native_titanium);
+    if (native_geology && minor_native_geology_underlay_installed) {
+        // Native underlay is already painted before the resource pass.
+        // Repeating special-resource type 4 would duplicate/obscure it.
+        return RES_NONE;
+    }
     if (native_geology && caller >= 0x4632D0u && caller < 0x467000u) {
-        return 4; // Rendering-only sentinel; no natural resource on this tile.
+        return 4; // Safe legacy fallback if the underlay preflight failed.
     }
     return RES_NONE;
 }

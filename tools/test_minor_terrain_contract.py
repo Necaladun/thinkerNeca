@@ -136,6 +136,40 @@ def main() -> None:
             and 'minor_graphics_underlay_native_probe();' in patches,
             'REND-005 underlay reconnaissance must be bounded and read-only')
 
+    underlay_install = body_between(
+        patches, 'static bool install_minor_native_geology_underlay()',
+        'The supported SMAX executable checks native Jungle')
+    require('constexpr int mask_site = 0x464D9C;' in underlay_install
+            and 'constexpr int compare_site = 0x464DA2;' in underlay_install
+            and 'constexpr int draw_site = 0x464DE3;' in underlay_install
+            and '0x81, 0xE6, 0x08, 0x00, 0x00, 0x80' in underlay_install
+            and '0x83, 0xFE, 0x08, 0x75, 0x1A' in underlay_install
+            and '0x50, 0x51, 0xB9, 0x2C, 0xA7, 0x78' in underlay_install
+            and 'if (!valid)' in underlay_install
+            and underlay_install.index('if (!valid)') < underlay_install.index('write_bytes(')
+            and 'write_jump(mask_site, (int)minor_native_geology_underlay_mask_hook)' in underlay_install
+            and 'write_call(draw_site, (int)minor_native_geology_underlay_sprite_hook)' in underlay_install
+            and 'minor_native_geology_underlay_installed = true;' in underlay_install,
+            'REND-005 must check all original Uranium/underlay bytes before both hooks')
+    require('minor_native_geology_underlay_installed' in yields
+            and 'return RES_NONE;' in bonus_wrapper
+            and 'return 4; // Safe legacy fallback' in bonus_wrapper,
+            'Underlay must remove duplicate geology sentinel but retain fallback')
+    require('orl $8, 4(%esp)' in patches
+            and 'andl $0x80000008, %esi' in patches
+            and 'minor_landmark_has(x, y, MINOR_URANIUM)' in patches
+            and 'minor_landmark_has(x, y, MINOR_TITANIUM)' in patches,
+            'Underlay trampoline must preserve LM_DISABLE, not mutate stored LM')
+    require('minor_select_geology_underlay_sprite' in renderer
+            and 'minor_landmark_has(x, y, MINOR_TITANIUM)' in renderer
+            and 'jmp *_minor_geology_underlay_draw_target' in renderer
+            and '0x78A72Cu' in renderer,
+            'Underlay Titanium must substitute the earlier native sprite call')
+    require('MATCH("minor_geology_underlay")' in cfg
+            and 'int minor_geology_underlay = 0;' in config
+            and 'minor_geology_underlay=1' in ini,
+            'Experimental REND-005 native underlay must be opt-out and reversible')
+
     require('write_jump(0x4688E0, (int)MapWin_gen_overlays);' in patches,
             'Alternative rendering must use the existing verified callback')
     require('draw_minor_terrain_tile(This, x, y);' in renderer,

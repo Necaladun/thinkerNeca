@@ -77,6 +77,56 @@ static bool install_minor_native_titanium_sprite()
 }
 
 /*
+REND-005 supported native underlay path, taken from the user's Develop
+log on the Scient-patched executable (7 November 2026):
+  0x464D9C  AND ESI,0x80000008   original LM_URANIUM/LM_DISABLE check
+  0x464DA2  CMP ESI,8; JNE +0x1A
+  0x464DDC  PUSH EAX; PUSH ECX; MOV ECX,0x78A72C
+  0x464DE3  CALL Sprite_draw_3 (0x5E4B9A), BEFORE ordinary resources
+All relevant preimages must match before writing either hook.
+The mask trampoline adds LM_URANIUM to local ESI only, without changing
+native MAP::landmarks, original LM_DISABLE or any v3 type/code storage.
+*/
+static bool install_minor_native_geology_underlay()
+{
+#if defined(__GNUC__) && defined(__i386__) && !defined(BUILD_REL)
+    constexpr int mask_site = 0x464D9C;
+    constexpr int compare_site = 0x464DA2;
+    constexpr int draw_site = 0x464DE3;
+    constexpr int sprite_target = 0x5E4B9A;
+    const byte expected_mask[6] = {0x81, 0xE6, 0x08, 0x00, 0x00, 0x80};
+    const byte expected_compare[5] = {0x83, 0xFE, 0x08, 0x75, 0x1A};
+    const byte expected_draw[12] = {
+        0x50, 0x51, 0xB9, 0x2C, 0xA7, 0x78, 0x00,
+        0xE8, 0xB2, 0xFD, 0x17, 0x00
+    };
+    const bool valid =
+        !memcmp((const void*)mask_site, expected_mask, sizeof(expected_mask))
+        && !memcmp((const void*)compare_site, expected_compare, sizeof(expected_compare))
+        && !memcmp((const void*)(draw_site - 7), expected_draw, sizeof(expected_draw));
+    if (!valid) {
+        minor_graphics_underlay_hook_result(mask_site, draw_site, false);
+        return false;
+    }
+
+    // The entire pair has passed preflight. All original-byte checks
+    // precede both writes, so unsupported executables retain the prior
+    // resource-sentinel renderer and never get a half-installed hook.
+    const byte redirect[6] = {0xE9, 0, 0, 0, 0, 0x90};
+    minor_geology_underlay_draw_target = (uintptr_t)sprite_target;
+    write_bytes(mask_site, expected_mask, redirect, sizeof(redirect));
+    write_jump(mask_site, (int)minor_native_geology_underlay_mask_hook);
+    write_call(draw_site, (int)minor_native_geology_underlay_sprite_hook);
+    minor_native_geology_underlay_installed = true;
+    minor_graphics_underlay_hook_result(mask_site, draw_site, true);
+    return true;
+#else
+    return false;
+#endif
+}
+
+
+/*
 The supported SMAX executable checks native Jungle at three locations
 inside MapWin_gen_terrain_poly. Original instruction (6 bytes):
     and edx, 0x80000004
@@ -96,6 +146,38 @@ all registers, alters saved EDX only for independent Jungle, replays
 the original AND and returns with exactly the same stack shape.
 */
 #if defined(__GNUC__) && defined(__i386__)
+#ifndef BUILD_REL
+extern "C" int __cdecl minor_render_geology_xy(int x, int y)
+{
+    return (conf.minor_native_uranium
+            && minor_landmark_has(x, y, MINOR_URANIUM))
+        || (conf.minor_native_titanium
+            && minor_landmark_has(x, y, MINOR_TITANIUM));
+}
+
+// Replay original 6-byte AND ESI,0x80000008 on return. The helper
+// modifies saved local ESI, never native MAP flags; OR preserves
+// LM_DISABLE so the following CMP ESI,8 still suppresses disabled art.
+extern "C" __attribute__((naked, used))
+void minor_native_geology_underlay_mask_hook()
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl 0x24(%ebp)\n\t"
+        "pushl 0x20(%ebp)\n\t"
+        "call _minor_render_geology_xy\n\t"
+        "addl $8, %esp\n\t"
+        "testl %eax, %eax\n\t"
+        "jz 1f\n\t"
+        "orl $8, 4(%esp)\n\t"
+        "1: popal\n\t"
+        "andl $0x80000008, %esi\n\t"
+        "pushl $0x464DA2\n\t"
+        "ret\n\t"
+    );
+}
+#endif
+
 extern "C" int __cdecl minor_render_jungle_xy(int x, int y)
 {
     return minor_landmark_has(x, y, MINOR_JUNGLE);
@@ -1512,6 +1594,16 @@ bool patch_setup(Config* cf) {
     if (!cf->reduced_mode && (cf->minor_native_uranium
         || cf->minor_native_titanium)) {
         minor_graphics_underlay_native_probe();
+    }
+#endif
+
+    // The Uranium major-landmark art is painted before ordinary bonuses.
+    // REND-005 uses that native stage with guarded, separate hooks.
+    // The preceding probe remains read-only; the switch is reversible.
+#ifndef BUILD_REL
+    if (cf->minor_geology_underlay && !cf->reduced_mode
+        && (cf->minor_native_uranium || cf->minor_native_titanium)) {
+        install_minor_native_geology_underlay();
     }
 #endif
 

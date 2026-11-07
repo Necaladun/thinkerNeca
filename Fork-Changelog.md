@@ -4,6 +4,8 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unreleased — draft PR #4 (2026-11-05)
 
+- **REND-005 experimental geology underlay (source/CI and Windows confirmation pending):** live user-provided executable bytes locate original Uranium landmark mask `0x464D9C` and its sprite call `0x464DE3`, earlier than ordinary resource drawing. Develop test switch `minor_geology_underlay=1` enables strict guarded hooks that render independent geology at this earlier stage, permit ordinary resource glyphs to draw later, and substitute Titanium blue-grey artwork where present. A disabled/mismatched hook uses old renderer; no native LM or save mutation. This remains experimental until Windows visual regression passes.
+
 - **Fix resource-icon priority (BUG-003; Windows retest pending):** normal procedural bonuses generated from map seed and coordinates must receive the same rendering priority as explicitly flagged/editor bonuses. Prior `BIT_BONUS_RES`-only check could conceal a generated resource under Titanium/Uranium art despite correct Inspector and stacked yields. `mod_bonus_at` now evaluates the complete normal resource algorithm before returning the renderer-only geological sentinel, without changing stored tile flags or yield logic.
 
 - **Safe config bit shifts / Release cross-build:** both the `skip_facility` parser and the production-choice consumer now use 64-bit masks for IDs 33–64; `skip_event`/`skip_faction` parser masks are unsigned 32-bit. Parser/consumer contracts and separate Release cross-compilation passed CI on `4809cb7`; neither proves high-ID gameplay or native Release graphics parity.

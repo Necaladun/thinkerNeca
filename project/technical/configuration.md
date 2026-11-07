@@ -21,6 +21,7 @@ At startup, the fork reads `thinker.ini`, then optionally `thinker_user.ini` fro
 | `minor_jungle` / `minor_uranium` / `minor_titanium` | All `1` | Independent minor-terrain generation |
 | `minor_native_jungle` / `minor_native_uranium` / `minor_native_titanium` | All `1` | Native Jungle and Uranium; Titanium has native-stage custom art in supported Develop mode |
 | `minor_native_inspector` | `1` | Develop-only native feature-line labels |
+| `minor_geology_underlay` | `1` (compiled default `0`) | Experimental REND-005 Develop-only Uranium-style geological underlay beneath normal resources; original-byte preflight; set `0` in `thinker_user.ini` for fallback. Windows visual acceptance pending |
 | `minor_titanium_sprite_mode` | `3` | **User-verified** local blue-grey Titanium atlas in Develop; compiled absent-option default `0` |
 | `minor_render_mode` / `minor_debug_tile_names` | `0` / `0` | Prototype fallback mode selection; no debug tile-name overlays |
 

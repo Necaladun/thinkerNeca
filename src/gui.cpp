@@ -2,6 +2,7 @@
 #include "gui.h"
 
 const void* MainWinHandle = &MapWin->oMainWin; // 0x939444
+bool minor_native_geology_underlay_installed = false;
 
 char label_pop_size[StrBufLen] = "Pop: %d / %d / %d / %d";
 char label_pop_boom[StrBufLen] = "Population Boom";
@@ -1925,6 +1926,20 @@ static Sprite neca_sprites[NECA_SPRITE_COUNT] = {};
 static bool neca_sprite_ready[NECA_SPRITE_COUNT] = {};
 static bool neca_sprites_attempted = false;
 
+// Native original LM_URANIUM underlay draw calls the same Sprite_draw_3
+// routine from an earlier stage, independently of ordinary resource icons.
+extern "C" { uintptr_t minor_geology_underlay_draw_target = 0; }
+
+void minor_graphics_underlay_hook_result(int mask_site, int draw_site, bool active)
+{
+    FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+    if (fp) {
+        fprintf(fp, "REND005 UNDERLAY HOOK mask=0x%08X draw=0x%08X active=%d\n",
+            (unsigned)mask_site, (unsigned)draw_site, active ? 1 : 0);
+        fclose(fp);
+    }
+}
+
 // Native sprite substitution is strictly scoped to one verified resource
 // drawing call in the supported terranx.exe, if that call can be found.
 // The actual resource sprite rendering position remains the game's own.
@@ -2283,6 +2298,92 @@ void minor_native_titanium_sprite_hook()
         "popal\n\t"
         "popfl\n\t"
         "jmp *_minor_titanium_native_draw_target\n\t"
+    );
+}
+#endif
+
+/*
+REND-005: native Uranium underlay draw at 0x464DE3, ahead of the ordinary
+resource icon pass. Never reject BIT_BONUS_RES here: the whole purpose
+is to show *both* geology and normal resource art on the same tile.
+The call loads original ECX=0x78A72C (native Uranium sprite variant 1).
+The existing indexed Titanium artwork can be substituted through its own
+Sprite* and key; all position, zoom, clip and normal resources stay native.
+*/
+#if defined(__GNUC__) && defined(__i386__)
+extern "C" Sprite* __cdecl minor_select_geology_underlay_sprite(
+    Sprite* original, Buffer* canvas, const int* frame)
+{
+    if (!minor_native_geology_underlay_installed || !conf.minor_native_titanium
+        || !original || !canvas || !canvas->palette || !frame) {
+        return original;
+    }
+    const int x = frame[8], y = frame[9];
+    if (!minor_landmark_has(x, y, MINOR_TITANIUM)
+        || reinterpret_cast<uintptr_t>(original) != 0x78A72Cu) {
+        return original;
+    }
+    const int mode = conf.minor_titanium_sprite_mode;
+    Sprite* selected = original;
+    if (mode == 1 || mode == 3) {
+        load_neca_test_sprites(canvas);
+        const NecaSpriteId id = mode == 3
+            ? NECA_SPRITE_TITANIUM_TEST : NECA_SPRITE_URANIUM_TEST;
+        if (neca_sprite_ready[id]) {
+            selected = &neca_sprites[id];
+        }
+    } else if (mode == 2) {
+        load_minor_terrain_sprites(canvas);
+        if (minor_sprite_ready[MINOR_TITANIUM]) {
+            selected = &minor_sprites[MINOR_TITANIUM];
+        }
+    }
+    // Native underlay uses variant 1; prior Titanium tests covered
+    // variant 0. Capture the real geometry and fallback behaviour.
+    static int reports = 0;
+    if (reports < 8) {
+        ++reports;
+        FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+        if (fp) {
+            fprintf(fp, "REND005 UNDERLAY SPRITE x=%d y=%d mode=%d swapped=%d "
+                "native=%p key=%u geometry=%dx%d offset=%d,%d pitch=%d "
+                "selected=%p key=%u geometry=%dx%d offset=%d,%d pitch=%d\n",
+                x, y, mode, selected != original ? 1 : 0,
+                (void*)original, (unsigned)original->color_index[0],
+                original->width, original->height, original->offset_x,
+                original->offset_y, original->pitch,
+                (void*)selected, (unsigned)selected->color_index[0],
+                selected->width, selected->height, selected->offset_x,
+                selected->offset_y, selected->pitch);
+            fclose(fp);
+        }
+    }
+    return selected;
+}
+
+// This native __thiscall Sprite_draw_3 has the same ABI as the
+// previously tested type-4 resource draw hook: ECX carries Sprite*,
+// entry ESP+4 carries Buffer* and entry ESP+8 carries the colour key.
+// Only saved ECX and the corresponding saved colour-key argument change.
+extern "C" __attribute__((naked, used))
+void minor_native_geology_underlay_sprite_hook()
+{
+    __asm__ __volatile__(
+        "pushfl\n\t"
+        "pushal\n\t"
+        "pushl %ebp\n\t"
+        "pushl 44(%esp)\n\t"
+        "pushl 32(%esp)\n\t"
+        "call _minor_select_geology_underlay_sprite\n\t"
+        "addl $12, %esp\n\t"
+        "cmpl 24(%esp), %eax\n\t"
+        "je 1f\n\t"
+        "movzbl 8(%eax), %edx\n\t"
+        "movl %edx, 44(%esp)\n\t"
+        "1: movl %eax, 24(%esp)\n\t"
+        "popal\n\t"
+        "popfl\n\t"
+        "jmp *_minor_geology_underlay_draw_target\n\t"
     );
 }
 #endif
