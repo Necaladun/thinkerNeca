@@ -4,7 +4,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unreleased — draft PR #4 (2026-11-05)
 
-- **AI-002 Titanium auto-Mine trial (source implemented, Windows AI test pending):** automatic Formers can now evaluate nonrocky Rolling/Flat independent Titanium Mine+Road yields, protecting Flat food and nutrient improvements, weighing Forest/Fungus/Borehole and eligible Solar, and giving viable Titanium +4 target priority. Mine/Solar pre-tech eligibility reads configured resource caps instead of hardcoded 2; distributed test `tile_output_limit=3,4,4` (N/M/E) replaces earlier 3/3/3. No general Former AI rewrite or player Mine/Road change.
+- **AI-002 Titanium auto-Mine trial (source implemented, Windows AI test pending):** automatic Formers can now evaluate nonrocky Rolling/Flat independent Titanium Mine+Road yields, protecting Flat food and nutrient improvements, weighing Forest/Fungus/Borehole, Flat Farm yield and eligible Solar, and giving viable Titanium +4 target priority. Mine/Solar pre-tech eligibility reads configured resource caps instead of hardcoded 2; distributed test `tile_output_limit=3,4,4` (N/M/E) replaces earlier 3/3/3. No general Former AI rewrite or player Mine/Road change.
 
 
 - **BAL-003 targeted pod resource reward:** when a Unity pod awards an ordinary mineral resource on independent Titanium, reroll the award to nutrient or energy (equal chance) by forcing the existing explicit resource-bias flag path. The underlying Titanium remains; all other pod outcomes and Uranium+energy are unchanged. No global resource suppression or save-format change; Windows gameplay validation pending.
