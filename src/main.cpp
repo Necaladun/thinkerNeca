@@ -48,6 +48,8 @@ int option_handler(void* user, const char* section, const char* name, const char
         cf->autosave_interval = atoi(value);
     } else if (MATCH("telemetry_enabled")) {
         cf->telemetry_enabled = atoi(value) != 0;
+    } else if (MATCH("autosim_manual_turns")) {
+        cf->autosim_manual_turns = clamp(atoi(value), 0, 100000);
     } else if (MATCH("warn_on_former_replace")) {
         cf->warn_on_former_replace = atoi(value);
     } else if (MATCH("manage_player_bases")) {
