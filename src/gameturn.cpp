@@ -2219,10 +2219,12 @@ void __cdecl faction_upkeep(int faction_id) {
     Faction* f = &Factions[faction_id];
     debug("faction_upkeep %d %d\n", *CurrentTurn, faction_id);
 
-    // Keep all visual processing fast without saving temporary pref bits.
+    // Keep the game's normal save/undo setup outside presentation overrides.
+    init_save_game(faction_id);
+    // Process AI faction actions with fast visuals, restoring preferences
+    // before the existing ordinary autosave at the bottom of this function.
     {
         AutoScopedAutosimFastPrefs fast_presentation;
-        init_save_game(faction_id);
     plans_upkeep(faction_id);
     reset_netmsg_status();
     *ControlUpkeepA = 1;
