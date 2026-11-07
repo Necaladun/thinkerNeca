@@ -35,6 +35,8 @@ assert "AutoScopedAutosimFastPrefs fast_presentation;" in upkeep
 assert upkeep.index("init_save_game(faction_id);") < upkeep.index("AutoScopedAutosimFastPrefs fast_presentation;")
 assert upkeep.index("} // Restore all preference bits before the ordinary autosave call.") < upkeep.index("auto_save();")
 assert "PREF_BSC_AUTOSAVE_EACH_TURN" in upkeep
+assert "((*GamePreferences & PREF_BSC_AUTOSAVE_EACH_TURN) || autosim_control_active())" in upkeep
+assert "auto_save();" in upkeep
 assert "autosave_interval=1" in ini
 assert "autosim_fast_combat=1" in ini
 
