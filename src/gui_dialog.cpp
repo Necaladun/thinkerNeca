@@ -80,6 +80,30 @@ void autosim_request_control(AutosimControlRequest request) {
     if (request == AUTOSIM_CTL_STOP || autosim_control_request != AUTOSIM_CTL_STOP)
         autosim_control_request = request;
 }
+// During a continuous all-AI control_turn() invocation the ordinary Win32
+// message loop may not dispatch keyboard events. Read only queued keyboard
+// messages (never dispatch them into native gameplay) so F9/F10 still latch.
+// Key-up, repeats, printable keys and legacy gameplay shortcuts are ignored
+// while no human faction is under control. This does NOT pump arbitrary game
+// messages or create a reentrant modal/AI action.
+void autosim_collect_queued_keys() {
+    if (!autosim_control_active()) return;
+    MSG msg = {};
+    while (PeekMessageA(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE)) {
+        if (msg.message != WM_KEYDOWN || (msg.lParam & (1u << 30)))
+            continue;
+        if (msg.wParam == VK_F10) {
+            autosim_request_control(AUTOSIM_CTL_STOP);
+        } else if (msg.wParam == VK_F9) {
+            autosim_request_control(AUTOSIM_CTL_PAUSE);
+        }
+    }
+}
+
+bool autosim_fast_combat_active() {
+    return conf.autosim_fast_combat != 0 && autosim_control_active();
+}
+
 AutosimControlRequest autosim_take_control_request() {
     const AutosimControlRequest value = autosim_control_request;
     autosim_control_request = AUTOSIM_CTL_NONE;
