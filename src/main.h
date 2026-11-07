@@ -151,6 +151,7 @@ struct Config {
     int autosave_interval = 1;
     int telemetry_enabled = 0; // independent per-campaign JSONL recorder
     int autosim_manual_turns = 0; // AUTO-001 manual handover: completed AI-only turns, 0=off
+    int autosim_suppress_notices = 0; // AUTO-002 opt-in, only when all factions are AI
     int warn_on_former_replace = 1;
     int manage_player_bases = 0;
     int manage_player_units = 0;
