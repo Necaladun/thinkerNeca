@@ -1022,13 +1022,13 @@ void __cdecl random_events(int flag) {
         }
         if (*GameState & STATE_PERIHELION_ACTIVE && !((game_year(*CurrentTurn) - 2180) % 80)) {
             *GameState &= ~STATE_PERIHELION_ACTIVE;
-            POP2("PERIHELIONENDS", "stars_sm.pcx", -1);
+            autosim_notice_pop2("PERIHELIONENDS", "stars_sm.pcx", -1);
             return;
         }
         if (!(conf.skip_random_events & 1) && *CurrentTurn > 50) {
             if (!((game_year(*CurrentTurn) - 2160) % 80)) {
                 *GameState |= STATE_PERIHELION_ACTIVE;
-                POP2("PERIHELION", "heat_sm.pcx", -1);
+                autosim_notice_pop2("PERIHELION", "heat_sm.pcx", -1);
                 return;
             }
         }
@@ -2009,7 +2009,7 @@ void __cdecl alien_fauna() {
                 draw_tiles(base->x, base->y, 2);
             }
             parse_says(0, base->name, -1, -1);
-            NetMsg_pop(NetMsg, "XMINDWORMS", -5000, 0, "mindworm_sm.pcx");
+            autosim_notice_netmsg(NetMsg, "XMINDWORMS", -5000, 0, "mindworm_sm.pcx");
         }
     }
 }
