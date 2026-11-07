@@ -6,6 +6,14 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## TEL-001 — first recorder/analyser code, unmerged branch (7 November 2026)
+
+**Branch:** `feature/tel-001-recorder-foundation`, no PR. **CI:** [run 42350976871](https://github.com/Necaladun/thinkerNeca/actions/runs/42350976871), Develop and Release x86 cross-compiles **passed**. The Develop job also ran `python -m py_compile tools/campaign_report.py tools/test_campaign_report.py` and `python tools/test_campaign_report.py` successfully on synthetic data; the game was **not** executed by CI.
+
+Source implementation: opt-in `telemetry_enabled=0` default, separate `campaigns/` folder, unique new campaign/session, manifest and config/executable fingerprints, completed-faction-cycle `turns.jsonl` and `bases.jsonl`, committed-turn `status.json`. Independent `tools/campaign_report.py` generates an offline local HTML chart and faction/base CSV exports. Recorder never calls gameplay RNG or writes through legacy `debug.txt`; source inspection is not proof of runtime neutrality.
+
+**Windows acceptance still pending:** 10–20 turns including all factions, correct turn/year and base totals, correct live and endgame lifecycle, same-build save/reload and new-session attribution, unchanged saves/RNG/game behaviour, file-write failures and long-game overhead. Menu-loaded saves have no reliable `source_save` identification in this first slice; loading a save currently starts a new campaign folder rather than automatically resuming an earlier one. In-progress or incomplete terminal turn snapshots and AI decision/event streams are not yet implemented. See [TEL-001](WORK-QUEUE.md).
+
 ## PR #4 closeout report and user-selected deferrals — 7 November 2026
 
 **Further user clarification:** the earlier repeated Windows Develop gameplay tests already used **3/4/4 nutrient/mineral/energy limits throughout**, including save → quit → reload → turn advance. The user also inspected **multiple fresh map seeds for geological deposit sizes and mineral-resource overlaps** and saw no Nessus Canyon. These count as the requested *qualitative* checks and **do not need another manual run solely because per-seed measurements were not retained**. Canyon absence itself is not sufficient to test the removal, as the old `canyon=0` was already the default; the generator/parser/yield removal and reserved-slot invariant are independently source/CI-checked.
