@@ -174,8 +174,11 @@ def main() -> None:
             and 'REND005 UNDERLAY GEOMETRY native_key=' in renderer
             and 'type == MINOR_TITANIUM && valid_original && loader_ready' in renderer
             and 'jmp *_minor_geology_underlay_draw_target' in renderer
-            and '0x78A72Cu' in renderer,
-            'Underlay Titanium must use native mask tile context and log early selector exits')
+            and 'native_sprite == 0x78A700u' in renderer
+            and 'native_sprite == 0x78A72Cu' in renderer
+            and 'native_variant >= 0' in renderer
+            and 'original=%p variant=%d expected=%d' in renderer,
+            'Underlay Titanium must recognise both original native Sprite objects and log the runtime variant')
     require('MATCH("minor_geology_underlay")' in cfg
             and 'int minor_geology_underlay = 0;' in config
             and 'minor_geology_underlay=1' in ini,

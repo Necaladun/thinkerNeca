@@ -2311,7 +2311,11 @@ void minor_native_titanium_sprite_hook()
 REND-005: native Uranium underlay draw at 0x464DE3, ahead of the ordinary
 resource icon pass. Never reject BIT_BONUS_RES here: the whole purpose
 is to show *both* geology and normal resource art on the same tile.
-The call loads original ECX=0x78A72C (native Uranium sprite variant 1).
+The original instruction stream references 0x78A72C, but the supported
+Windows underlay callback actually receives 0x78A700 (native variant 0):
+REND005 log x=67,y=67 cached=3, original=0078a700, expected=0.
+Allow either known native Uranium sprite object, while rejecting any other
+sprite pointer. The existing Titanium art has already worked on variant 0.
 The existing indexed Titanium artwork can be substituted through its own
 Sprite* and key; all position, zoom, clip and normal resources stay native.
 */
@@ -2327,8 +2331,14 @@ extern "C" Sprite* __cdecl minor_select_geology_underlay_sprite(
     const int type = minor_geology_underlay_current_type;
     const int x = minor_geology_underlay_current_x;
     const int y = minor_geology_underlay_current_y;
-    const bool valid_original = original
-        && reinterpret_cast<uintptr_t>(original) == 0x78A72Cu;
+    const uintptr_t native_sprite = reinterpret_cast<uintptr_t>(original);
+    // Windows evidence (REND005 log 2) shows native 0x78A700 on all
+    // tested Titanium underlay calls, with valid frame/canvas and key 9.
+    // The earlier static draw-site setup referenced 0x78A72C. Both are
+    // the existing engine Uranium Sprite objects; no arbitrary addresses.
+    const int native_variant = native_sprite == 0x78A700u ? 0
+        : native_sprite == 0x78A72Cu ? 1 : -1;
+    const bool valid_original = original && native_variant >= 0;
     const bool valid_canvas = canvas && canvas->palette;
     // Sprite extraction only needs a valid palette-bearing canvas as a
     // readiness guard. The user's main map canvas is the fallback if the
@@ -2368,11 +2378,11 @@ extern "C" Sprite* __cdecl minor_select_geology_underlay_sprite(
             const int frame_x = frame ? frame[8] : -1;
             const int frame_y = frame ? frame[9] : -1;
             fprintf(fp, "REND005 UNDERLAY SELECT cached=%d x=%d y=%d "
-                "frame_x=%d frame_y=%d original=%p expected=%d canvas=%p "
+                "frame_x=%d frame_y=%d original=%p variant=%d expected=%d canvas=%p "
                 "canvas_palette=%d loader_palette=%d enabled=%d mode=%d "
                 "atlas_attempted=%d atlas_ready=%d swapped=%d\n",
                 type, x, y, frame_x, frame_y, (void*)original,
-                valid_original ? 1 : 0, (void*)canvas,
+                native_variant, valid_original ? 1 : 0, (void*)canvas,
                 valid_canvas ? 1 : 0, loader_ready ? 1 : 0,
                 minor_native_geology_underlay_installed ? 1 : 0, mode,
                 neca_sprites_attempted ? 1 : 0,
