@@ -162,6 +162,9 @@ def main() -> None:
             and 'int mine_n = projected_mine_nutrients(' in selection
             and 'int solar_total = mod_crop_yield(' in selection
             and 'mine_total > solar_total' in selection
+            and 'bool flat_farm_wins' in selection
+            and 'flat_farm_wins' in selection
+            and 'titanium_mine_val == 0' in selection
             and 'borehole_val, titanium_mine_val' in selection
             and 'titanium_mine_val == max_val' in selection
             and 'return FORMER_MINE;' in selection
