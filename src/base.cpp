@@ -450,13 +450,13 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
                     parse_says(0, get_adjective(faction_id), -1, -1);
                     // Fix: this used previously incorrect negative facility_id
                     parse_says(1, Facility[item_id].name, -1, -1);
-                    popp(ScriptFile, "SURVIVEPROJECT", 0, "secproj_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "SURVIVEPROJECT", "secproj_sm.pcx");
                 } else {
                     parse_says(0, get_title(faction_id), -1, -1);
                     parse_says(1, get_name(faction_id), -1, -1);
                     parse_says(2, get_noun(faction_id), -1, -1);
                     parse_says(3, Facility[item_id].name, -1, -1);
-                    popp(ScriptFile, "HALTPROJECT", 0, "secproj_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "HALTPROJECT", "secproj_sm.pcx");
                     uint32_t fac_idx, fac_bit;
                     bitmask(item_id - SP_ID_First, &fac_idx, &fac_bit);
                     plr_def->secret_project_intel[fac_idx] &= ~fac_bit;
@@ -469,9 +469,9 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
             if (project_base((FacilityId)i) == base_id) {
                 parse_says(0, Facility[i].name, -1, -1);
                 if (faction_id_atk == player_id) {
-                    popp(ScriptFile, "SEIZEPROJECT", 0, "secproj_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "SEIZEPROJECT", "secproj_sm.pcx");
                 } else {
-                    popp(ScriptFile, "LOSEPROJECT", 0, "secproj_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "LOSEPROJECT", "secproj_sm.pcx");
                 }
             }
         }
@@ -510,7 +510,14 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
 
                 bool relocate = true;
                 if (!*MultiplayerActive && faction_id == player_id) {
-                    relocate = X_pop("ESCAPE", 0);
+                    if (autosim_ui_active()) {
+                        // Unobserved AI already uses relocate=true. The
+                        // observer must not invent a human-only decision.
+                        telemetry_record_ui_notice("base_capture", "ESCAPE",
+                            "used_existing_ai_relocation");
+                    } else {
+                        relocate = X_pop("ESCAPE", 0);
+                    }
                 }
                 if (relocate) {
                     plr_def->energy_credits -= 1000;
@@ -721,7 +728,7 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
         }
         Console_update_data(MapWin, 0);
         const char* image = (faction_id_atk == player_id ? "liberate_sm.pcx" : "seized_sm.pcx");
-        popp(ScriptFile, event_label, 0, image, 0);
+        autosim_notice_popp(ScriptFile, event_label, image);
         ambience(213);
     } else {
         draw_tile_fixup(base_x, base_y, 1, 2);
@@ -729,15 +736,15 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
         || (plr_atk->diplo_status[player_id] & DIPLO_UNK_80
         && plr_atk->diplo_status[faction_id] & DIPLO_UNK_40)) {
             strcat(event_label, "2");
-            popp(ScriptFile, event_label, 0, "liberate_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, event_label, "liberate_sm.pcx");
         } else if (Factions[player_id].diplo_status[faction_id] & DIPLO_PACT
         || (plr_def->diplo_status[player_id] & DIPLO_UNK_80
         && plr_def->diplo_status[faction_id_atk] & DIPLO_UNK_40)) {
             strcat(event_label, "3");
-            popp(ScriptFile, event_label, 0, "seized_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, event_label, "seized_sm.pcx");
         } else if (spying(faction_id_atk) || spying(faction_id)) {
             strcat(event_label, "4");
-            popp(ScriptFile, event_label, 0, "seized_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, event_label, "seized_sm.pcx");
         }
     }
     if (base_id >= 0 && alien_fight) {
@@ -963,7 +970,12 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
         set_base(base_id);
         base_compute(1);
         if (faction_id_atk == player_id) {
-            if (Console_ready_search(MapWin, -1) >= 0) {
+            if (autosim_ui_active()) {
+                // Ownership and base_compute() already completed. Do not
+                // open observer-only colony management during AI turns.
+                telemetry_record_ui_notice("base_capture", "BaseWin_zoom",
+                    "suppressed_observer_window");
+            } else if (Console_ready_search(MapWin, -1) >= 0) {
                 BaseWin_zoom(BaseWin, base_id, 0);
             } else {
                 *GameState |= STATE_UNK_4;
@@ -3855,7 +3867,12 @@ int __cdecl mod_base_production() {
             if ((*GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES) && !*MultiplayerActive) {
                 amovie_project(project_id);
             }
-            help_project(project_id);
+            if (autosim_ui_active()) {
+                telemetry_record_ui_notice("project", "DATALINKS_PROJECT",
+                    "suppressed_help_window");
+            } else {
+                help_project(project_id);
+            }
         } else if (facility_id == FAC_ASCENT_TO_TRANSCENDENCE
         && (*GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES) && !*MultiplayerActive) {
             mod_amovie_project("theyTranscend");
@@ -4137,7 +4154,12 @@ int __cdecl mod_base_upkeep(int base_id) {
         BaseWin_on_redraw(BaseWin);
     }
     if (*BaseUpkeepFlag && full_game_turn()) {
-        BaseWin_zoom(BaseWin, *CurrentBaseID, 1);
+        if (autosim_ui_active()) {
+            telemetry_record_ui_notice("base_upkeep", "BaseWin_zoom",
+                "suppressed_observer_window");
+        } else {
+            BaseWin_zoom(BaseWin, *CurrentBaseID, 1);
+        }
     }
     *BaseUpkeepState = 0;
     if (base->assimilation_turns_left) {
