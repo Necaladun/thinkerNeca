@@ -149,6 +149,7 @@ struct Config {
     int render_high_detail = 1; // unlisted option
     int editor_free_units = 1; // unlisted option
     int autosave_interval = 1;
+    int telemetry_enabled = 0; // independent per-campaign JSONL recorder
     int warn_on_former_replace = 1;
     int manage_player_bases = 0;
     int manage_player_units = 0;
@@ -376,6 +377,7 @@ struct AIPlans {
 #include "patch.h"
 #include "game.h"
 #include "gameturn.h"
+#include "telemetry.h"
 #include "gamewin.h"
 #include "faction.h"
 #include "faction_diplo.h"
