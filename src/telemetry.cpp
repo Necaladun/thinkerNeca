@@ -325,7 +325,7 @@ void telemetry_record_completed_turn() {
                   << ",\"industry\":" << f.SE_industry
                   << ",\"research\":" << f.SE_research << "}}";
     }
-    turn_line << "]}\n";
+    turn_line << "]}";
 
     std::ostringstream base_line;
     base_line << "{\"schema\":1,\"phase\":\"completed_faction_cycle\""
@@ -354,7 +354,7 @@ void telemetry_record_completed_turn() {
                   << ",\"golden_age\":" << (b.golden_age_active() ? "true" : "false")
                   << "}";
     }
-    base_line << "]}\n";
+    base_line << "]}";
 
     // Only publish a committed turn in status.json after both data streams
     // have been flushed; partial lines/turns can then be diagnosed by readers.
