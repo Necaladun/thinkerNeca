@@ -6,6 +6,10 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 probe notice CI checkpoint (7 November 2026)
+
+**Windows x86 cross-build:** [GitHub Actions run 42363509724](https://github.com/Necaladun/thinkerNeca/actions/runs/42363509724) at `366a57e` passed both Develop and Release, existing automated checks, and new `tools/test_autosim_probe_ui.py` structural contract for `src/probe.cpp`, `src/veh_action.cpp` and `src/faction.cpp`. Artifact `thinker-develop-win32` contains `thinker.dll` and `thinker.exe`. The final code was not run inside SMAC/X on Windows, and the Council session remains a known blocking modal; no zero-click, vote-outcome or save/reload success is inferred from CI.
+
 ## AUTO-002 Planetary Council modal blocker (7 November 2026)
 
 **User Windows report:** Lady Deirdre convened the Planetary Council for election of Planetary Governor. The convening announcement blocked all-AI simulation; after dismissal, the full voting window appeared, with Deirdre's vote already selected for herself. This is an observed native modal chain, **not** evidence all AI ballots or governor effects have been processed.
