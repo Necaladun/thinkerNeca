@@ -2047,6 +2047,16 @@ int select_item(int x, int y, int faction_id, FormerMode mode, MAP* sq) {
         if (sea && allow_farm && !(items & BIT_FARM)) {
             return FORMER_FARM;
         }
+        // The regular fallback must respect the same Titanium comparison
+        // rather than undoing the Flat food / Solar safeguards above.
+        if (!sea && !sq->is_rocky()
+        && minor_landmark_has(x, y, MINOR_TITANIUM)
+        && titanium_mine_val == 0) {
+            if (allow_farm && !(items & BIT_FARM)) {
+                return FORMER_FARM;
+            }
+            return FORMER_NONE;
+        }
         return FORMER_MINE;
     }
     if (items & BIT_SOLAR && solar_need >= 0) {
