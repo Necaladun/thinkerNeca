@@ -271,7 +271,7 @@ void telemetry_record_ui_notice(const char* source, const char* label, const cha
     }
     std::ostringstream event;
     event << "{\"schema\":1,\"turn\":" << *CurrentTurn
-          << ",\"faction\":" << *CurrentFaction
+          << ",\"processing_faction\":" << *CurrentFaction
           << ",\"source\":" << json_string(source)
           << ",\"label\":" << json_string(label)
           << ",\"action\":" << json_string(action) << "}";
