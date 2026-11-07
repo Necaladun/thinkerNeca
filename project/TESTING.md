@@ -6,6 +6,14 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 Planetary Council modal blocker (7 November 2026)
+
+**User Windows report:** Lady Deirdre convened the Planetary Council for election of Planetary Governor. The convening announcement blocked all-AI simulation; after dismissal, the full voting window appeared, with Deirdre's vote already selected for herself. This is an observed native modal chain, **not** evidence all AI ballots or governor effects have been processed.
+
+**Source inspection (no correction yet):** `src/gameturn.cpp::faction_upkeep` invokes native `call_council(faction_id)` for AI participants; turn control invokes native `council(MapWin->cOwner, 0, 0)` while `*CouncilSessionPending` is true. Existing AUTO-002 covers the later `COUNCILHOT*` outcome notices. Engine bindings expose `call_council` at `0x52C880`, `council` at `0x428350`, and `council_get_vote`/`council_action` at `0x52BE60`/`0x52BF60`. Their behavior in the patched binary has not been independently traced.
+
+**Before changing UI:** determine whether native `council` computes/commits AI ballots and governor/proposal effects, or merely presents a resolved session. If it processes game state, implement and validate equivalent noninteractive AI handling, without auto-selecting human options. Test Governor election and at least one non-election resolution, veto/diplomatic victory conditions, pending-state cleanup, ordinary human Council, and same-build save/reload. **No Council suppression fix claimed; Windows blocker remains open.**
+
 ## AUTO-002 probe-team presentation audit (7 November 2026)
 
 **New user-reported Windows blocker:** observed AI Chairman Yang infiltration of the data networks still opens a native notification. The prior probe pass covered 24 result-style `NetMsg_pop_2` calls but did not cover raw `NetMsg_pop(..., "DETECTINFILTRATE", ...)`. This is a **real observed missing suppression path**, not proof the new revision works.
