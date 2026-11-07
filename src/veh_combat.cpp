@@ -1423,16 +1423,10 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
         }
         return value;
     }
-    // Combat mechanics and RNG remain native. This profile accelerates only
-    // in-memory visuals of an eligible all-AI turn; the RAII destructor
-    // restores the user's exact pref bits on all return paths.
-    const bool fast_autosim_combat = autosim_fast_combat_active();
-    AutoScopedCombatPrefs fast_presentation(fast_autosim_combat,
-        GamePreferences, GameMorePreferences,
-        PREF_ADV_FAST_BATTLE_RESOLUTION,
-        PREF_BSC_DONT_QUICK_MOVE_ENEMY_VEH|PREF_BSC_DONT_QUICK_MOVE_ALLY_VEH,
-        MPREF_ADV_QUICK_MOVE_ALL_VEH,
-        MPREF_ADV_PAUSE_AFTER_BATTLES);
+    // Preserve fast presentation for fights invoked outside normal AI order
+    // processing. Nested scopes restore the encompassing phase's preference
+    // state rather than disabling quick movement after a battle.
+    AutoScopedAutosimFastPrefs fast_presentation;
 
     // Fix: original code used DIPLO_COMMLINK instead of DIPLO_TRUCE to break_treaty
     if (is_human(faction_id_atk)
