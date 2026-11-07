@@ -6,6 +6,16 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 probe-team presentation audit (7 November 2026)
+
+**New user-reported Windows blocker:** observed AI Chairman Yang infiltration of the data networks still opens a native notification. The prior probe pass covered 24 result-style `NetMsg_pop_2` calls but did not cover raw `NetMsg_pop(..., "DETECTINFILTRATE", ...)`. This is a **real observed missing suppression path**, not proof the new revision works.
+
+**Source correction on unmerged `feature/auto-002-noninteractive-ui` (not yet compiled or Windows-tested):** all 17 remaining return-unused `NetMsg_pop` sites in `src/probe.cpp` now use the existing all-AI-only notification wrapper. The intelligence-result `report_intel` panel, `SPYFOUND`/`SPYLOST` counter-espionage presentation, genetic-warfare and mind-control `popp_2` results, and five post-operation `X_pops` portrait reports are similarly bypassed and logged only during opt-in AUTO-002. Infiltration state changes, unit/base outcomes and diplomacy side effects remain in their original code paths. Four choice-returning `popp_2` frame/excuse calls and probe action menus stay native.
+
+**Additional observed-AI probe encounter paths in `src/veh_action.cpp`:** `PROBEPACTTEAM`, `PROBEPACT` and `ENEMYPROBE2` can ask for human permission merely because the AI is the observed `MapWin` owner. In opt-in all-AI mode, skip only that extra observer prompt and follow the already existing path used for a non-observed AI; record a structured UI notice. The `GOTMYPROBE`/`GOTYOURPROBE` result messages use the passive wrapper. Normal human-controlled games and disabled suppression preserve native prompts. `ENEMYPROBE` and other meaningful human decisions are not blindly answered.
+
+**Acceptance still required:** compile the new branch, verify actual Windows zero-click infiltration/Hunter-Seeker/spy loss/mind control/genetic warfare and AI probe-vs-probe encounters, compare faction intelligence/relations and unit/base state with a normal-path control, ensure no popup choices or preferences changed in human play; continue 20/100+ turns and F9/F10 checks. Source review is not in-game verification. This is separate from **BUG-001** probe/base-capture workaround.
+
 ## AUTO-002 keyboard delivery and fast-combat follow-up (7 November 2026)
 
 **New Windows Develop finding (user-reported):** F9 and F10 work while the game is waiting for the first manual End Turn after Scenario Editor all-AI handover. Once continuous AI `control_turn()` starts, **F9, F10, Escape, Ctrl+Q and other keys do not respond**. This demonstrates the previous shortcut handler is not servicing queued Windows input during consecutive AI turns, **not** that the F9/F10 key bindings are invalid. Combat displays at ordinary/slow presentation speed; the previous AUTO-002 changes had not enabled native Fast Battle Resolution.
