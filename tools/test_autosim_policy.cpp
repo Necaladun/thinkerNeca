@@ -113,6 +113,34 @@ static void test_transient_interlude_preferences() {
     assert(prefs == (flag | 0x82));
 }
 
+static void test_scoped_combat_visual_preferences() {
+    const int fast = 0x8;
+    const int nonquick = 0x4 | 0x8000;
+    const int quick_all = 0x80;
+    const int pause = 0x10;
+    int prefs = nonquick | 0x400;
+    int more = pause | 0x200;
+    {
+        AutoScopedCombatPrefs active(true, &prefs, &more,
+            fast, nonquick, quick_all, pause);
+        assert((prefs & fast) != 0);
+        assert((prefs & nonquick) == 0);
+        assert((more & quick_all) != 0);
+        assert((more & pause) == 0);
+    }
+    assert(prefs == (nonquick | 0x400));
+    assert(more == (pause | 0x200));
+
+    {
+        AutoScopedCombatPrefs inactive(false, &prefs, &more,
+            fast, nonquick, quick_all, pause);
+        assert(prefs == (nonquick | 0x400));
+        assert(more == (pause | 0x200));
+    }
+    assert(prefs == (nonquick | 0x400));
+    assert(more == (pause | 0x200));
+}
+
 int main() {
     test_entry_guards();
     test_full_turn_limit_and_reset();
@@ -122,6 +150,7 @@ int main() {
     test_monument_new_event_only();
     test_ai_observer_hasty_attack_policy();
     test_transient_interlude_preferences();
+    test_scoped_combat_visual_preferences();
     std::puts("AUTO-001 host policy tests passed");
     return 0;
 }
