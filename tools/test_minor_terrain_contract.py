@@ -136,6 +136,9 @@ def main() -> None:
             and 'minor_graphics_underlay_native_probe();' in patches,
             'REND-005 underlay reconnaissance must be bounded and read-only')
 
+    # Evaluate the resource wrapper before asserting underlay fallback.
+    bonus_wrapper = body_between(yields, 'int __cdecl mod_bonus_at(int x, int y) {',
+                                 'Determine if the tile has a supply pod')
     underlay_install = body_between(
         patches, 'static bool install_minor_native_geology_underlay()',
         'The supported SMAX executable checks native Jungle')
