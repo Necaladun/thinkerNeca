@@ -233,7 +233,7 @@ def generate(campaign_dir, session_id=None, output_dir=None):
         if notice.get("schema") != SCHEMA:
             raise ValueError("UI notice: unsupported record schema")
     write_csv(output / "ui_notices.csv",
-              ("turn", "faction", "source", "label", "action"), notices)
+              ("turn", "processing_faction", "source", "label", "action"), notices)
     faction_rows = (
         {"turn": record["turn"], "mission_year": record["mission_year"], **f}
         for record in turns for f in record["factions"]
