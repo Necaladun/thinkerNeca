@@ -8,7 +8,7 @@
 
 ## AUTO-001 first manual all-AI driver — implementation and acceptance (7 November 2026)
 
-**Branch:** `feature/auto-001-manual-ai-turn-driver` (stacked on unmerged TEL-001, no PR). `src/autosim.h` contains pure entry guards and completed-cycle counter, tested by the host C++11 `tools/test_autosim_policy.cpp`. The native `control_turn()` uses the unchanged AI path; it conditionally omits the between-turn native `Console_human_turn()` call only when all seven faction slots are AI-controlled, single-player, a living view owner is present and no endgame state is set. After `autosim_manual_turns` full cycles it sets `ControlTurnA=1` and `ControlTurnB=1` for the normal menu-return path. No forced game-state or save-format modifications. Config default: zero/off.
+**Branch:** `feature/auto-001-manual-ai-turn-driver` (stacked on unmerged TEL-001, no PR). [CI run 42355116603](https://github.com/Necaladun/thinkerNeca/actions/runs/42355116603) **passed** both Windows x86 Develop and Release builds, host C++11 AUTO-001 guard/cycle-count tests and existing checks. CI only cross-compiles; it does not execute SMAC/X. `src/autosim.h` contains pure entry guards and completed-cycle counter, tested by the host C++11 `tools/test_autosim_policy.cpp`. The native `control_turn()` uses the unchanged AI path; it conditionally omits the between-turn native `Console_human_turn()` call only when all seven faction slots are AI-controlled, single-player, a living view owner is present and no endgame state is set. After `autosim_manual_turns` full cycles it sets `ControlTurnA=1` and `ControlTurnB=1` for the normal menu-return path. No forced game-state or save-format modifications. Config default: zero/off.
 
 **Windows Develop acceptance (pending):**
 
