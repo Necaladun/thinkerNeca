@@ -156,7 +156,7 @@ State should be **local to an ecological network/region**, not a single global �
 
 ## Empire Turn Report (UI-002) — future workflow, not present in PR #5
 
-The parked native Empire Report (UI-001, [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5)) is a manually opened **live-state** view. The desired **start-of-turn Turn Report** is distinct: finish all relevant faction-wide upkeep first, then present the **results and pending player decisions together**, instead of asking for sequential colony orders while energy and labs are still changing.
+The native Empire Report (UI-001, [merged PR #5](https://github.com/Necaladun/thinkerNeca/pull/5)) is a manually opened **live-state** view. The desired **start-of-turn Turn Report** is distinct: finish all relevant faction-wide upkeep first, then present the **results and pending player decisions together**, instead of asking for sequential colony orders while energy and labs are still changing.
 
 - Headline: **“X colonies finished production and need new orders.”** For each genuine completion, list the colony, exact item completed, the next queue/current order and a native **Change Production / Queue** action. It must handle 30 or more completions with independent scrolling, not rely on the current Stockpile Energy listing.
 - Show opening/closing treasury, credited income/maintenance, research progress and breakthroughs, population changes, major incidents, riots/starvation, and actionable colony exceptions. Distinguish routine advisories such as habitation caps from urgent decisions.

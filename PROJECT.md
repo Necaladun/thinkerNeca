@@ -2,7 +2,7 @@
 
 This repository is **Necaladun's fork of Thinker Mod for Sid Meier's Alpha Centauri: Alien Crossfire (SMAC/X)**. It builds on [Induktio's Thinker](https://github.com/induktio/thinker); it is not an upstream release. The fork primarily targets **fresh single-player games**; ongoing experimental work includes independent minor terrain, map generation, native rendering and UI changes. See [Readme.md](Readme.md) for an introduction.
 
-> **Branch status (7 November 2026):** Independent Jungle/Uranium/Titanium generation, rendering and the experimental test profile **merged to `master` in [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4)** ([`0f05fdb`](https://github.com/Necaladun/thinkerNeca/commit/0f05fdbd5509616cb5fea598a68ab74d3fd13d8b)). The native Empire Report is **still unmerged**, parked on [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), which requires ancestry reconciliation. Release/PRACX native-art parity, long-game AI acceptance and selected rare compatibility cases remain deferred; merging is not runtime certification.
+> **Branch status (7 November 2026):** Independent Jungle/Uranium/Titanium generation, rendering and the experimental test profile merged through [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4) (`0f05fdb`); the native manual Empire Report merged through [PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) (`0b2e77a`). Both are now on `master`. The user accepted the general Windows Develop Report smoke test and **deferred** narrow layout, large-base, modal/focus and additional final-binary edge-case testing; UI-002 Turn Report and other experimental compatibility tests are still deferred. Merging does not establish untested Release/PRACX parity.
 
 ## Where to start
 

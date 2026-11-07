@@ -2,6 +2,12 @@
 
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
+## Merged PR #5 — native manual Empire Report (7 November 2026)
+
+- [PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) merged into `master` at [`0b2e77a`](https://github.com/Necaladun/thinkerNeca/commit/0b2e77a00655d332a9b50578691b56a0c595a861), after integrating the PR #4 terrain branch. Adds an in-engine, manually opened Empire Report with Overview, Colonies/Military/Intelligence placeholder/Records sections, twelve views, colony actions, native Queue and Change Production, and a shared eco-damage display helper. No automatic post-upkeep Turn Report (UI-002).
+- Final PR-head x86 Develop+Release CI passed (`e5a4edd`, [run 42338436623](https://github.com/Necaladun/thinkerNeca/actions/runs/42338436623)). Prior Windows Develop report features, native queue editing and save/reload were user-tested on `3c08b52`; general post-integration impression “generally seems fine” was user-reported. **Deferred** without claiming verification: 1024×768/high-res, 40–60+ colonies, exact scrolled-base target, zoom-font, modal/focus/display modes and explicit repeated final-build save/reload. The stay-open-on-game-load quirk is accepted.
+
+
 ## Merged PR #4 — minor terrain and native rendering (7 November 2026)
 
 - **7 November closeout review:** user reconfirmed prior 3/4/4 N/M/E, repeated save/quit/reload/advance and multi-seed mineral-overlap/geological patch-size tests. Qualitative Windows Develop Forest/fungus extraction, resource underlay, Unity pod reroll and ordinary save/Inspector/graphics behaviour are positively reported. Canyon source removal/slot reservation is CI-verified (its old `canyon=0` default already suppressed placement). Longer AI simulations, quantitative patch counts/economy, constructed minor stacks, variant-1 sprite and Release/PRACX native feature parity remain deferred, not accepted; PR #4 remains unmerged.
