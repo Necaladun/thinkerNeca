@@ -14,7 +14,7 @@ At startup, the fork reads `thinker.ini`, then optionally `thinker_user.ini` fro
 | `base_capture_fix` | `0` | Probe-team problem appears mitigated in-game; temporary workaround, not a confirmed underlying fix (BUG-001) |
 | `probe_action_fix` | `1` | Separate probe-team mechanic fixes remain on |
 | `spawn_free_units` | `0,2,2,0,2,2,1,2,2` | Player-preferred additional starting Formers and scouts, including aquatic equivalents |
-| `tile_output_limit` | `3,3,3` | **Experimental** pre-tech resource cap; BAL-001, previously 2/2/2 |
+| `tile_output_limit` | `3,4,4` | **Experimental** N/M/E pre-tech caps; previous trial 3/3/3, original 2/2/2 (BAL-001) |
 | `world_polar_caps` | `0` | Player preference |
 | `skip_event` | `13`, `17` on separate lines | Exclude Sunspots and Base Asteroid Strike |
 | `new_world_builder` / `modified_landmarks` | `1` / `1` | Intended modified-map path |
