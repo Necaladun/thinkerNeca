@@ -14,6 +14,12 @@
 
 **Current CI evidence:** [run 42336179959](https://github.com/Necaladun/thinkerNeca/actions/runs/42336179959) passed Develop and Release on `8c3386a`, including synthetic v3 save, native-hook harness and source/config tests. Later documentation commits require their own CI result; no CI run executes SMAC/X.
 
+## UI-001 — PR #5 source integration against merged `master` (7 November 2026)
+
+**Branch work only; not merged or newly user-tested.** The existing Empire Report feature branch has been updated by integrating `master` after PR #4. Unmodified Empire Report sources and production/colony helper changes are retained; its `src/gui.cpp` and `src/gui.h` changes are overlaid on the newer native terrain/Inspector/underlay source from `master`. The canonical master docs take precedence over outdated PR #5 planning copies. No direct game-code changes to THMIN001, map generation, geology yields or test INI were introduced by this reconciliation.
+
+**CI verified, Windows runtime still pending:** on reconciled PR #5 head `e2a536d`, both Windows x86 Develop and Release builds and Develop source/document checks **passed** ([run 42338306442](https://github.com/Necaladun/thinkerNeca/actions/runs/42338306442)). These cross-builds do not execute the game. A *short final integrated Develop Windows smoke* is still needed: current + 1024×768 report layout, 12 views/navigation, native modal Change/Queue/Hurry/Governor actions, scrolling correct colony identity, independent font through map zoom, focus/reopen around F4, and new-game same-build save→reload→advance. The prior combined `3c08b52` Windows report remains valid for that specific prior binary only. Keep UI-002, optional appearance and event capture out of UI-001 scope.
+
 ## Test matrix
 
 | Area | Evidence | Remaining checks |

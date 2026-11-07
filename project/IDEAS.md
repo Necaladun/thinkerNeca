@@ -165,3 +165,8 @@ The parked native Empire Report (UI-001, [draft PR #5](https://github.com/Necala
 - Implement in stages: **capture true events and snapshots without changing upkeep**, then distinguish safe routine notifications from mechanically significant decisions, then integrate an automatic reopenable post-upkeep report. The game's `production_phase() -> mod_base_upkeep()` processes colonies sequentially and can invoke native `BaseWin_zoom()` during processing; a mid-loop report would show partial totals. Guard same-build save/reload, eliminated bases, research breakthroughs, upkeep order and multiplayer/PBEM differences.
 
 This design is deferred under [UI-002](WORK-QUEUE.md) and **does not hold up merging the currently functional manual Empire Report**.
+
+
+## Further manual Empire Report interactions — exploratory
+
+The source history of PR #5 discusses possible **contextual right-click actions** on base/unit rows, a missing-facility checklist, a separate orbital/satellite summary, and additional filters for stalled production, energy inefficiency, sanctions and unit support. These are **unapproved candidates**, not UI-001 acceptance requirements; existing native Change Production, Queue, Hurry, Governor and the current twelve report views must not be mistaken for unfinished work. Trends in population, economy, research or orbital investment would require explicit event/history capture and save/reload policy, potentially reusing the later TEL-* recorder. Preserve player-known fog-of-war information for any future threat/proximity display. UI-002's actual post-upkeep completion summary remains the separately deferred design above.

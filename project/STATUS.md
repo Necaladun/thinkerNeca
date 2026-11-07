@@ -19,4 +19,4 @@ The user previously completed the requested basic smoke, cap, qualitative multi-
 
 **Separate backlog:** projected-vs-live yield discrepancies (TERR-003), general Former AI (AI-001), Forest balance (BAL-002), combat/arty BUG-004 and BAL-004, telemetry/automation, and prototype renderer retirement (MAINT-001). Do not fold these into PR #4 merge acceptance.
 
-**Next integration:** reconcile the still-draft PR #5 against current `master`, rerun its Develop/Release CI, then perform the final Empire Report runtime regression. UI-002's future Turn Report stays deferred.
+**PR #5 integration in progress:** its older terrain ancestry has been reconciled with current `master` on the existing Empire Report feature branch, retaining PR #4 code and canonical documentation. The PR remains **draft and unmerged**; **Develop and Release source-integration CI passed** on `e2a536d` ([run 42338306442](https://github.com/Necaladun/thinkerNeca/actions/runs/42338306442)); an actual **final integrated Windows Empire Report regression** remains required before its separate merge. UI-002's Turn Report remains deferred.

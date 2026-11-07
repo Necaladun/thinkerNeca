@@ -2,6 +2,11 @@
 
 #include "main.h"
 
+// Existing native main-interface frame resources, already used in
+// control_turn() to draw framed MainInfc panels.
+extern int* const dword_78D7F8;
+extern int* const dword_78D870;
+
 void __cdecl control_turn();
 int __cdecl net_upkeep_phase(int value);
 void __cdecl net_upkeep();
