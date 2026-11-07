@@ -76,12 +76,21 @@ static void test_popup_allowlist_fails_closed() {
     assert(autosim_xpop_policy(nullptr, false) == AUTO_UI_NATIVE);
 }
 
+static void test_monument_new_event_only() {
+    assert(autosim_suppress_monument(true, 1));
+    assert(autosim_suppress_monument(true, 2));
+    assert(!autosim_suppress_monument(true, 0)); // explicit history view
+    assert(!autosim_suppress_monument(false, 0));
+    assert(!autosim_suppress_monument(false, 1)); // normal human game
+}
+
 int main() {
     test_entry_guards();
     test_full_turn_limit_and_reset();
     test_resume_mid_cycle_and_reenable_human();
     test_notice_suppression_guards();
     test_popup_allowlist_fails_closed();
+    test_monument_new_event_only();
     std::puts("AUTO-001 host policy tests passed");
     return 0;
 }
