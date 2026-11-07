@@ -71,12 +71,16 @@ void autosim_interlude(int event_id, const char* text, int a3, int a4) {
         return;
     }
     const int original_prefs = *GamePreferences;
+    const unsigned prior_interlude_state = (unsigned)*GameInterludeState;
     *GamePreferences = original_prefs | PREF_AV_INTERLUDES_DISABLED;
     interlude(event_id, text, a3, a4);
     *GamePreferences = original_prefs;
     char label[40];
+    char action[96];
     snprintf(label, sizeof(label), "INTERLUDE_%d", event_id);
-    telemetry_record_ui_notice("interlude", label, "native_disable_requested");
+    snprintf(action, sizeof(action), "native_disable_requested_state_%08X_to_%08X",
+        prior_interlude_state, (unsigned)*GameInterludeState);
+    telemetry_record_ui_notice("interlude", label, action);
 }
 
 int __cdecl X_pop(const char* label, fp_none fn)
