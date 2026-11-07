@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main.h"
+#include "autosim.h"
 
 enum DiploProposal {
     DiploProposalMakeGift = 1,
@@ -44,6 +45,21 @@ enum AutosimControlRequest { AUTOSIM_CTL_NONE, AUTOSIM_CTL_PAUSE, AUTOSIM_CTL_ST
 void autosim_request_control(AutosimControlRequest request);
 void autosim_collect_queued_keys();
 bool autosim_fast_combat_active();
+
+// AUTO-002: fast native presentation throughout all-AI turn phases, not
+// solely during combat. All normal human/opt-out preferences are unchanged.
+// Scope this to processing phases only: keep autosave and manual Save Game
+// outside the temporary override, so no modified preferences are serialized.
+struct AutoScopedAutosimFastPrefs : AutoScopedCombatPrefs {
+    AutoScopedAutosimFastPrefs()
+        : AutoScopedCombatPrefs(autosim_fast_combat_active(),
+            GamePreferences, GameMorePreferences,
+            PREF_ADV_FAST_BATTLE_RESOLUTION,
+            PREF_BSC_DONT_QUICK_MOVE_ENEMY_VEH
+                | PREF_BSC_DONT_QUICK_MOVE_ALLY_VEH | PREF_AV_MAP_ANIMATIONS,
+            MPREF_ADV_QUICK_MOVE_ALL_VEH | MPREF_ADV_QUICK_MOVE_VEH_ORDERS,
+            MPREF_ADV_PAUSE_AFTER_BATTLES) {}
+};
 AutosimControlRequest autosim_take_control_request();
 void autosim_notice_pop2(const char* label, const char* image, int recipient);
 void autosim_interlude(int event_id, const char* text, int a3, int a4);
