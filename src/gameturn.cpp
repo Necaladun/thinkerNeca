@@ -326,7 +326,8 @@ void __cdecl control_turn() {
                 conf.autosim_manual_turns, autosim_ready(), !first_cycle_partial);
             first_cycle_partial = false;
             const AutosimControlRequest user_request = autosim_take_control_request();
-            bool stop_requested = (user_request == AUTOSIM_CTL_STOP);
+            bool stop_requested = (action != AUTO_CYCLE_NORMAL
+                && user_request == AUTOSIM_CTL_STOP);
             if (user_request == AUTOSIM_CTL_PAUSE && action == AUTO_CYCLE_ADVANCE) {
                 telemetry_record_ui_notice("autosim", "PAUSE", "requested_completed_turn");
                 // Explicit user-requested pause: no game phase is in progress.
