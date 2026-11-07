@@ -150,6 +150,7 @@ struct Config {
     int editor_free_units = 1; // unlisted option
     int autosave_interval = 1;
     int telemetry_enabled = 0; // independent per-campaign JSONL recorder
+    int autosim_manual_turns = 0; // AUTO-001 manual handover: completed AI-only turns, 0=off
     int warn_on_former_replace = 1;
     int manage_player_bases = 0;
     int manage_player_units = 0;
