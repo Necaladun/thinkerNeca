@@ -2,6 +2,11 @@
 
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
+## Artillery PR #10 — user-approved merge (7 November 2026)
+
+- [PR #10](https://github.com/Necaladun/thinkerNeca/pull/10) restores reactor-normalised ordinary artillery bombardment damage and remaining-HP floors under `ignore_reactor_power=1` (BUG-004), preserving `=0` behaviour. Adds WTP-style fractional one-point damage chance below 1:1 only (BAL-005); above threshold original uniform damage remains. No direct combat, artillery duels, pricing, AI weights or naval-range changes.
+- Develop/Release Win32 compilation, host C++11 damage/cap tests and retained regression checks passed at `9b61543d` ([CI](https://github.com/Necaladun/thinkerNeca/actions/runs/42345065149)). User Windows Develop smoke: Impact 4 vs armour 8 occasionally damaged; Fission/Fusion outcomes appeared comparable; bunkers/colonies stopped at 50%; Spore Launchers damaged Fusion; no apparent regression. **Not a full probability or combat-path audit.** User explicitly approved merge, deferring low-strength mass-stack economics, sea/open cap edges, alternate reactor setting, all reactor levels, direct/duel controls and same-build save/reload to later monitoring. See [TESTING](project/TESTING.md).
+
 ## Merged PR #5 — native manual Empire Report (7 November 2026)
 
 - [PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) merged into `master` at [`0b2e77a`](https://github.com/Necaladun/thinkerNeca/commit/0b2e77a00655d332a9b50578691b56a0c595a861), after integrating the PR #4 terrain branch. Adds an in-engine, manually opened Empire Report with Overview, Colonies/Military/Intelligence placeholder/Records sections, twelve views, colony actions, native Queue and Change Production, and a shared eco-damage display helper. No automatic post-upkeep Turn Report (UI-002).
