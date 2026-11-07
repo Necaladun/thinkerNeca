@@ -2,6 +2,10 @@
 
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
+## Unmerged AUTO-002 — probe notification audit (7 November 2026)
+
+- An observed-AI `DETECTINFILTRATE` popup exposed a gap beyond the earlier 24 `NetMsg_pop_2` result wrappers. On `feature/auto-002-noninteractive-ui`, classified and wrapped all remaining return-unused `src/probe.cpp` NetMsg, counter-spy, genetic/mind-control and portrait reports; suppress only the optional on-success intelligence panel. Observed-AI `PROBEPACT*`/`ENEMYPROBE2` human prompts now take the normal unobserved-AI path in opt-in simulation; passive probe clash alerts are wrapped. Choice-returning human dialogs and game state remain intact by source intent. **Source-only; Windows build, simulation and unchanged state/choices require verification.** Separate from BUG-001.
+
 ## Merged PR #10 — artillery reactor and fractional weak hits (7 November 2026)
 
 - [PR #10](https://github.com/Necaladun/thinkerNeca/pull/10), merged at [`2b889dc`](https://github.com/Necaladun/thinkerNeca/commit/2b889dcb6c15477fdc930827245fad5292bebed7), restores reactor-normalised ordinary artillery bombardment damage and remaining-HP floors under `ignore_reactor_power=1` (BUG-004), preserving `=0` behaviour. Adds WTP-style fractional one-point damage chance below 1:1 only (BAL-005); above threshold original uniform damage remains. No direct combat, artillery duels, pricing, AI weights or naval-range changes.
