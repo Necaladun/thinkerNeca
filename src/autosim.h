@@ -33,3 +33,32 @@ struct AutoTurnDriver {
         return completed_turns >= requested_turns ? AUTO_CYCLE_STOP : AUTO_CYCLE_ADVANCE;
     }
 };
+
+
+// AUTO-002: deliberate allowlist, not a global popup auto-clicker.
+// The only handled choices decline *optional human-only UI*, so AI decisions
+// continue through existing code. Every unknown label remains native/modal.
+#include <cstring>
+
+enum AutoUiAction {
+    AUTO_UI_NATIVE,
+    AUTO_UI_NOTICE,
+    AUTO_UI_DECLINE_OPTIONAL
+};
+
+inline AutoUiAction autosim_xpop_policy(const char* label, bool has_callback) {
+    if (!label || has_callback) {
+        return AUTO_UI_NATIVE;
+    }
+    if (std::strcmp(label, "REACTORUPGRADE") == 0
+        || std::strcmp(label, "THESECRET0") == 0
+        || std::strcmp(label, "THESECRET1") == 0
+        || std::strcmp(label, "TREETIME") == 0) {
+        return AUTO_UI_NOTICE;
+    }
+    if (std::strcmp(label, "SOCIETY") == 0
+        || std::strcmp(label, "ASKSEEDESIGN") == 0) {
+        return AUTO_UI_DECLINE_OPTIONAL;
+    }
+    return AUTO_UI_NATIVE;
+}
