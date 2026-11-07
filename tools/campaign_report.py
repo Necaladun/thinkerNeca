@@ -36,18 +36,21 @@ BASE_FIELDS = (
 
 
 def read_jsonl(path):
-    """Read complete JSONL records. Report malformed lines with their location."""
+    """Read complete records; ignore an uncommitted, truncated final line."""
     records = []
-    with path.open(encoding="utf-8") as source:
-        for line_no, line in enumerate(source, 1):
-            if not line.strip():
+    with path.open("rb") as source:
+        lines = source.readlines()
+    for line_no, raw in enumerate(lines, 1):
+        if not raw.strip():
+            continue
+        try:
+            records.append(json.loads(raw.decode("utf-8")))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            if line_no == len(lines) and not raw.endswith(b"\n"):
+                print(f"Warning: ignoring truncated final line in {path}:{line_no}", file=sys.stderr)
                 continue
-            try:
-                records.append(json.loads(line))
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"{path}:{line_no}: invalid JSON: {exc}") from exc
+            raise ValueError(f"{path}:{line_no}: invalid JSON: {exc}") from exc
     return records
-
 
 def load_session(session_dir):
     manifest = json.loads((session_dir / "manifest.json").read_text(encoding="utf-8"))
