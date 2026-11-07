@@ -45,7 +45,7 @@
 | TEL-003 | P2 | TODO | **Offline reporting and comparisons.** Campaign timelines, faction graphs and issue summaries from recorded history; support repeated output and derived narrative without treating flavour as AI rationale. |
 | DEV-001 | P2 | TODO | **Optional CI Debug build + diagnostics guide.** Publish a distinct Windows Debug artifact and document existing developer shortcuts, keeping Debug mode side effects explicit and ordinary telemetry usable in Develop. |
 
-See [technical design](technical/telemetry-automation.md) for schemas, constraints, test stages and limitations. TEL-001 is provisionally implemented on an unmerged branch; **AUTO-001 onward remain unimplemented**.
+See [technical design](technical/telemetry-automation.md) for schemas, constraints, test stages and limitations. TEL-001, AUTO-001, and the first AUTO-002 UI suppression slice exist on separate stacked unmerged branches. AUTO-001 manual handover has positive Windows evidence; AUTO-002 and later automation remain unverified/unimplemented as stated above.
 
 ## Design decisions and later work
 
