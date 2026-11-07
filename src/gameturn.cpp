@@ -320,6 +320,10 @@ void __cdecl control_turn() {
             }
         }
         if (++current_id >= 8) {
+            // No normal Win32 message pump runs during continuous all-AI
+            // turns. Collect pending F9/F10 without dispatching gameplay
+            // input; consume only after this entire cycle has completed.
+            autosim_collect_queued_keys();
             // All faction phases have completed for this turn.
             telemetry_record_completed_turn();
             const AutoCycleAction action = auto_driver.on_cycle(
