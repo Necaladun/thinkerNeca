@@ -335,9 +335,9 @@ int __cdecl mod_alien_move(int veh_id) {
                             }
                         } else {
                             if (veh->unit_id == BSC_SPORE_LAUNCHER) {
-                                popp(ScriptFile, "SPORELAUNCHSWARM", 0, "sporlnch_sm.pcx", 0);
+                                autosim_notice_popp(ScriptFile, "SPORELAUNCHSWARM", "sporlnch_sm.pcx");
                             } else {
-                                popp(ScriptFile, "MINDWORMSWARM", 0, "mindworm_sm.pcx", 0);
+                                autosim_notice_popp(ScriptFile, "MINDWORMSWARM", "mindworm_sm.pcx");
                             }
                         }
                     }
