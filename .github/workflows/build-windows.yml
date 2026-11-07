@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - feature/auto-002-noninteractive-ui
 
 # One build per live PR revision; cancel superseded CI jobs.
 concurrency:
