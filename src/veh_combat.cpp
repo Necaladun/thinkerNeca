@@ -1426,6 +1426,8 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
     // Preserve fast presentation for fights invoked outside normal AI order
     // processing. Nested scopes restore the encompassing phase's preference
     // state rather than disabling quick movement after a battle.
+    // Also used below by the existing scoped veh_scoot animation skip.
+    const bool fast_autosim_combat = autosim_fast_combat_active();
     AutoScopedAutosimFastPrefs fast_presentation;
 
     // Fix: original code used DIPLO_COMMLINK instead of DIPLO_TRUCE to break_treaty
