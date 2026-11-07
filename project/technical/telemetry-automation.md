@@ -1,5 +1,18 @@
 # Campaign telemetry and automated AI games — accepted design, not implemented
 
+
+> **Implementation status (7 November 2026):** `TEL-001` has an initial opt-in recorder and local HTML/CSV analyser on unmerged branch `feature/tel-001-recorder-foundation`. Windows x86 Develop/Release CI and synthetic analyser tests passed ([run 42350976871](https://github.com/Necaladun/thinkerNeca/actions/runs/42350976871)); **Windows game runtime, save/reload, RNG neutrality and error handling are unverified**. None of `AUTO-001+`, detailed AI event/decision history or watchdog features are implemented.
+
+### Initial TEL-001 usage (unmerged branch)
+
+1. Build the branch Develop DLL/launcher; install them into the same supported game directory and retain the normal game files/configuration.
+2. Set `telemetry_enabled=1` in `thinker_user.ini` under `[thinker]` (the distributed `thinker.ini` ships `0`). This is independent of `debug.txt` and does **not** activate developer Debug mode.
+3. Play normally. At each completed all-faction cycle, the recorder writes under `campaigns/campaign-*/sessions/session-001/`: `manifest.json`, `turns.jsonl`, `bases.jsonl` and `status.json`. `campaign.json` sits in the campaign root.
+4. Run `python tools/campaign_report.py "campaigns/<campaign-id>"` from a checkout or with an explicit script path; open `campaigns/<campaign-id>/reports/session-001/index.html`. No network access, libraries or ChatGPT needed.
+5. Restore `telemetry_enabled=0` to disable recording. If it is off, no telemetry folder is intentionally created.
+
+**First-slice limitations:** each new game session creates a *new* campaign directory, including when a save is loaded; menu-loaded save origin may be unknown, whereas command-line loaded saves have a source path. Automated save lineage, baseline and partial-terminal snapshots, AI decisions/events, live report regeneration, report packaging, and unattended turn control remain deferred. The new recorder makes no changes to the SAV format. The appended faction and base JSONL files are distinct from `debug.txt`. The browser report processes one session at a time; advanced cross-session/campaign analytics remain `TEL-003`.
+
 **Scope:** optional historical logging of the *whole* SMAC/X game and unattended AI-vs-AI campaigns. This document defines the implementation contract; it is not evidence that features already exist. Relevant source: `src/main.cpp` / `src/main.h` (configuration and command line), `src/gameturn.cpp` (turn controller and faction upkeep), `src/game.cpp` (setup and victory), `src/savegame.cpp` (save/reload), `src/gui.cpp` (developer shortcuts and dialogs), `src/patch.cpp` (native hooks).
 
 Accepted constraints:
