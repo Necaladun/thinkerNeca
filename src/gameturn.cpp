@@ -2303,7 +2303,12 @@ void __cdecl faction_upkeep(int faction_id) {
         }
     }
     } // Restore all preference bits before the ordinary autosave call.
-    if (!*MultiplayerActive && *GamePreferences & PREF_BSC_AUTOSAVE_EACH_TURN
+    // AUTO-002 uses the *existing* autosave naming, interval and write path.
+    // Ensure an unattended all-AI run continues autosaving even when the
+    // operator disabled that preference for ordinary human play. The native
+    // preference flag itself is never changed or serialized differently.
+    if (!*MultiplayerActive
+    && ((*GamePreferences & PREF_BSC_AUTOSAVE_EACH_TURN) || autosim_control_active())
     && faction_id == MapWin->cOwner) {
         auto_save();
     }
