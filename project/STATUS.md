@@ -37,7 +37,7 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 
 ## AI-002 Titanium Mine automation trial — 7 November
 
-- Source now lets normal automated Formers consider Mines on independent Rolling/Flat Titanium without enabling nonrocky Mines on other tiles. Flat needs projected food ≥1 after the conditional Mine penalty and a positive mineral gain; Mine forecasts compete with Forest/Fungus/Borehole, Flat Farm and eligible Solar choices. Eligible Titanium gets +4 Former tile priority. Former mineral/energy eligibility reads configured caps. **Distributed experimental INI: 3/4/4 N/M/E; parser defaults unchanged.** No Windows AI selection test yet; see [AI-002](WORK-QUEUE.md).
+- Source now lets normal automated Formers consider Mines on independent Rolling/Flat Titanium without enabling nonrocky Mines on other tiles. Flat needs projected food ≥1 after the conditional Mine penalty and a positive mineral gain; Mine forecasts compete with Forest/Fungus/Borehole, Flat Farm and eligible Solar choices. Eligible Titanium gets +4 Former tile priority. Former mineral/energy eligibility reads configured caps. **Distributed experimental INI: 3/4/4 N/M/E; parser defaults unchanged.** Develop/Release CI passes, but no Windows AI selection/balance test exists. **User has deferred AI-002 runtime validation until logged multi-game AI-only campaigns can run (TEL-001/TEL-002 and AUTO-001/002); it is not a PR #4 merge blocker.** See [AI-002](WORK-QUEUE.md).
 
 ## Remaining before PR #4 can merge
 
