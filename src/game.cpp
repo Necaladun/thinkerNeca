@@ -355,6 +355,7 @@ void __cdecl control_game() {
             *ControlTurnB = 0;
             *MultiplayerActive = 0;
             flush_input();
+            std::string telemetry_source_save;
             if (start_lobby) {
                 prefs_load(0);
                 prefs_use();
@@ -363,6 +364,7 @@ void __cdecl control_game() {
                 }
             } else if (startup_load_path.size()) {
                 if (!mod_load_daemon(startup_load_path.c_str(), 0)) {
+                    telemetry_source_save = startup_load_path;
                     for (int i = 1; i < MaxPlayerNum; ++i) {
                         load_faction_art(i);
                     }
@@ -388,7 +390,9 @@ void __cdecl control_game() {
             if (*MultiplayerActive) {
                 net_control_turn();
             } else {
+                telemetry_begin_session(telemetry_source_save.c_str());
                 control_turn();
+                telemetry_end_session();
             }
             desktop_close();
             if (!*ControlTurnB) {
