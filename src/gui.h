@@ -69,6 +69,7 @@ int __thiscall mod_calc_dim(Console* This);
 int __thiscall mod_gen_map(Console* This, int faction_id, int units_only);
 #ifndef BUILD_REL
 void minor_graphics_startup_trace();
+void minor_graphics_underlay_native_probe();
 void minor_graphics_inspector_hook_result(int addr, bool active);
 extern bool minor_native_titanium_sprite_installed;
 void minor_graphics_titanium_hook_result(int bonus_site, int draw_site,

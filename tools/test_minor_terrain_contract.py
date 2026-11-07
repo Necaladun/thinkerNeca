@@ -123,6 +123,19 @@ def main() -> None:
             'minor_landmark_at(' not in renderer,
             'Do not revive single-valued minor feature access')
 
+    underlay = body_between(renderer, 'void minor_graphics_underlay_native_probe()',
+                            'Ready-to-use native feature-line composition')
+    require('REND005 READONLY native Uranium probe' in underlay
+            and '0x4632D0u' in underlay and '0x467000u' in underlay
+            and '0x5E4B9Au' in underlay
+            and 'max_predicates = 24' in underlay
+            and 'max_draw_calls = 24' in underlay
+            and 'write_bytes(' not in underlay
+            and 'write_jump(' not in underlay
+            and 'write_call(' not in underlay
+            and 'minor_graphics_underlay_native_probe();' in patches,
+            'REND-005 underlay reconnaissance must be bounded and read-only')
+
     require('write_jump(0x4688E0, (int)MapWin_gen_overlays);' in patches,
             'Alternative rendering must use the existing verified callback')
     require('draw_minor_terrain_tile(This, x, y);' in renderer,

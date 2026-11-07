@@ -1505,6 +1505,16 @@ bool patch_setup(Config* cf) {
     }
 #endif
 
+    // REND-005 reconnaissance. The resource-only draw site is already
+    // known; the distinct Uranium landmark underlay stage is not.
+    // This pass is read-only and never installs speculative x86 hooks.
+#ifndef BUILD_REL
+    if (!cf->reduced_mode && (cf->minor_native_uranium
+        || cf->minor_native_titanium)) {
+        minor_graphics_underlay_native_probe();
+    }
+#endif
+
     // Titanium may replace only the native Uranium resource Sprite*.
     // If no unique, validated draw call exists, use the working Uranium art.
 #ifndef BUILD_REL

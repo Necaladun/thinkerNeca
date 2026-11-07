@@ -24,6 +24,19 @@ Native Uranium selects `0x78A700` (**variant 0**) or `0x78A72C` (**variant 1**).
 
 Jungle's current patch sites are `0x463CC5`, `0x463D93` and `0x464E78`. The installer now compares all three original six-byte instruction sequences before writing any; an unsupported/mismatched site returns without installing a partial hook. This has source-level coverage, not yet Windows failure-path verification. The Develop Inspector uses a guarded native `strlen` site at `0x4B7A0C`, without hijacking the status window or rewriting terrain flags. PRACX/reduced mode and Release custom-art parity are not established.
 
+## REND-005 read-only native draw reconnaissance (7 November 2026; awaiting Windows log)
+
+**Work in progress; no new underlay draw is installed.** The type-4 special-resource branch at `0x465DFC`/`0x465E37` is a proven **single-resource-sprite** callsite. It is **not** a validated way to draw an independent Uranium/Titanium underlay in addition to an ordinary bonus icon. In particular, changing `mod_bonus_at()` to prefer geology over normal resources, or jumping from the native type-4 branch into the normal-resource branch without knowing its register/stack contract, could damage glyphs, redraw state and gameplay.
+
+A new bounded **read-only** Develop diagnostic, `minor_graphics_underlay_native_probe()` in `src/gui.cpp`, runs during `patch_setup()` after Scient's patch and before existing native Jungle/Titanium hook installation, only when native geology is configured and PRACX/reduced mode is off. It appends `REND005` lines to `minor_terrain_render.log` in the executable folder:
+
+- `BRANCH`: 160 bytes from the verified native type-4 bonus branch (hex dump), including its fall-through to ordinary resource drawing.
+- `CANDIDATE`: up to 24 possible original Uranium-bit mask operations in the bounded map-renderer code range `0x4632D0..0x467000`; these are byte-pattern candidates, **not** confirmed instruction boundaries or patches.
+- `SPRITE_CALL`: up to 24 relative calls whose target resolves to native `Sprite_draw_3` (`0x5E4B9A`), with local byte context to distinguish the known resource call from any landmark-underlay draw.
+- `READONLY ... end`: counts and logging caps. No write, `LM_*` mutation, synthetic Sprite call or speculative hook.
+
+**Evidence required before implementation:** run a normal Develop game with the supported Scient-patched `terranx.exe`, `minor_native_uranium=1` and `minor_native_titanium=1`; preserve the complete new `minor_terrain_render.log`. Decode the candidate native instructions, find the original Uranium-underlay predicate and draw order, check the x/y and canvas ABI, then add guarded original-byte preflights before any patch. The logging pass itself does **not** achieve REND-005's visual acceptance criteria. Do not change a player's `terranx.exe` to force a negative test.
+
 ## Native-editor Uranium baseline for REND-005 (source/save inspection)
 
 The user supplied `uranium H'minee of the Caretakers, 2105.SAV`, with an area manually stamped using the Scenario Editor's old Uranium tile tool. The tool does **not** create a named Uranium Flats entry, but the saved MAP tiles **do** carry the original `LM_URANIUM` bit (`0x8`). At **(48,64)**, native landmarks are `0x00400008`, while `THMIN001` independent minor type/code is `0/0`. The contiguous painted native Uranium region contains 225 tiles. At **(47,67)**, `LM_URANIUM=0x8` and normal `BIT_BONUS_RES=0x400` coexist; the normal resource is nutrient according to `src/map.cpp::underlying_resource_bonus_at`. This is a concrete native editor reference for the observed ability to draw a resource above Uranium.

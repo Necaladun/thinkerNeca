@@ -1045,6 +1045,107 @@ void minor_graphics_startup_trace()
 
 
 /*
+REND-005 native Uranium diagnostic, NOT a rendering patch. The only
+verified type-4 sprite call (0x465E37) is NOT proven to be the separate
+landmark-underlay call used for Uranium plus ordinary resources.
+
+Read only a tightly bounded portion of MapWin_gen_terrain_poly after
+Scient's patch but before experimental native hooks. Print candidate
+Uranium landmark flag predicates and confirmed Sprite_draw_3 call targets,
+with short opcode context for reproducible disassembly on the user's exe.
+Never guess a hook from a mask alone; no engine memory writes.
+*/
+void minor_graphics_underlay_native_probe()
+{
+#if defined(__GNUC__) && defined(__i386__)
+    FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+    if (!fp) {
+        return;
+    }
+    constexpr uintptr_t first = 0x4632D0u;
+    constexpr uintptr_t last = 0x467000u;
+    constexpr uintptr_t sprite_draw_3 = 0x5E4B9Au;
+    constexpr int max_predicates = 24;
+    constexpr int max_draw_calls = 24;
+    int predicates = 0, draw_calls = 0;
+
+    fprintf(fp, "REND005 READONLY native Uranium probe begin range=0x%08X..0x%08X\n",
+        (unsigned)first, (unsigned)last);
+
+    // Reproducible original branch context: bonus_at, 4-branch, native
+    // Sprite* selection, draw and the original jump over other resources.
+    const uintptr_t branch_start = 0x465DF0u;
+    const byte* branch = reinterpret_cast<const byte*>(branch_start);
+    for (unsigned offset = 0; offset < 0xA0u; offset += 16) {
+        fprintf(fp, "REND005 BRANCH 0x%08X", (unsigned)(branch_start + offset));
+        for (unsigned j = 0; j < 16; ++j) {
+            fprintf(fp, " %02X", (unsigned)branch[offset + j]);
+        }
+        fputc('\n', fp);
+    }
+
+    for (uintptr_t site = first; site + 7u < last; ++site) {
+        const byte* p = reinterpret_cast<const byte*>(site);
+        uint32_t mask = 0;
+        bool possible_mask = false;
+        // Immediate AND / TEST of a register: 81 E0..E7 imm32,
+        // F7 C0..C7 imm32. These are candidate starts, not decoded
+        // instructions; overlapping byte patterns need disassembly.
+        if ((p[0] == 0x81 && p[1] >= 0xE0 && p[1] <= 0xE7)
+            || (p[0] == 0xF7 && p[1] >= 0xC0 && p[1] <= 0xC7)) {
+            memcpy(&mask, p + 2, sizeof(mask));
+            possible_mask = mask == 0x00000008u
+                || mask == 0x80000008u || mask == 0x8000000Cu;
+        }
+        // Short AND / TEST reg,imm8. These are especially common for
+        // checking single-bit LM flags.
+        const bool possible_short =
+            ((p[0] == 0x83 && p[1] >= 0xE0 && p[1] <= 0xE7)
+            || (p[0] == 0xF6 && p[1] >= 0xC0 && p[1] <= 0xC7))
+            && p[2] == 0x08;
+
+        if ((possible_mask || possible_short) && predicates < max_predicates) {
+            ++predicates;
+            fprintf(fp, "REND005 CANDIDATE %02d at=0x%08X op=%02X %02X mask=0x%08X context=",
+                predicates, (unsigned)site, (unsigned)p[0],
+                (unsigned)p[1], possible_short ? 8u : (unsigned)mask);
+            const uintptr_t context = site >= first + 8 ? site - 8 : first;
+            for (uintptr_t addr = context; addr < site + 16; ++addr) {
+                fprintf(fp, "%02X", (unsigned)*reinterpret_cast<const byte*>(addr));
+            }
+            fputc('\n', fp);
+        }
+
+        // E8 rel32 calls resolving to the already known sprite draw
+        // routine. Report potential *other* calls separately from the
+        // verified 0x465E37 resource-only call.
+        if (p[0] == 0xE8) {
+            int32_t relative = 0;
+            memcpy(&relative, p + 1, sizeof(relative));
+            const uintptr_t target =
+                static_cast<uintptr_t>(static_cast<intptr_t>(site + 5)
+                    + static_cast<intptr_t>(relative));
+            if (target == sprite_draw_3 && draw_calls < max_draw_calls) {
+                ++draw_calls;
+                fprintf(fp, "REND005 SPRITE_CALL %02d at=0x%08X target=0x%08X context=",
+                    draw_calls, (unsigned)site, (unsigned)target);
+                const uintptr_t context = site >= first + 8 ? site - 8 : first;
+                for (uintptr_t addr = context; addr < site + 16; ++addr) {
+                    fprintf(fp, "%02X", (unsigned)*reinterpret_cast<const byte*>(addr));
+                }
+                fputc('\n', fp);
+            }
+        }
+    }
+    fprintf(fp, "REND005 READONLY native Uranium probe end candidates=%d sprite_calls=%d"
+        " caps=%d,%d (no hooks installed)\n",
+        predicates, draw_calls, max_predicates, max_draw_calls);
+    fclose(fp);
+#endif
+}
+
+
+/*
 Ready-to-use native feature-line composition, kept outside the engine
 until the original local text-buffer callsite and capacity are verified.
 No native LM bits, Natural[] entries or MAP fields are ever modified.
