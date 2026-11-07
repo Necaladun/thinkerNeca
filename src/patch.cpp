@@ -2,6 +2,303 @@
 #include "patch.h"
 #include "patchdata.h"
 #include "patchveh.h"
+#include "savegame.h"
+#include "jungle_hook_preflight.h"
+
+
+// From the user's supported terranx.exe inspection:
+ // 0x4B7A07 pushes StrBuffer, then 0x4B7A0C calls strlen.
+ // The return value controls the native feature-text empty-line skip
+ // (JE 0x4B7C27), so appending here supports standalone minor terrain.
+static bool install_minor_native_inspector()
+{
+#if defined(__GNUC__) && defined(__i386__) && !defined(BUILD_REL)
+    const int site = 0x4B7A0C;
+    // A verified, complete five-byte native E8 call to strlen (0x6453E0).
+    const byte expected[5] = {0xE8, 0xCF, 0xD9, 0x18, 0x00};
+    const bool valid = !memcmp((const void*)site, expected, sizeof(expected));
+    minor_graphics_inspector_hook_result(site, valid);
+    if (!valid) {
+        // Fail closed for alternate executables/patch overlaps, not by
+        // redirecting arbitrary instructions or touching native LM state.
+        return false;
+    }
+    write_call(site, (int)minor_native_inspector_strlen_hook);
+    return true;
+#else
+    return false;
+#endif
+}
+
+/*
+Verified from the user's terranx.exe:
+  0x465DFC  call bonus_at
+  0x465E0E  cmp eax,4; jne other resources
+  0x465E2E  lea ecx,[edx*4+0x78A700] (native Uranium Sprite*)
+  0x465E37  call Sprite_draw_3 at 0x5E4B9A
+This is the exact type-4 resource branch. The old broad scan matched
+15 unrelated Sprite::draw_3 callsites and refused to hook.
+Validate every relevant instruction boundary before changing any bytes.
+*/
+static bool install_minor_native_titanium_sprite()
+{
+#if defined(__GNUC__) && defined(__i386__) && !defined(BUILD_REL)
+    constexpr int bonus_site = 0x465DFC;
+    constexpr int type_four_site = 0x465E0E;
+    constexpr int sprite_site = 0x465E2E;
+    constexpr int draw_site = 0x465E37;
+    constexpr int target = 0x5E4B9A;
+    const byte bonus_expected[] = {0xE8, 0x2F, 0xC2, 0x12, 0x00};
+    const byte type_four_expected[] = {0x83, 0xF8, 0x04, 0x75, 0x2B};
+    const byte sprite_expected[] = {0x8D, 0x0C, 0x95, 0x00, 0xA7, 0x78, 0x00};
+    const byte draw_expected[] = {0x50, 0x53, 0xE8, 0x5E, 0xED, 0x17, 0x00};
+    const byte after_expected[] = {0xEB, 0x40};
+    const bool valid =
+        !memcmp((const void*)bonus_site, bonus_expected, sizeof(bonus_expected))
+        && !memcmp((const void*)type_four_site, type_four_expected,
+            sizeof(type_four_expected))
+        && !memcmp((const void*)sprite_site, sprite_expected,
+            sizeof(sprite_expected))
+        && !memcmp((const void*)(draw_site - 2), draw_expected,
+            sizeof(draw_expected))
+        && !memcmp((const void*)(draw_site + 5), after_expected,
+            sizeof(after_expected));
+    if (!valid) {
+        minor_graphics_titanium_hook_result(bonus_site, draw_site, 0, target);
+        return false;
+    }
+    minor_titanium_native_draw_target = (uintptr_t)target;
+    write_call(draw_site, (int)minor_native_titanium_sprite_hook);
+    minor_native_titanium_sprite_installed = true;
+    minor_graphics_titanium_hook_result(bonus_site, draw_site, 1, target);
+    return true;
+#else
+    return false;
+#endif
+}
+
+/*
+REND-005 supported native underlay path, taken from the user's Develop
+log on the Scient-patched executable (7 November 2026):
+  0x464D9C  AND ESI,0x80000008   original LM_URANIUM/LM_DISABLE check
+  0x464DA2  CMP ESI,8; JNE +0x1A
+  0x464DDC  PUSH EAX; PUSH ECX; MOV ECX,0x78A72C
+  0x464DE3  CALL Sprite_draw_3 (0x5E4B9A), BEFORE ordinary resources
+All relevant preimages must match before writing either hook.
+The mask trampoline adds LM_URANIUM to local ESI only, without changing
+native MAP::landmarks, original LM_DISABLE or any v3 type/code storage.
+*/
+static bool install_minor_native_geology_underlay()
+{
+#if defined(__GNUC__) && defined(__i386__) && !defined(BUILD_REL)
+    constexpr int mask_site = 0x464D9C;
+    constexpr int compare_site = 0x464DA2;
+    constexpr int draw_site = 0x464DE3;
+    constexpr int sprite_target = 0x5E4B9A;
+    const byte expected_mask[6] = {0x81, 0xE6, 0x08, 0x00, 0x00, 0x80};
+    const byte expected_compare[5] = {0x83, 0xFE, 0x08, 0x75, 0x1A};
+    const byte expected_draw[12] = {
+        0x50, 0x51, 0xB9, 0x2C, 0xA7, 0x78, 0x00,
+        0xE8, 0xB2, 0xFD, 0x17, 0x00
+    };
+    const bool valid =
+        !memcmp((const void*)mask_site, expected_mask, sizeof(expected_mask))
+        && !memcmp((const void*)compare_site, expected_compare, sizeof(expected_compare))
+        && !memcmp((const void*)(draw_site - 7), expected_draw, sizeof(expected_draw));
+    if (!valid) {
+        minor_graphics_underlay_hook_result(mask_site, draw_site, false);
+        return false;
+    }
+
+    // The entire pair has passed preflight. All original-byte checks
+    // precede both writes, so unsupported executables retain the prior
+    // resource-sentinel renderer and never get a half-installed hook.
+    const byte redirect[6] = {0xE9, 0, 0, 0, 0, 0x90};
+    minor_geology_underlay_draw_target = (uintptr_t)sprite_target;
+    write_bytes(mask_site, expected_mask, redirect, sizeof(redirect));
+    write_jump(mask_site, (int)minor_native_geology_underlay_mask_hook);
+    write_call(draw_site, (int)minor_native_geology_underlay_sprite_hook);
+    minor_native_geology_underlay_installed = true;
+    minor_graphics_underlay_hook_result(mask_site, draw_site, true);
+    return true;
+#else
+    return false;
+#endif
+}
+
+
+/*
+The supported SMAX executable checks native Jungle at three locations
+inside MapWin_gen_terrain_poly. Original instruction (6 bytes):
+    and edx, 0x80000004
+The original following comparison checks edx == 4 (LM_JUNGLE on and
+LM_DISABLE off). Preserve that test and its flags, but OR in independent
+Jungle *only for rendering*. Never change MAP::landmarks or the 16
+native landmark slots.
+
+Exact 6-byte sites, verified against the user's Develop mask log:
+  current tile         0x463CC5 (resume 0x463CCB)
+  neighbour transition 0x463D93 (resume 0x463D99)
+  later neighbour pass 0x464E78 (resume 0x464E7E)
+
+The two neighbour sites already have a MAP* in EAX. The current-tile
+site uses x=[EBP+0x20], y=[EBP+0x24]. Each naked trampoline preserves
+all registers, alters saved EDX only for independent Jungle, replays
+the original AND and returns with exactly the same stack shape.
+*/
+#if defined(__GNUC__) && defined(__i386__)
+#ifndef BUILD_REL
+extern "C" int __cdecl minor_render_geology_xy(int x, int y)
+{
+    // Store the specific type for the subsequent earlier-stage Uranium
+    // Sprite_draw_3 callback. Its arguments are not interchangeable with
+    // those of the later type-4 resource-sprite call.
+    const bool titanium = conf.minor_native_titanium
+        && minor_landmark_has(x, y, MINOR_TITANIUM);
+    const bool uranium = conf.minor_native_uranium
+        && minor_landmark_has(x, y, MINOR_URANIUM);
+    minor_geology_underlay_current_type =
+        titanium ? MINOR_TITANIUM : uranium ? MINOR_URANIUM : MINOR_NONE;
+    minor_geology_underlay_current_x = x;
+    minor_geology_underlay_current_y = y;
+    return titanium || uranium;
+}
+
+// Replay original 6-byte AND ESI,0x80000008 on return. The helper
+// modifies saved local ESI, never native MAP flags; OR preserves
+// LM_DISABLE so the following CMP ESI,8 still suppresses disabled art.
+extern "C" __attribute__((naked, used))
+void minor_native_geology_underlay_mask_hook()
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl 0x24(%ebp)\n\t"
+        "pushl 0x20(%ebp)\n\t"
+        "call _minor_render_geology_xy\n\t"
+        "addl $8, %esp\n\t"
+        "testl %eax, %eax\n\t"
+        "jz 1f\n\t"
+        "orl $8, 4(%esp)\n\t"
+        "1: popal\n\t"
+        "andl $0x80000008, %esi\n\t"
+        "pushl $0x464DA2\n\t"
+        "ret\n\t"
+    );
+}
+#endif
+
+extern "C" int __cdecl minor_render_jungle_xy(int x, int y)
+{
+    return minor_landmark_has(x, y, MINOR_JUNGLE);
+}
+
+extern "C" int __cdecl minor_render_jungle_map(const MAP* sq)
+{
+    if (!sq || !*MapTiles || !*MapHalfX || *MapAreaTiles <= 0) {
+        return 0;
+    }
+    const uintptr_t first = reinterpret_cast<uintptr_t>(*MapTiles);
+    const uintptr_t pointer = reinterpret_cast<uintptr_t>(sq);
+    if (pointer < first || pointer - first >=
+        static_cast<size_t>(*MapAreaTiles) * sizeof(MAP)) {
+        return 0;
+    }
+    const size_t offset = pointer - first;
+    if (offset % sizeof(MAP)) {
+        return 0;
+    }
+    const size_t id = offset / sizeof(MAP);
+    const int y = static_cast<int>(id / *MapHalfX);
+    const int x = static_cast<int>(2 * (id % *MapHalfX) + (y & 1));
+    return minor_landmark_has(x, y, MINOR_JUNGLE);
+}
+
+extern "C" __attribute__((naked, used))
+void minor_native_jungle_current_hook()
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl 0x24(%ebp)\n\t"
+        "pushl 0x20(%ebp)\n\t"
+        "call _minor_render_jungle_xy\n\t"
+        "addl $8, %esp\n\t"
+        "testl %eax, %eax\n\t"
+        "jz 1f\n\t"
+        "movl $4, 20(%esp)\n\t"
+        "1: popal\n\t"
+        "andl $0x80000004, %edx\n\t"
+        "pushl $0x463CCB\n\t"
+        "ret\n\t"
+    );
+}
+
+extern "C" __attribute__((naked, used))
+void minor_native_jungle_neighbour_hook_1()
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl %eax\n\t"
+        "call _minor_render_jungle_map\n\t"
+        "addl $4, %esp\n\t"
+        "testl %eax, %eax\n\t"
+        "jz 1f\n\t"
+        "movl $4, 20(%esp)\n\t"
+        "1: popal\n\t"
+        "andl $0x80000004, %edx\n\t"
+        "pushl $0x463D99\n\t"
+        "ret\n\t"
+    );
+}
+
+extern "C" __attribute__((naked, used))
+void minor_native_jungle_neighbour_hook_2()
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl %eax\n\t"
+        "call _minor_render_jungle_map\n\t"
+        "addl $4, %esp\n\t"
+        "testl %eax, %eax\n\t"
+        "jz 1f\n\t"
+        "movl $4, 20(%esp)\n\t"
+        "1: popal\n\t"
+        "andl $0x80000004, %edx\n\t"
+        "pushl $0x464E7E\n\t"
+        "ret\n\t"
+    );
+}
+
+static bool install_minor_native_jungle()
+{
+    const byte original[6] = {0x81, 0xE2, 0x04, 0, 0, 0x80};
+    const byte redirect[6] = {0xE9, 0, 0, 0, 0, 0x90};
+    // Fail closed if the executable or another mod changed these
+    // instructions; write_jump itself does not validate original bytes.
+    struct JungleHookSite { int addr; int target; };
+    const JungleHookSite locations[] = {
+        {0x463CC5, (int)minor_native_jungle_current_hook},
+        {0x463D93, (int)minor_native_jungle_neighbour_hook_1},
+        {0x464E78, (int)minor_native_jungle_neighbour_hook_2},
+    };
+    // All three predicates are required for coherent Jungle edges.
+    // Shared two-phase helper is exercised by a host-only negative-path
+    // harness: no write callback fires until *all* preimages match.
+    return jungle_hook_preflight::validate_then_apply(
+        locations,
+        [&](const JungleHookSite& site) -> bool {
+            if (memcmp((const void*)site.addr, original, sizeof(original))) {
+                debug("minor Jungle native hook skipped: byte mismatch at 0x%08X\n",
+                    site.addr);
+                return false;
+            }
+            return true;
+        },
+        [&](const JungleHookSite& site) {
+            write_bytes(site.addr, original, redirect, sizeof(original));
+            write_jump(site.addr, site.target);
+        });
+}
+#endif
 
 
 int __cdecl BaseWin_random_seed() {
@@ -1290,6 +1587,53 @@ bool patch_setup(Config* cf) {
     }
 
     /*
+    Integrate independent Jungle into the original terrain pass.
+    The three patched AND instructions are unique, verified six-byte
+    instructions from the user's exact supported terranx.exe.
+    Do not enable a binary patch with unknown instruction boundaries.
+    PRACX/reduced mode retains its own renderer and stays unpatched.
+    */
+#if defined(__GNUC__) && defined(__i386__)
+    if (cf->minor_native_jungle && !cf->reduced_mode) {
+        install_minor_native_jungle();
+    }
+#endif
+
+    // REND-005 reconnaissance. The resource-only draw site is already
+    // known; the distinct Uranium landmark underlay stage is not.
+    // This pass is read-only and never installs speculative x86 hooks.
+#ifndef BUILD_REL
+    if (!cf->reduced_mode && (cf->minor_native_uranium
+        || cf->minor_native_titanium)) {
+        minor_graphics_underlay_native_probe();
+    }
+#endif
+
+    // The Uranium major-landmark art is painted before ordinary bonuses.
+    // REND-005 uses that native stage with guarded, separate hooks.
+    // The preceding probe remains read-only; the switch is reversible.
+#ifndef BUILD_REL
+    if (cf->minor_geology_underlay && !cf->reduced_mode
+        && (cf->minor_native_uranium || cf->minor_native_titanium)) {
+        install_minor_native_geology_underlay();
+    }
+#endif
+
+    // Titanium may replace only the native Uranium resource Sprite*.
+    // If no unique, validated draw call exists, use the working Uranium art.
+#ifndef BUILD_REL
+    if (cf->minor_native_titanium && !cf->reduced_mode) {
+        install_minor_native_titanium_sprite();
+    }
+#endif
+
+#ifndef BUILD_REL
+    if (cf->minor_native_inspector && !cf->reduced_mode) {
+        install_minor_native_inspector();
+    }
+#endif
+
+    /*
     Fix engine rendering issue where ocean fungus tiles displayed
     inconsistent graphics compared to the adjacent land fungus tiles.
     */
@@ -1611,7 +1955,8 @@ bool patch_setup(Config* cf) {
     if (!cf->landmarks.ruins     ) remove_call(0x5C88D9);
     if (!cf->landmarks.unity     ) remove_call(0x5C88EE);
     if (!cf->landmarks.fossil    ) remove_call(0x5C88F7);
-    if (!cf->landmarks.canyon    ) remove_call(0x5C8903);
+    // Retired native Canyon slot (0x200): disable its original WorldBuilder call.
+    remove_call(0x5C8903);
     if (!cf->landmarks.nexus     ) remove_call(0x5C890F);
     if (!cf->landmarks.borehole  ) remove_call(0x5C8918);
     if (!cf->landmarks.sargasso  ) remove_call(0x5C8921);

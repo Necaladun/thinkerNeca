@@ -1,0 +1,96 @@
+name: Windows 32-bit build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+# One build per live PR revision; cancel superseded CI jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-develop:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install MinGW and CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++-mingw-w64-i686 binutils-mingw-w64-i686
+          python -m pip install 'cmake>=3.31,<4' pillow
+      - name: Configure 32-bit Windows target
+        run: |
+          cat > win32-toolchain.cmake <<'EOF'
+          set(CMAKE_SYSTEM_NAME Windows)
+          set(CMAKE_C_COMPILER i686-w64-mingw32-gcc)
+          set(CMAKE_CXX_COMPILER i686-w64-mingw32-g++)
+          set(CMAKE_RC_COMPILER i686-w64-mingw32-windres)
+          EOF
+          cmake -S . -B build/ci -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=win32-toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Develop
+      - name: Compile Develop DLL and launcher
+        run: cmake --build build/ci --parallel 2
+      - name: Test indexed sprite atlas generation (synthetic art only)
+        run: |
+          python -m py_compile tools/make_minor_terrain.py tools/build_neca_sprites.py
+          python tools/test_neca_sprites.py
+          python tools/test_minor_terrain_atlas.py
+          python tools/test_titanium_sprite_mask.py
+          python tools/make_minor_terrain.py assets/minor_terrain.pcx build/ci/minor_terrain.pcx
+      - name: Test native Jungle three-site preflight (host harness)
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic \
+            tools/test_jungle_hook_preflight.cpp -o build/ci/test_jungle_hook_preflight
+          build/ci/test_jungle_hook_preflight
+      - name: Check independent terrain source contract
+        run: python tools/test_minor_terrain_contract.py
+      - name: Check reserved major-landmark slot 10
+        run: python tools/test_reserved_landmark_slot.py
+      - name: Check Sunny Mesa centre-only energy bonus
+        run: python tools/test_mesa_energy.py
+      - name: Validate distributed thinker.ini options
+        run: python tools/test_thinker_ini_contract.py
+      - name: Validate fork docs and local links
+        run: python tools/test_project_docs.py
+      - name: Check independent minor-terrain SAV decoder
+        run: python tools/test_minor_save.py
+      - name: Upload Windows Develop binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: thinker-develop-win32
+          path: |
+            build/ci/thinker.dll
+            build/ci/thinker.exe
+          if-no-files-found: error
+
+  # Compile-only parity check. Custom Titanium/Inspector native hooks remain
+  # Develop-only; a passing Release build does not establish graphics parity.
+  build-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MinGW and CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++-mingw-w64-i686 binutils-mingw-w64-i686
+          python -m pip install 'cmake>=3.31,<4'
+      - name: Configure Release 32-bit Windows target
+        run: |
+          cat > win32-toolchain.cmake <<'EOF'
+          set(CMAKE_SYSTEM_NAME Windows)
+          set(CMAKE_C_COMPILER i686-w64-mingw32-gcc)
+          set(CMAKE_CXX_COMPILER i686-w64-mingw32-g++)
+          set(CMAKE_RC_COMPILER i686-w64-mingw32-windres)
+          EOF
+          cmake -S . -B build/ci-release -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=win32-toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Release
+      - name: Compile Release DLL and launcher (no runtime/artwork assertion)
+        run: cmake --build build/ci-release --parallel 2

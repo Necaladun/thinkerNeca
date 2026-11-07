@@ -812,7 +812,7 @@ int __cdecl mod_crop_yield(int faction_id, int base_id, int x, int y, int flag) 
     int alt = sq->alt_level();
     bool has_limit = false;
     bool bonus_landmark = false;
-    const int minor_nutrients = minor_terrain_definition(minor_landmark_at(x, y)).nutrient;
+    const int minor_nutrients = minor_terrain_yields_at(x, y).nutrient;
     bool bonus_nutrient = bonus_at(x, y) == RES_NUTRIENT;
     bool is_base = sq->is_base();
     int planet = Factions[faction_id].SE_planet_pending;
@@ -947,8 +947,11 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
     if (!sq) {
         return 0;
     }
-    // Minor minerals use the same cap/mine interaction as a landmark bonus.
-    const int minor_minerals = minor_terrain_definition(minor_landmark_at(x, y)).mineral;
+    // A Forest exploits its normal forest output, not underground Titanium.
+    // Keep the underlying minor feature in storage for later terraforming.
+    // Other improvements (including Mines) still get the existing bonus.
+    const int minor_minerals = (sq->items & BIT_FOREST)
+        ? 0 : minor_terrain_yields_at(x, y).mineral;
     bool has_limit = true;
     bool bonus_landmark = false;
     bool bonus_mineral = bonus_at(x, y) == RES_MINERAL;
@@ -958,8 +961,7 @@ int __cdecl mod_mine_yield(int faction_id, int base_id, int x, int y, int flag) 
 
     if ((sq->landmarks & LM_CRATER && sq->code_at() < 9)
     || (sq->landmarks & LM_VOLCANO && sq->code_at() < 9)
-    || (sq->landmarks & LM_FOSSIL && sq->code_at() < 6)
-    || (sq->landmarks & LM_CANYON)) {
+    || (sq->landmarks & LM_FOSSIL && sq->code_at() < 6)) {
         bonus_landmark |= !(sq->landmarks & LM_DISABLE);
     }
     int value = bonus_landmark + minor_minerals
@@ -1069,7 +1071,10 @@ int __cdecl mod_energy_yield(int faction_id, int base_id, int x, int y, int flag
     bool is_fungus = false;
     bool has_limit = true;
     bool bonus_energy = bonus_at(x, y) == RES_ENERGY;
-    const int minor_energy = minor_terrain_definition(minor_landmark_at(x, y)).energy;
+    // Uranium is not an additional Forest energy yield. The deposit persists
+    // on the tile and becomes exploitable after forest removal.
+    const int minor_energy = (sq->items & BIT_FOREST)
+        ? 0 : minor_terrain_yields_at(x, y).energy;
     bool is_base = sq->is_base();
     int economy = Factions[faction_id].SE_economy_pending
         + (base_id >= 0 && Bases[base_id].golden_age_active() ? 1 : 0);
@@ -1166,7 +1171,8 @@ int __cdecl mod_energy_yield(int faction_id, int base_id, int x, int y, int flag
             value += ResInfo->bonus_sq.energy;
         }
         if ((sq->landmarks & LM_VOLCANO && sq->code_at() < 9)
-        || sq->landmarks & (LM_URANIUM|LM_GEOTHERMAL|LM_RIDGE|LM_MESA)) {
+        || (sq->landmarks & LM_MESA && sq->code_at() < 9)
+        || sq->landmarks & (LM_URANIUM|LM_GEOTHERMAL|LM_RIDGE)) {
             value += !(sq->landmarks & LM_DISABLE);
         }
         if (base_id >= 0 && project_base(FAC_MERCHANT_EXCHANGE) == base_id) {
@@ -1347,8 +1353,11 @@ int __cdecl mod_minerals_at(int x, int y) {
 Determine if the tile has a resource bonus.
 Return Value: 0 (no bonus), 1 (nutrient), 2 (mineral), 3 (energy)
 */
-int __cdecl mod_bonus_at(int x, int y) {
-    MAP* sq = mapsq(x, y);
+// Evaluate the actual natural resource first. Some resource bonuses have
+// BIT_BONUS_RES explicitly set (e.g. editor placement); others are inferred
+// from the map seed and coordinates. Neither kind may be hidden by our
+// renderer-only geological sentinel.
+static int underlying_resource_bonus_at(int x, int y, MAP* sq) {
     uint32_t bit = sq->items;
     uint32_t alt = sq->alt_level();
 
@@ -1389,6 +1398,45 @@ int __cdecl mod_bonus_at(int x, int y) {
         return ((bit & BIT_MINERAL_RES) != 0) + 1; // nutrient or mineral
     }
     return ret;
+}
+
+int __cdecl mod_bonus_at(int x, int y) {
+    MAP* sq = mapsq(x, y);
+    if (!sq) {
+        return RES_NONE;
+    }
+
+    // Resource art is a single native sprite slot. Give both flagged and
+    // procedural resource bonuses priority; independent minor-terrain
+    // nutrient/mineral/energy bonuses still stack in the yield functions.
+    const int normal_bonus = underlying_resource_bonus_at(x, y, sq);
+    if (normal_bonus != RES_NONE) {
+        return normal_bonus;
+    }
+
+    // The native map renderer uses bonus_at(x,y)==4 to draw its already
+    // loaded terrestrial special-resource sprite for Uranium/Titanium.
+    // Present 4 ONLY at that renderer's direct callsite. All genuine
+    // resource calculations and AI calls receive ordinary 0..3 bonuses.
+    // OpenSMAC identifies this native terrain draw range for the supported
+    // terranx.exe; never turn independent geology into a global resource.
+#if defined(__GNUC__)
+    const uintptr_t caller = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
+#else
+    const uintptr_t caller = 0; // Unsupported compiler: no visual shortcut.
+#endif
+    const bool native_geology =
+        (minor_landmark_has(x, y, MINOR_URANIUM) && conf.minor_native_uranium)
+        || (minor_landmark_has(x, y, MINOR_TITANIUM) && conf.minor_native_titanium);
+    if (native_geology && minor_native_geology_underlay_installed) {
+        // Native underlay is already painted before the resource pass.
+        // Repeating special-resource type 4 would duplicate/obscure it.
+        return RES_NONE;
+    }
+    if (native_geology && caller >= 0x4632D0u && caller < 0x467000u) {
+        return 4; // Safe legacy fallback if the underlay preflight failed.
+    }
+    return RES_NONE;
 }
 
 /*
@@ -1569,10 +1617,14 @@ int item_yield(int x, int y, int faction_id, int bonus, MapItem item) {
         if (sq->items & BIT_RIVER && !is_ocean(sq)) {
             E++;
         }
-        const MinorTerrainDefinition& minor = minor_terrain_definition(minor_landmark_at(x, y));
+        const MinorTerrainYield minor = minor_terrain_yields_at(x, y);
         N += minor.nutrient;
-        M += minor.mineral;
-        E += minor.energy;
+        // The AI must not prefer a future Forest because of buried geology.
+        // Preserve Jungle's nutrient contribution and ordinary bonus icons.
+        if (item != BIT_FOREST) {
+            M += minor.mineral;
+            E += minor.energy;
+        }
         if (sq->landmarks & LM_CRATER && sq->code_at() < 9) { M++; }
         if (sq->landmarks & LM_VOLCANO && sq->code_at() < 9) { M++; E++; }
         if (sq->landmarks & LM_JUNGLE) { N++; }
@@ -1580,8 +1632,7 @@ int item_yield(int x, int y, int faction_id, int bonus, MapItem item) {
         if (sq->landmarks & LM_FRESH && is_ocean(sq)) { N++; }
         if (sq->landmarks & LM_GEOTHERMAL) { E++; }
         if (sq->landmarks & LM_RIDGE) { E++; }
-        if (sq->landmarks & LM_MESA) { E++; }
-        if (sq->landmarks & LM_CANYON) { M++; }
+        if (sq->landmarks & LM_MESA && sq->code_at() < 9) { E++; }
         if (sq->landmarks & LM_FOSSIL && sq->code_at() < 6) { M++; }
         if (Factions[faction_id].SE_economy_pending >= 2) {
             E++;

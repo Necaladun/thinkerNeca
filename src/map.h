@@ -12,6 +12,8 @@ const int ManifoldHarmonicsBonus[][3] = {
 
 MAP* next_tile(int x, int y, size_t offset, int* tx, int* ty);
 MAP* mapsq(int x, int y);
+// True only after native REND-005 underlay hooks pass complete byte preflight.
+extern bool minor_native_geology_underlay_installed;
 int wrap(int x);
 int x_dist(int x1, int x2);
 int map_range(int x1, int y1, int x2, int y2);

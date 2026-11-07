@@ -9,8 +9,10 @@
 
 - `new_world_builder=1` invokes Thinker's generator. The current test profile has `modified_landmarks=1`.
 - The modified generator places independent climate-sensitive Jungle **early**, then native major landmarks; major placement clears overlapping earlier minor terrain. It finalises climate/rockiness before a **shared late geology pass**, alternating one Uranium and one Titanium deposit each round (if both enabled).
-- Independent Uranium and Titanium do not use `LM_URANIUM` or any other major slot. Each deposit shares Uranium's former lowland eligibility and fungus clearing, and completed patches enforce a two-tile buffer against both types and major landmarks. Different geology preferences are future ideas, not current rules. The old major Jungle/Uranium generators are disabled under the modified-map route.
+- Independent Uranium and Titanium do not use `LM_URANIUM` or any other major slot. Each deposit uses the same lowland eligibility and **preserves any existing fungus** (clearing it is left to the player); completed patches enforce a two-tile buffer against both types and major landmarks. Different geology preferences are future ideas, not current rules. The old major Jungle/Uranium generators are disabled under the modified-map route.
 - Mirrored world generation currently skips independent minor terrain. Neither mirrored modes nor the native original builder are a supported target for the current fresh-game terrain experience.
+
+**Future overlap policy (DEC-016/TERR-004):** current eligibility and post-generation cleanup intentionally prevent minor-versus-minor and minor-versus-major overlaps. The approved **data model** must allow multiple minor features on a tile, including conjunctions with native flags. **Approved generation policy:** preserve existing exclusion and spacing between all current independent Jungle/Uranium/Titanium features, and separation from native major landmarks. The engine may *store* Jungle+geology or Uranium+Titanium on an intentionally edited/synthetic tile, but the generator must **not** place these combinations because of the unbalanced combined yields. Only future type-specific, explicitly approved overlap rules may relax exclusion. Shared native per-tile `code_at()` can conflict across overlapping native landmarks, so the ability to store multiple `LM_*` bits does not guarantee every native major combination works correctly. This section describes current generation until TERR-004 is implemented.
 
 ## Sixteen native major slots
 
@@ -35,11 +37,21 @@ Original slot ordering is retained; **new independent minor types consume none o
 | 15 | U.N.S. Unity Wreckage | `unity=1` (expansion context) |
 | 16 | Fossil Field Ridge | `fossil=1`; modified shelf placement |
 
-Additional modified features include changed Great Dunes geometry, resource distribution and a freshwater oasis. **Great Dunes have a positive user visual test**, while full regression on other landmarks remains outstanding.
+Additional modified features include changed Great Dunes geometry, resource distribution and a freshwater oasis. **Great Dunes and Sunny Mesa have positive user visual/yield tests.** A complete other-major landmark interaction matrix remains unverified, but is not a PR #4 merge gate.
 
 **Sunny Mesa (MAP-005, MAP-006):** the generator marks the full `TableRange[3]` (7×7, 49-tile) area as `LM_MESA`. The earlier generator raised the **central 5×5** (`TableRange[2]`, 25 tiles) to the 1,000–1,999 m band and left the outer 24 tiles below 1,000 m; the +1 energy effect was separately restricted to `code_at() < 9` (central 3×3), which the user verified in-game on 2026-11-04. **Current elevation (restored):** the central 5×5 (indices 0–24) is generated in the 1,000–1,999 m band and the outer 7×7 rim (indices 25–48) in the 0–999 m band. The engine's normal `world_alt_set(..., true)` slope adjustments remain. **Discarded MAP-006 experiment:** raising the 3×3 core to the 2,000–2,999 m band caused the native Mesa surface to look domed/bulging in a user screenshot (2026-11-04); reverted without changing the sprite or the confirmed +1E centre-only effect. No guaranteed energy resource was added.
 
 **Slot 10:** the old Canyon-shaped random terrain, name and economic bonus no longer generate, and the native WorldBuilder Canyon call is disabled. The original executable may still contain native Canyon graphics/editor interpretation for flag `0x200`; do not assign it to new terrain before implementing appropriate new rendering. No new landmark has been selected.
+
+## Geological/resource and Forest balance rules — 7 November 2026
+
+Further balance decision during the 3–5-tile geological trial: **new Titanium patches may overlap ordinary nutrient or energy resources, but not ordinary mineral resources**. The eligibility predicate checks `mod_bonus_at()`, which resolves both explicitly flagged resource bonuses and implicit map-seed-derived bonuses. It does not simply check `BIT_MINERAL_RES`, nor does it erase mineral resources. Already-saved Titanium/mineral-resource overlaps are unaffected by map generation. **Post-generation pod discoveries are handled separately:** `goody_box()` rerolls an otherwise mineral resource on independent Titanium into an equal-chance nutrient/energy resource, leaving Uranium+energy allowed. No global `bonus_at()` suppression is introduced.
+
+**Independent Titanium and Uranium no longer improve Forest output**. Live mineral/energy yield branches and Thinker's projected Forest `item_yield()` omit those geological modifiers when the tile/forecast is Forest. Jungle nutrients, natural resource icons, ordinary Forest base yields, Mine mechanics, and geology storage survive unchanged. The +1 Titanium Mine enhancement is deliberately **retained for this trial**, pending observations of smaller deposits. The native legacy Uranium major-landmark implementation is outside this change.
+
+## Geological distribution trial — 7 November 2026
+
+Approved for draft PR #4: Uranium and Titanium deposits shrink from the old weighted 3–9 tiles (mean 6) to **3–5** (weights 1:3:1, mean 4), while per-type deposit attempts increase by approximately 50% from **2–6** to **3–9** based on map area. The mathematical expected number of geological tiles remains approximately constant where all attempts succeed; realised values can be lower because the existing 2-tile exclusion buffer can reject centres or shapes. Existing fungus is **not cleared** by geology generation. A fungus-covered deposit normally produces fungus-specific yields until clearing, even while its hidden geology is stored and Inspector-visible. Other generation rules, natural overlap exclusions, resource bonuses, saving and rendering remain unchanged. This is a **balance experiment** until representative fresh maps are compared; previous successful Develop graphics and save/reload tests do not verify this revised distribution.
 
 ## Testing and balance
 

@@ -796,7 +796,7 @@ enum MapLandmark {
     LM_DUNES = 0x40,
     LM_FRESH = 0x80,
     LM_MESA = 0x100,
-    LM_CANYON = 0x200,
+    LM_RESERVED_10 = 0x200, // Native slot 10; former Nessus Canyon is retired
     LM_GEOTHERMAL = 0x400,
     LM_RIDGE = 0x800,
     LM_BOREHOLE = 0x1000,

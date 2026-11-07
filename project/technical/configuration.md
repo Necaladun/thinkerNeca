@@ -14,13 +14,14 @@ At startup, the fork reads `thinker.ini`, then optionally `thinker_user.ini` fro
 | `base_capture_fix` | `0` | Probe-team problem appears mitigated in-game; temporary workaround, not a confirmed underlying fix (BUG-001) |
 | `probe_action_fix` | `1` | Separate probe-team mechanic fixes remain on |
 | `spawn_free_units` | `0,2,2,0,2,2,1,2,2` | Player-preferred additional starting Formers and scouts, including aquatic equivalents |
-| `tile_output_limit` | `3,3,3` | **Experimental** pre-tech resource cap; BAL-001, previously 2/2/2 |
+| `tile_output_limit` | `3,4,4` | **Experimental** N/M/E pre-tech caps; previous trial 3/3/3, original 2/2/2 (BAL-001) |
 | `world_polar_caps` | `0` | Player preference |
 | `skip_event` | `13`, `17` on separate lines | Exclude Sunspots and Base Asteroid Strike |
 | `new_world_builder` / `modified_landmarks` | `1` / `1` | Intended modified-map path |
 | `minor_jungle` / `minor_uranium` / `minor_titanium` | All `1` | Independent minor-terrain generation |
 | `minor_native_jungle` / `minor_native_uranium` / `minor_native_titanium` | All `1` | Native Jungle and Uranium; Titanium has native-stage custom art in supported Develop mode |
 | `minor_native_inspector` | `1` | Develop-only native feature-line labels |
+| `minor_geology_underlay` | `1` (compiled default `0`) | Experimental REND-005 Develop-only Uranium-style geological underlay beneath normal resources; original-byte preflight; set `0` in `thinker_user.ini` for fallback. Core Windows Develop visuals accepted; optional rare compatibility checks deferred |
 | `minor_titanium_sprite_mode` | `3` | **User-verified** local blue-grey Titanium atlas in Develop; compiled absent-option default `0` |
 | `minor_render_mode` / `minor_debug_tile_names` | `0` / `0` | Prototype fallback mode selection; no debug tile-name overlays |
 

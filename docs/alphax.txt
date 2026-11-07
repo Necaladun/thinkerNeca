@@ -1267,7 +1267,7 @@ The Ruins, Ruins
 Great Dunes, Dunes
 Freshwater Sea, Fresh
 Sunny Mesa, Mesa
-Nessus Canyon, Canyon
+Reserved Landmark 10, Reserved
 Geothermal Shallows, Geothermal
 Pholus Ridge, Ridge
 Borehole Cluster, Borehole

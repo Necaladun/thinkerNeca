@@ -287,13 +287,14 @@ int option_handler(void* user, const char* section, const char* name, const char
         }
     } else if (MATCH("skip_event")) {
         int val = clamp(atoi(value), 0, 32);
-        cf->skip_random_events = (!val ? 0 : cf->skip_random_events | (1 << (val - 1)));
+        cf->skip_random_events = (!val ? 0 : cf->skip_random_events | (1u << (val - 1)));
     } else if (MATCH("skip_faction")) {
         int val = clamp(atoi(value), 0, 32);
-        cf->skip_random_factions = (!val ? 0 : cf->skip_random_factions | (1 << (val - 1)));
+        cf->skip_random_factions = (!val ? 0 : cf->skip_random_factions | (1u << (val - 1)));
     } else if (MATCH("skip_facility")) {
         int val = clamp(atoi(value), 0, 64);
-        cf->skip_gov_facility = (!val ? 0 : cf->skip_gov_facility | (1 << (val - 1)));
+        // This mask is 64 bits. A 32-bit signed shift was undefined for IDs 33-64.
+        cf->skip_gov_facility = (!val ? 0 : cf->skip_gov_facility | (1ull << (val - 1)));
     } else if (MATCH("crater")) {
         cf->landmarks.crater = max(0, atoi(value));
     } else if (MATCH("volcano")) {
@@ -302,8 +303,26 @@ int option_handler(void* user, const char* section, const char* name, const char
         cf->minor_jungle = !!atoi(value);
     } else if (MATCH("minor_uranium")) {
         cf->minor_uranium = !!atoi(value);
-    } else if (MATCH("minor_ironstone")) {
-        cf->minor_ironstone = !!atoi(value);
+    } else if (MATCH("minor_titanium")) {
+        cf->minor_titanium = !!atoi(value);
+    } else if (MATCH("minor_native_uranium")) {
+        cf->minor_native_uranium = !!atoi(value);
+    } else if (MATCH("minor_native_titanium")) {
+        cf->minor_native_titanium = !!atoi(value);
+    } else if (MATCH("minor_geology_underlay")) {
+        cf->minor_geology_underlay = !!atoi(value);
+    } else if (MATCH("minor_titanium_sprite_mode")) {
+        cf->minor_titanium_sprite_mode = clamp(atoi(value), 0, 3);
+    } else if (MATCH("minor_native_inspector")) {
+        cf->minor_native_inspector = !!atoi(value);
+    } else if (MATCH("minor_native_jungle_preview")) {
+        cf->minor_native_jungle_preview = !!atoi(value);
+    } else if (MATCH("minor_native_jungle")) {
+        cf->minor_native_jungle = !!atoi(value);
+    } else if (MATCH("minor_render_mode")) {
+        cf->minor_render_mode = clamp(atoi(value), 0, 1);
+    } else if (MATCH("minor_debug_tile_names")) {
+        cf->minor_debug_tile_names = !!atoi(value);
     } else if (MATCH("jungle")) {
         cf->landmarks.jungle = max(0, atoi(value));
     } else if (MATCH("uranium")) {
@@ -318,8 +337,6 @@ int option_handler(void* user, const char* section, const char* name, const char
         cf->landmarks.fresh = max(0, atoi(value));
     } else if (MATCH("mesa")) {
         cf->landmarks.mesa = max(0, atoi(value));
-    } else if (MATCH("canyon")) {
-        cf->landmarks.canyon = max(0, atoi(value));
     } else if (MATCH("geothermal")) {
         cf->landmarks.geothermal = max(0, atoi(value));
     } else if (MATCH("ridge")) {

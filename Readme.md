@@ -1,6 +1,23 @@
 
-SMACX Thinker Mod
-=================
+# thinkerNeca — Alpha Centauri / Alien Crossfire Thinker fork
+
+**This is Necaladun's experimental fork of [Induktio's Thinker Mod](https://github.com/induktio/thinker)**, not an upstream Thinker release. Its current focus is independent minor terrain, major-landmark generation, graphics integration and adjustable terrain economics for **fresh SMAC/X games**. Draft [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4) carries the latest work; the fork is **not yet a validated Release build**.
+
+The new independent minor features are **Jungle (+1 nutrient), Uranium (+1 energy) and Titanium (+1 mineral)**, rendered without consuming original major-landmark slots. Uranium and Titanium use the same native resource sprite provisionally, with an alternating shared geology generator that keeps the two deposit types apart. Nessus Canyon's generator has been retired; major slot 10 is reserved. The distributed `docs/thinker.ini` is a **specific gameplay test profile**, currently using 3/3/3 resource caps, additional starting units and selected event exclusions.
+
+**Project navigation:** [What is happening now?](project/STATUS.md) · [Work queue / WIP / TODO / TBD](project/WORK-QUEUE.md) · [Fork changelog](Fork-Changelog.md) · [Testing](project/TESTING.md) · [Project guide](PROJECT.md) · [Decisions](project/DECISIONS.md) · [Ideas](project/IDEAS.md).
+
+**Detailed mechanics:** [Independent terrain](project/technical/minor-terrain.md) · [Native graphics](project/technical/rendering.md) · [Major landmarks](project/technical/map-generation.md) · [INI configuration](project/technical/configuration.md).
+
+## Fork build and installation
+
+For testing use the **Windows 32-bit Develop** artifacts from the [fork's GitHub Actions workflow](https://github.com/Necaladun/thinkerNeca/actions/workflows/build-windows.yml) associated with the intended commit/PR. The CI artifact includes `thinker.dll`, `thinker.exe` and the generated `minor_terrain.pcx`. Put the DLL **and matching PCX** in the SMAC/X game directory with the launcher, and deploy the intended `docs/thinker.ini` plus other game data you elect to use. If you have `thinker_user.ini`, it loads *after* `thinker.ini` and can override your tests. Delete any obsolete `canyon=` line from local overrides.
+
+The fork assumes a supported Alien Crossfire v2.0 `terranx.exe`. Native x86 hooks may be executable-specific. CI compilation/static checks do not replace runtime testing. Start the game from `thinker.exe` and verify the mod version via the Thinker options/game version menu. Older save/scenario compatibility is not an objective, but games must save and reload correctly on the same tested build.
+
+**The material below is inherited Thinker information** and may describe upstream defaults or releases rather than this fork's current configuration. For fork differences use the links above.
+
+## Upstream Thinker overview
 
 Thinker is a remake of game engine features for Alpha Centauri: Alien Crossfire.
 By patching the game to use an additional DLL, many new features can be developed in C++.
@@ -24,9 +41,9 @@ It's strongly recommended to read Details.md since many features are added not p
 Remember also to star and watch the repository to receive notifications about new updates.
 
 
-Download
---------
-These links are the only original source to download binary releases. See also the [Changelog](Changelog.md) for useful release notes.
+Upstream Thinker downloads
+-------------------------
+These are **Induktio's upstream Thinker** binaries, not builds of thinkerNeca. The inherited [Changelog](Changelog.md) is upstream history; use the [fork changelog](Fork-Changelog.md) for fork changes.
 
 * [Release versions](https://www.dropbox.com/sh/qsps5bhz8v020o9/AAAp6ioWxdo7vnG6Ity5W3o1a?dl=0&lst=)
 * [Develop builds](https://www.dropbox.com/sh/qsps5bhz8v020o9/AADv-0D0-bPq22pgoAIcDRC3a/develop?dl=0&lst=)
@@ -34,12 +51,14 @@ These links are the only original source to download binary releases. See also t
 
 Installation
 ------------
-1. Extract the files to Alpha Centauri game folder. Alphax.txt changes are optional.
-2. Check Changelog.md and Details.md for useful information.
-3. Change configuration from thinker.ini or just use the defaults.
-4. Start the game from thinker.exe.
-5. Press ALT+T to open Thinker's options menu. Other option is to check that mod version/build date is visible in the game version menu (CTRL+F4).
-6. If neither of those options display mod version, Thinker is incorrectly installed and not loaded.
+For **this fork**, follow [the fork build instructions above](#fork-build-and-installation). The steps below apply broadly to Thinker's launcher and UI:
+
+1. Use the intended compatible Alien Crossfire v2.0 game installation and matching fork build.
+2. Deploy the correct `thinker.dll`, `thinker.exe`, `minor_terrain.pcx` and chosen INI/data files; don't mix atlas and DLL versions.
+3. Review `thinker.ini` and any local `thinker_user.ini` overrides.
+4. Start the game from `thinker.exe`.
+5. Press ALT+T for Thinker's options menu (ALT+H when using PRACX). The version/build date is also visible via CTRL+F4.
+6. If Thinker version information is absent, the mod was not loaded correctly.
 
 
 Troubleshooting

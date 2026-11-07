@@ -1,44 +1,22 @@
 # Current status
 
-> **Master documentation status (7 November 2026):** PR #4 terrain/rendering and PR #5 Empire Report are still unmerged. Their working branches contain code that `master` does not; this document records their experimental state, not master runtime functionality.
+**Updated:** 2026-11-07. **Authority:** `master` is the published branch; terrain/rendering changes remain on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), `feature/minor-terrain-generation-migration`. [Draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), the native Empire Report, is parked on an older PR #4 ancestry and is not part of this PR.
 
-**Updated:** 2026-11-07. **Repository:** `Necaladun/thinkerNeca`. **Active:** [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), `feature/minor-terrain-generation-migration` → `master`.
+## PR #4 — current Develop scope
 
-## Verified foundation
+- Independent Jungle **+1 nutrient**, Uranium **+1 energy**, Titanium **+1 mineral**, with no natural independent-type overlap; geological Uranium/Titanium artwork underneath ordinary resource icons. Current independent-terrain storage uses ordered `THMIN001` **v3**, retaining native `LM_*` identities. Distinct blue-grey Titanium art requires the user's local `neca_sprites.pcx`.
+- **Windows Develop user evidence:** repeated same-build save → quit → reload → turn advance; minor yields/Inspector; native Jungle/Uranium; custom Titanium and resource underlay; fog/zoom/units/bases; Forest geological suppression and restoration; fungus removal; Titanium Mine + Road output (Rolling 4M, Flat 3M); nutrient/energy ordinary resource overlaps; Titanium Unity pod reroll producing nutrient and energy outcomes.
+- **Fresh-map survey:** user checked multiple new seeds for mineral-resource exclusions and geological patch sizes, as well as rainy/dry Jungle abundance. This is positive *qualitative* evidence for the 3–5-tile experiment, not a logged quantitative successful-patch/seed/size matrix.
+- **Nessus Canyon:** generator, old mineral yield, parser option and native call removed; slot 10 reserved, source/CI tests pass. User observed no Canyon; the old `canyon=0` was already the default. This does not need another gameplay test.
+- **Configuration:** distributed trial `docs/thinker.ini` uses **`tile_output_limit=3,4,4` N/M/E**; user confirms those caps applied throughout previous Windows tests. Their complete installed `thinker.ini`/`thinker_user.ini` was not independently inspected. Core native graphics/Inspector support is **Develop-only**; Release cross-builds pass, but Release/PRACX parity is not claimed.
+- **AI-002:** scoped automatic Titanium Mine selection implemented and source/CI checked, but the user deferred behavioural testing until multiple longer logged AI-only games are possible.
 
-- Independent **Jungle +1 nutrient**, **Uranium +1 energy**, **Titanium +1 mineral** per-tile storage and yields are in the fork. Storage/yields merged in PR #3; generation, rendering, Inspector, Canyon retirement and test INI changes remain on PR #4.
-- **Windows Develop user tests (5 Nov):** local `neca_sprites.pcx` with distinct blue-grey Titanium art displays on Titanium tiles, with correct transparency, positioning and zoom-in/out; +1 mineral works. The user subsequently reports the visible feature persisted across repeated loads and turn advances. Yield after reloading and Jungle/Uranium persistence were not separately reported. This is successful **native sprite variant-0** evidence, not a complete graphics regression.
-- External Uranium reference mode 1 visually matched native Uranium. Runtime log confirmed processed hash `24A1B67A`, 5635 transparent / 565 visible pixels and identical sprite size, offsets, pitch and transparency key. Mode-3 Titanium log: hash `D4B3AC2C` and 559 visible pixels.
-- New-map geology, native Jungle and Uranium art have positive user reports. Great Dunes look good; Sunny Mesa centre-only +1E confirmed. Raised Mesa experiment was rejected and reverted (MAP-006).
-- **CI passed on `4809cb7` (5 November):** separate Windows 32-bit Develop and Release cross-builds; Develop synthetic save/atlas/configuration/source contracts all passed. **Neither build executes SMAC/X.** Source changes add Jungle patch preflight, avoid redundant overlay scans, trace successful native Inspector appends and independently log variant-1 sprite geometry; their Windows runtime effects remain unverified.
+## PR #4 merge disposition
 
-## Parked Empire Report (unmerged draft PR #5)
+The user has **already completed** the requested basic smoke, cap, qualitative multi-seed patch-size/resource and Canyon checks and does not need to repeat them. Develop and Release CI passed at the last audited PR head. A final merge review must check that the latest head is still green, the intended experimental/Develop-specific scope and differences against `master`. CI cannot establish Windows gameplay correctness. [Evidence](TESTING.md), [work queue](WORK-QUEUE.md) and [decisions](DECISIONS.md) retain the detailed qualifications.
 
-- [UI-001](WORK-QUEUE.md): Native Empire Report (12 views, Overview with grouped stats/native art, colony/production controls) remains on [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), **parked** after positive Windows user testing and latest visual approval. PR #5 is stacked on PR #4, which currently conflicts with the newer `master` documentation. Before merge: resolve PR #4 or decouple, preserve the consolidated design docs, rebuild and finish targeted Windows regression and same-build save/reload checks. See [testing](TESTING.md).
-- [UI-002](WORK-QUEUE.md): Deferred **start-of-turn consolidated Turn Report** with 30+ actual production-completion events, post-upkeep finances/research, actionable colony orders and optional Secret Project movie choice. This is **not implemented** in PR #5 and is not a blocker for merging its manual report.
+**Explicitly deferred, non-blocking:** Release/PRACX native features (REND-002), native sprite variant 1 (REND-004), constructed multi-minor tiles (TERR-004), optional editor/invalid-art/fog edge cases (REND-005), intermittent Inspector recurrence (BUG-002), probe capture under the current workaround (BUG-001), quantitative geology and economy studies (TERR-002/BAL-001/BAL-003), and multi-game AI-002 behavioural acceptance (TEL/AUTO dependency). Other major-landmark regression (MAP-001) and alternate generation-switch policy (CFG-001) are outside the accepted normal-world test scope.
 
-## Active test configuration
+**Separate backlog:** projected-vs-live yield discrepancies (TERR-003), general Former AI (AI-001), Forest balance (BAL-002), combat/arty BUG-004 and BAL-004, telemetry/automation, and prototype renderer retirement (MAINT-001). Do not fold these into PR #4 merge acceptance.
 
-Distributed [test INI](../docs/thinker.ini): `minor_native_titanium=1` and `minor_titanium_sprite_mode=3`, matching the user's successful local art test. Compiled absent-option default is mode 0 (native Uranium). Mode 3 needs a separately prepared 1024×1024 indexed `neca_sprites.pcx` next to the executable; neither Git nor public CI provides that art. Missing art falls back to native Uranium. `thinker_user.ini` may override the distributed profile, and the complete user's installed INI is not independently inspected.
-
-Other current test-profile values include `base_capture_fix=0` (probe workaround), `tile_output_limit=3,3,3` (balance trial), extra starting units, polar caps disabled and excluded events 13/17. See [configuration](technical/configuration.md).
-
-## Remaining before PR #4 can merge
-
-- [TERR-001](WORK-QUEUE.md): new-game **same-build save→reload→continue**, unusual improvements, fog, unit/base drawing and Inspector checks.
-- [REND-001/002/004](WORK-QUEUE.md): Jungle all-site preflight is implemented but needs Windows verification; Release/packaging parity and the second Uranium/Titanium sprite variant remain open (variant 1 still uses native Uranium).
-- [BUG-002](WORK-QUEUE.md): intermittent Inspector label. [BUG-003](WORK-QUEUE.md): naturally seeded resource icons were hidden by geology though yields stacked; resource-priority source fix now needs Windows retest. [BUG-001](WORK-QUEUE.md): probe/base capture workaround still needs root-cause investigation.
-- More map seeds/climates and landmark regressions remain open. PR #4 stays **draft**.
-
-
-## Other development and design documentation
-
-- **PR #5:** Empire Report native UI remains a draft feature requiring further game-specific validation; its source is not part of `master`.
-- **Telemetry/automation:** accepted future work with actionable `TEL-*`, `AUTO-*`, `DIAG-*` and `DEV-*` entries; no unattended simulation code is implemented in `master`. See [technical plan](technical/telemetry-automation.md).
-- **Deferred studies:** [special abilities](technical/special-abilities.md), [aircraft combat](technical/aircraft-combat.md) and [AI operations/formations](technical/ai-strategy-operations.md) record source inspection and ideas without committing to gameplay changes.
-
-## Separate combat review
-
-Source inspection identified an existing ordinary-artillery-bombardment reactor-normalization mismatch under `ignore_reactor_power=1` ([BUG-004](WORK-QUEUE.md)); a reported late-game Spore Launcher weakness is consistent but lacks isolated Windows reproduction. Broader chassis, armour cost and artillery-duel changes are **unapproved exploration** ([BAL-004](WORK-QUEUE.md)). Neither changes the active terrain PR's merge criteria; [technical reference](technical/unit-combat-and-costs.md).
-
-**Next:** same-build save/reload, fog/unit/Inspector checks with the working mode-3 atlas; verify the new all-site Jungle preflight, then variant 1 and Release parity. See [TESTING](TESTING.md), [WORK-QUEUE](WORK-QUEUE.md), and [sprite-atlas](technical/sprite-atlas.md).
+**After PR #4:** reconcile PR #5 against updated `master`, rerun its CI, then perform its final integrated Empire Report regression. Neither its UI code nor UI-002's future Turn Report should be merged through PR #4.

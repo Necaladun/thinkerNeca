@@ -117,7 +117,7 @@ struct LMConfig {
     int dunes = 1;
     int fresh = 1;
     int mesa = 1;
-    int canyon = 0;
+    int reserved_10 = 0; // Unused major-landmark slot; preserve 16-slot layout
     int geothermal = 1;
     int ridge = 1;
     int borehole = 1;
@@ -183,7 +183,32 @@ struct Config {
     int modified_landmarks = 0;
     int minor_jungle = 1;
     int minor_uranium = 1;
-    int minor_ironstone = 1;
+    int minor_titanium = 1;
+    // Render-only native uranium special-resource sprite via the original
+    // MapWin_gen_terrain_poly -> bonus_at call (does not change stored flags).
+    int minor_native_uranium = 1;
+    // Draw custom Titanium during the native special-resource stage;
+    // uses a runtime-verified renderer bonus_at callsite in Develop.
+    int minor_native_titanium = 1;
+    // Experimental Develop-only native LM_URANIUM-style geological underlay.
+    // Absent-option default off; distributed test profile enables it.
+    int minor_geology_underlay = 0;
+    // Develop-only Titanium sprite test: 0=native Uranium,
+    // 1=external Uranium control, 2=legacy Titanium, 3=external Titanium
+    // (both external graphics use user-supplied neca_sprites.pcx).
+    int minor_titanium_sprite_mode = 0;
+    // Develop-only, expected-byte-validated native tile-inspector feature-line append.
+    int minor_native_inspector = 1;
+    // Develop-only: original loaded Jungle textures, drawn at an overlay
+    // stage until the internal native terrain predicate can be patched.
+    int minor_native_jungle_preview = 1;
+    // Recognise independent Jungle in the original terrain renderer via
+    // three expected-byte-validated instruction hooks (no map mutation).
+    int minor_native_jungle = 1;
+    // Develop-only diagnostic: 0=post-map proof of concept,
+    // 1=existing per-tile MapWin_gen_overlays callback.
+    int minor_render_mode = 0;
+    int minor_debug_tile_names = 0;
     int time_warp_mod = 1;
     int time_warp_techs = 5;
     int time_warp_projects = 1;
