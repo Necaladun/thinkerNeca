@@ -42,6 +42,11 @@ def main() -> None:
             f"{name}: expected {length} integer values"
         )
 
+    # Check the current distributed trial; compiled defaults stay 2/2/2.
+    assert dict(entries)["tile_output_limit"].split(";", 1)[0].strip() == "3,4,4", (
+        "Expected 3/4/4 experimental nutrient/mineral/energy caps"
+    )
+
     # Static parser-width contract; this is not a game runtime test.
     config = Path("src/main.h").read_text(encoding="utf-8")
     build = Path("src/build.cpp").read_text(encoding="utf-8")
