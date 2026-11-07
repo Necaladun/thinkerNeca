@@ -141,6 +141,63 @@ static void test_scoped_combat_visual_preferences() {
     assert(more == (pause | 0x200));
 }
 
+static void test_full_turn_fast_visual_preferences() {
+    // Matches src/engine_enums.h; policy uses those named flags in
+    // AutoScopedAutosimFastPrefs (host harness must not include Win32 headers).
+    constexpr int fast_battle = 0x8;
+    constexpr int dont_quick_enemy = 0x4;
+    constexpr int dont_quick_ally = 0x8000;
+    constexpr int map_animations = 0x80;
+    constexpr int quick_orders = 0x40;
+    constexpr int quick_all = 0x80;
+    constexpr int pause_battles = 0x10;
+    constexpr int other_basic = 0x400 | 0x200;
+    constexpr int other_more = 0x100 | 0x200;
+
+    const int original_basic = dont_quick_enemy | dont_quick_ally
+        | map_animations | other_basic;
+    const int original_more = pause_battles | other_more;
+    int basic = original_basic;
+    int more = original_more;
+    {
+        AutoScopedCombatPrefs full_turn(true, &basic, &more,
+            fast_battle,
+            dont_quick_enemy | dont_quick_ally | map_animations,
+            quick_all | quick_orders, pause_battles);
+        assert((basic & fast_battle) != 0);
+        assert((basic & (dont_quick_enemy | dont_quick_ally | map_animations)) == 0);
+        assert((more & (quick_all | quick_orders)) == (quick_all | quick_orders));
+        assert((more & pause_battles) == 0);
+        assert((basic & other_basic) == other_basic);
+        assert((more & other_more) == other_more);
+        const int active_basic = basic;
+        const int active_more = more;
+        {
+            // Nested battle scopes restore the full turn's fast profile.
+            AutoScopedCombatPrefs combat(true, &basic, &more,
+                fast_battle, dont_quick_enemy | dont_quick_ally | map_animations,
+                quick_all | quick_orders, pause_battles);
+            assert(basic == active_basic);
+            assert(more == active_more);
+        }
+        assert(basic == active_basic);
+        assert(more == active_more);
+    }
+    // Autosave and Save Game run only after the phase scope has exited.
+    assert(basic == original_basic);
+    assert(more == original_more);
+
+    {
+        AutoScopedCombatPrefs disabled(false, &basic, &more,
+            fast_battle, dont_quick_enemy | dont_quick_ally | map_animations,
+            quick_all | quick_orders, pause_battles);
+        assert(basic == original_basic);
+        assert(more == original_more);
+    }
+    assert(basic == original_basic);
+    assert(more == original_more);
+}
+
 int main() {
     test_entry_guards();
     test_full_turn_limit_and_reset();
@@ -151,6 +208,7 @@ int main() {
     test_ai_observer_hasty_attack_policy();
     test_transient_interlude_preferences();
     test_scoped_combat_visual_preferences();
+    test_full_turn_fast_visual_preferences();
     std::puts("AUTO-001 host policy tests passed");
     return 0;
 }
