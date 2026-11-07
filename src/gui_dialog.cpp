@@ -43,6 +43,16 @@ int autosim_notice_netmsg(NetMessage* msg, const char* label, int delay,
 
 // Source-audited, return-unused intelligence messages; do not intercept
 // probe action menus or prompts with meaningful return values.
+// Treaty and pact announcement call sites ignore return values. Do not
+// use for any X_dialog path whose answer changes diplomacy or resources.
+int autosim_notice_dialog(const char* label, int faction_id) {
+    if (autosim_ui_active()) {
+        telemetry_record_ui_notice("diplomatic_dialog", label, "suppressed_notice");
+        return 0;
+    }
+    return X_dialog(label, faction_id);
+}
+
 int autosim_notice_netmsg2(const char* label, const char* image) {
     if (autosim_ui_active()) {
         telemetry_record_ui_notice("netmsg2", label, "suppressed_notice");
