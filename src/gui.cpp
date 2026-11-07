@@ -3,6 +3,7 @@
 #include "empire_report.h"
 
 const void* MainWinHandle = &MapWin->oMainWin; // 0x939444
+bool minor_native_geology_underlay_installed = false;
 
 char label_pop_size[StrBufLen] = "Pop: %d / %d / %d / %d";
 char label_pop_boom[StrBufLen] = "Population Boom";
@@ -1090,6 +1091,107 @@ void minor_graphics_startup_trace()
 
 
 /*
+REND-005 native Uranium diagnostic, NOT a rendering patch. The only
+verified type-4 sprite call (0x465E37) is NOT proven to be the separate
+landmark-underlay call used for Uranium plus ordinary resources.
+
+Read only a tightly bounded portion of MapWin_gen_terrain_poly after
+Scient's patch but before experimental native hooks. Print candidate
+Uranium landmark flag predicates and confirmed Sprite_draw_3 call targets,
+with short opcode context for reproducible disassembly on the user's exe.
+Never guess a hook from a mask alone; no engine memory writes.
+*/
+void minor_graphics_underlay_native_probe()
+{
+#if defined(__GNUC__) && defined(__i386__)
+    FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+    if (!fp) {
+        return;
+    }
+    constexpr uintptr_t first = 0x4632D0u;
+    constexpr uintptr_t last = 0x467000u;
+    constexpr uintptr_t sprite_draw_3 = 0x5E4B9Au;
+    constexpr int max_predicates = 24;
+    constexpr int max_draw_calls = 24;
+    int predicates = 0, draw_calls = 0;
+
+    fprintf(fp, "REND005 READONLY native Uranium probe begin range=0x%08X..0x%08X\n",
+        (unsigned)first, (unsigned)last);
+
+    // Reproducible original branch context: bonus_at, 4-branch, native
+    // Sprite* selection, draw and the original jump over other resources.
+    const uintptr_t branch_start = 0x465DF0u;
+    const byte* branch = reinterpret_cast<const byte*>(branch_start);
+    for (unsigned offset = 0; offset < 0xA0u; offset += 16) {
+        fprintf(fp, "REND005 BRANCH 0x%08X", (unsigned)(branch_start + offset));
+        for (unsigned j = 0; j < 16; ++j) {
+            fprintf(fp, " %02X", (unsigned)branch[offset + j]);
+        }
+        fputc('\n', fp);
+    }
+
+    for (uintptr_t site = first; site + 7u < last; ++site) {
+        const byte* p = reinterpret_cast<const byte*>(site);
+        uint32_t mask = 0;
+        bool possible_mask = false;
+        // Immediate AND / TEST of a register: 81 E0..E7 imm32,
+        // F7 C0..C7 imm32. These are candidate starts, not decoded
+        // instructions; overlapping byte patterns need disassembly.
+        if ((p[0] == 0x81 && p[1] >= 0xE0 && p[1] <= 0xE7)
+            || (p[0] == 0xF7 && p[1] >= 0xC0 && p[1] <= 0xC7)) {
+            memcpy(&mask, p + 2, sizeof(mask));
+            possible_mask = mask == 0x00000008u
+                || mask == 0x80000008u || mask == 0x8000000Cu;
+        }
+        // Short AND / TEST reg,imm8. These are especially common for
+        // checking single-bit LM flags.
+        const bool possible_short =
+            ((p[0] == 0x83 && p[1] >= 0xE0 && p[1] <= 0xE7)
+            || (p[0] == 0xF6 && p[1] >= 0xC0 && p[1] <= 0xC7))
+            && p[2] == 0x08;
+
+        if ((possible_mask || possible_short) && predicates < max_predicates) {
+            ++predicates;
+            fprintf(fp, "REND005 CANDIDATE %02d at=0x%08X op=%02X %02X mask=0x%08X context=",
+                predicates, (unsigned)site, (unsigned)p[0],
+                (unsigned)p[1], possible_short ? 8u : (unsigned)mask);
+            const uintptr_t context = site >= first + 8 ? site - 8 : first;
+            for (uintptr_t addr = context; addr < site + 16; ++addr) {
+                fprintf(fp, "%02X", (unsigned)*reinterpret_cast<const byte*>(addr));
+            }
+            fputc('\n', fp);
+        }
+
+        // E8 rel32 calls resolving to the already known sprite draw
+        // routine. Report potential *other* calls separately from the
+        // verified 0x465E37 resource-only call.
+        if (p[0] == 0xE8) {
+            int32_t relative = 0;
+            memcpy(&relative, p + 1, sizeof(relative));
+            const uintptr_t target =
+                static_cast<uintptr_t>(static_cast<intptr_t>(site + 5)
+                    + static_cast<intptr_t>(relative));
+            if (target == sprite_draw_3 && draw_calls < max_draw_calls) {
+                ++draw_calls;
+                fprintf(fp, "REND005 SPRITE_CALL %02d at=0x%08X target=0x%08X context=",
+                    draw_calls, (unsigned)site, (unsigned)target);
+                const uintptr_t context = site >= first + 8 ? site - 8 : first;
+                for (uintptr_t addr = context; addr < site + 16; ++addr) {
+                    fprintf(fp, "%02X", (unsigned)*reinterpret_cast<const byte*>(addr));
+                }
+                fputc('\n', fp);
+            }
+        }
+    }
+    fprintf(fp, "REND005 READONLY native Uranium probe end candidates=%d sprite_calls=%d"
+        " caps=%d,%d (no hooks installed)\n",
+        predicates, draw_calls, max_predicates, max_draw_calls);
+    fclose(fp);
+#endif
+}
+
+
+/*
 Ready-to-use native feature-line composition, kept outside the engine
 until the original local text-buffer callsite and capacity are verified.
 No native LM bits, Natural[] entries or MAP fields are ever modified.
@@ -1097,8 +1199,8 @@ No native LM bits, Natural[] entries or MAP fields are ever modified.
 static std::string minor_inspector_feature_line(const char* native, int x, int y)
 {
     std::string line = native ? native : "";
-    const char* minor = minor_terrain_name_at(x, y);
-    if (minor && minor[0]) {
+    const std::string minor = minor_terrain_names_at(x, y);
+    if (!minor.empty()) {
         if (!line.empty()) {
             line += ", ";
         }
@@ -1148,11 +1250,11 @@ extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x,
         || (*GameState & STATE_OMNISCIENT_VIEW))) {
         return static_cast<int>(length);
     }
-    const char* name = minor_terrain_name_at(x, tile_y);
-    if (!name || !name[0]) {
+    const std::string name = minor_terrain_names_at(x, tile_y);
+    if (name.empty()) {
         return static_cast<int>(length);
     }
-    const size_t name_len = strlen(name);
+    const size_t name_len = name.size();
     const size_t separator_len = length ? 2 : 0;
     if (length + separator_len >= capacity
         || name_len >= capacity - length - separator_len) {
@@ -1163,7 +1265,7 @@ extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x,
         *end++ = ',';
         *end++ = ' ';
     }
-    memcpy(end, name, name_len + 1);
+    memcpy(end, name.c_str(), name_len + 1);
     // Unlike hover-only diagnostics, this verifies the native Inspector
     // hook actually appended the label. Limit writes on frequent redraws.
     static int append_reports = 0;
@@ -1172,7 +1274,7 @@ extern "C" int __cdecl minor_inspector_length_inner(char* text, int tile_half_x,
         FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
         if (fp) {
             fprintf(fp, "INSPECTOR APPEND x=%d y=%d minor=%s native_len=%u\n",
-                x, tile_y, name, (unsigned)length);
+                x, tile_y, name.c_str(), (unsigned)length);
             fclose(fp);
         }
     }
@@ -1211,8 +1313,8 @@ static void minor_inspector_trace_hover(int x, int y)
             || (*GameState & STATE_OMNISCIENT_VIEW))) {
         return;
     }
-    const char* name = minor_terrain_name_at(x, y);
-    if (!name || !*name) {
+    const std::string name = minor_terrain_names_at(x, y);
+    if (name.empty()) {
         return;
     }
     previous_x = x;
@@ -1223,7 +1325,7 @@ static void minor_inspector_trace_hover(int x, int y)
     FILE* fp = fopen(path.c_str(), "a");
     if (fp) {
         fprintf(fp, "INSPECTOR HOVER x=%d y=%d minor=%s sample_feature_line=%s\n",
-            x, y, name, expected.c_str());
+            x, y, name.c_str(), expected.c_str());
         fclose(fp);
     }
 }
@@ -1263,16 +1365,16 @@ void __thiscall MapWin_gen_overlays(Console* This, int x, int y)
     // This does not touch the native status panel or landmark table.
     if (This == MapWin && conf.minor_debug_tile_names
         && This->PixelsPerTileX >= 60) {
-        const char* name = minor_terrain_name_at(x, y);
+        const std::string name = minor_terrain_names_at(x, y);
         MAP* sq = mapsq(x, y);
-        if (name[0] && sq && This->cOwner >= 0
+        if (!name.empty() && sq && This->cOwner >= 0
             && This->cOwner < MaxPlayerNum && sq->is_known(This->cOwner)) {
             RECT label_rect;
             MapWin_tile_to_pixel(This, x, y, &label_rect.left, &label_rect.top);
             label_rect.right = label_rect.left + This->PixelsPerTileX;
             label_rect.bottom = label_rect.top + This->PixelsPerTileY;
             char label[64] = {};
-            strcpy_n(label, sizeof(label), name);
+            strcpy_n(label, sizeof(label), name.c_str());
             Buffer_set_text_color(&This->oMainWin.oCanvas, ColorWhite, 0, 1, 1);
             Buffer_set_font(&This->oMainWin.oCanvas, &This->oFont2, 0, 0, 0);
             Buffer_write_cent_l_7(&This->oMainWin.oCanvas, label, &label_rect, 20);
@@ -1869,6 +1971,25 @@ static Sprite neca_sprites[NECA_SPRITE_COUNT] = {};
 static bool neca_sprite_ready[NECA_SPRITE_COUNT] = {};
 static bool neca_sprites_attempted = false;
 
+// Native original LM_URANIUM underlay draw calls the same Sprite_draw_3
+// routine from an earlier stage, independently of ordinary resource icons.
+extern "C" {
+uintptr_t minor_geology_underlay_draw_target = 0;
+int minor_geology_underlay_current_type = MINOR_NONE;
+int minor_geology_underlay_current_x = -1;
+int minor_geology_underlay_current_y = -1;
+}
+
+void minor_graphics_underlay_hook_result(int mask_site, int draw_site, bool active)
+{
+    FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+    if (fp) {
+        fprintf(fp, "REND005 UNDERLAY HOOK mask=0x%08X draw=0x%08X active=%d\n",
+            (unsigned)mask_site, (unsigned)draw_site, active ? 1 : 0);
+        fclose(fp);
+    }
+}
+
 // Native sprite substitution is strictly scoped to one verified resource
 // drawing call in the supported terranx.exe, if that call can be found.
 // The actual resource sprite rendering position remains the game's own.
@@ -2129,7 +2250,7 @@ extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
     // do not reject a valid resource draw using that unrelated argument.
     const int x = frame[8], y = frame[9];
     MAP* tile = mapsq(x, y);
-    if (!tile || minor_landmark_at(x, y) != MINOR_TITANIUM
+    if (!tile || !minor_landmark_has(x, y, MINOR_TITANIUM)
         || (tile->items & BIT_BONUS_RES)) {
         // Normal icons (including procedural ones) are prioritised by
         // mod_bonus_at before the renderer reaches this type-4 draw branch.
@@ -2231,6 +2352,131 @@ void minor_native_titanium_sprite_hook()
 }
 #endif
 
+/*
+REND-005: native Uranium underlay draw at 0x464DE3, ahead of the ordinary
+resource icon pass. Never reject BIT_BONUS_RES here: the whole purpose
+is to show *both* geology and normal resource art on the same tile.
+The original instruction stream references 0x78A72C, but the supported
+Windows underlay callback actually receives 0x78A700 (native variant 0):
+REND005 log x=67,y=67 cached=3, original=0078a700, expected=0.
+Allow either known native Uranium sprite object, while rejecting any other
+sprite pointer. The existing Titanium art has already worked on variant 0.
+The existing indexed Titanium artwork can be substituted through its own
+Sprite* and key; all position, zoom, clip and normal resources stay native.
+*/
+#if defined(__GNUC__) && defined(__i386__)
+extern "C" Sprite* __cdecl minor_select_geology_underlay_sprite(
+    Sprite* original, Buffer* canvas, const int* frame)
+{
+    // On the prior build, all of these silent guards could return native
+    // Uranium without reaching the first diagnostic. The mask hook already
+    // knows the actual tile at EBP+0x20/+0x24. Use that cached classification
+    // for this *earlier* landmark draw rather than copying assumptions from
+    // the later resource-sprite call.
+    const int type = minor_geology_underlay_current_type;
+    const int x = minor_geology_underlay_current_x;
+    const int y = minor_geology_underlay_current_y;
+    const uintptr_t native_sprite = reinterpret_cast<uintptr_t>(original);
+    // Windows evidence (REND005 log 2) shows native 0x78A700 on all
+    // tested Titanium underlay calls, with valid frame/canvas and key 9.
+    // The earlier static draw-site setup referenced 0x78A72C. Both are
+    // the existing engine Uranium Sprite objects; no arbitrary addresses.
+    const int native_variant = native_sprite == 0x78A700u ? 0
+        : native_sprite == 0x78A72Cu ? 1 : -1;
+    const bool valid_original = original && native_variant >= 0;
+    const bool valid_canvas = canvas && canvas->palette;
+    // Sprite extraction only needs a valid palette-bearing canvas as a
+    // readiness guard. The user's main map canvas is the fallback if the
+    // native landmark call passes a different Buffer than the resource pass.
+    Buffer* loader_canvas = valid_canvas ? canvas : &MapWin->oMainWin.oCanvas;
+    const bool loader_ready = loader_canvas && loader_canvas->palette;
+    const int mode = conf.minor_titanium_sprite_mode;
+
+    Sprite* selected = original;
+    if (minor_native_geology_underlay_installed && conf.minor_native_titanium
+        && type == MINOR_TITANIUM && valid_original && loader_ready) {
+        if (mode == 1 || mode == 3) {
+            load_neca_test_sprites(loader_canvas);
+            const NecaSpriteId id = mode == 3
+                ? NECA_SPRITE_TITANIUM_TEST : NECA_SPRITE_URANIUM_TEST;
+            if (neca_sprite_ready[id]) {
+                selected = &neca_sprites[id];
+            }
+        } else if (mode == 2) {
+            load_minor_terrain_sprites(loader_canvas);
+            if (minor_sprite_ready[MINOR_TITANIUM]) {
+                selected = &minor_sprites[MINOR_TITANIUM];
+            }
+        }
+    }
+
+    // Log selector ENTRY, not just successful substitutions. Bounded
+    // separately for Titanium and control draws; no huge per-tile scan.
+    static int titanium_reports = 0, control_reports = 0;
+    const bool report_titanium = type == MINOR_TITANIUM
+        && titanium_reports++ < 12;
+    const bool report_control = type != MINOR_TITANIUM
+        && control_reports++ < 3;
+    if (report_titanium || report_control) {
+        FILE* fp = fopen(minor_graphics_file("minor_terrain_render.log").c_str(), "a");
+        if (fp) {
+            const int frame_x = frame ? frame[8] : -1;
+            const int frame_y = frame ? frame[9] : -1;
+            fprintf(fp, "REND005 UNDERLAY SELECT cached=%d x=%d y=%d "
+                "frame_x=%d frame_y=%d original=%p variant=%d expected=%d canvas=%p "
+                "canvas_palette=%d loader_palette=%d enabled=%d mode=%d "
+                "atlas_attempted=%d atlas_ready=%d swapped=%d\n",
+                type, x, y, frame_x, frame_y, (void*)original,
+                native_variant, valid_original ? 1 : 0, (void*)canvas,
+                valid_canvas ? 1 : 0, loader_ready ? 1 : 0,
+                minor_native_geology_underlay_installed ? 1 : 0, mode,
+                neca_sprites_attempted ? 1 : 0,
+                neca_sprite_ready[NECA_SPRITE_TITANIUM_TEST] ? 1 : 0,
+                selected != original ? 1 : 0);
+            if (original && type == MINOR_TITANIUM) {
+                fprintf(fp, "REND005 UNDERLAY GEOMETRY native_key=%u "
+                    "native=%dx%d offset=%d,%d pitch=%d "
+                    "selected_key=%u selected=%dx%d offset=%d,%d pitch=%d\n",
+                    (unsigned)original->color_index[0], original->width,
+                    original->height, original->offset_x, original->offset_y,
+                    original->pitch,
+                    (unsigned)selected->color_index[0], selected->width,
+                    selected->height, selected->offset_x, selected->offset_y,
+                    selected->pitch);
+            }
+            fclose(fp);
+        }
+    }
+    return selected;
+}
+
+// This native __thiscall Sprite_draw_3 has the same ABI as the
+// previously tested type-4 resource draw hook: ECX carries Sprite*,
+// entry ESP+4 carries Buffer* and entry ESP+8 carries the colour key.
+// Only saved ECX and the corresponding saved colour-key argument change.
+extern "C" __attribute__((naked, used))
+void minor_native_geology_underlay_sprite_hook()
+{
+    __asm__ __volatile__(
+        "pushfl\n\t"
+        "pushal\n\t"
+        "pushl %ebp\n\t"
+        "pushl 44(%esp)\n\t"
+        "pushl 32(%esp)\n\t"
+        "call _minor_select_geology_underlay_sprite\n\t"
+        "addl $12, %esp\n\t"
+        "cmpl 24(%esp), %eax\n\t"
+        "je 1f\n\t"
+        "movzbl 8(%eax), %edx\n\t"
+        "movl %edx, 44(%esp)\n\t"
+        "1: movl %eax, 24(%esp)\n\t"
+        "popal\n\t"
+        "popfl\n\t"
+        "jmp *_minor_geology_underlay_draw_target\n\t"
+    );
+}
+#endif
+
 // This Draw-only preview uses the game's *already loaded* Monsoon Jungle
 // textures, native RainTransition neighbour mask and native polygon blitter.
 // It doesn't modify map LM flags or ship texture.pcx-derived artwork.
@@ -2255,7 +2501,7 @@ static void draw_native_minor_jungle(Console* win, int x, int y)
             continue;
         }
         const bool native = (n->landmarks & (LM_DISABLE | LM_JUNGLE)) == LM_JUNGLE;
-        if (native || minor_landmark_at(nx, ny) == MINOR_JUNGLE) {
+        if (native || minor_landmark_has(nx, ny, MINOR_JUNGLE)) {
             mask |= 1u << k;
         }
     }
@@ -2309,53 +2555,41 @@ static void draw_native_minor_jungle(Console* win, int x, int y)
 static void draw_minor_terrain_tile(Console* win, int x, int y)
 {
     if (conf.reduced_mode || win != MapWin || !*MapTiles
-        || win->cOwner < 0 || win->cOwner >= MaxPlayerNum) {
-        return;
-    }
-    const MinorLandmark type = minor_landmark_at(x, y);
-    if (type <= MINOR_NONE || type >= MINOR_TYPE_COUNT) {
+        || win->cOwner < 0 || win->cOwner >= MaxPlayerNum
+        || !minor_landmark_any_at(x, y)) {
         return;
     }
     MAP* tile = mapsq(x, y);
-    if (type == MINOR_JUNGLE && conf.minor_native_jungle) {
-        // The original terrain function draws native Jungle from the
-        // game's texture array before resources, fungus and improvements.
-        // Never repeat Jungle in our late sprite/diagnostic overlay.
-        return;
-    }
-    if ((type == MINOR_URANIUM && conf.minor_native_uranium)
-        || (type == MINOR_TITANIUM && conf.minor_native_titanium)) {
-        // The engine draws both minerals using the same native resource
-        // sprite. Never duplicate them with a late custom PCX overlay.
-        return;
-    }
     if (!tile || !(tile->is_known(win->cOwner)
         || (*GameState & STATE_OMNISCIENT_VIEW))
         || tile->is_base() || (tile->items & BIT_VEH_IN_TILE)) {
-        // A post-map proof-of-concept must not paint over base/unit art.
-        // The feature remains in the underlying minor tile data.
         return;
     }
-    if (type == MINOR_JUNGLE && conf.minor_native_jungle_preview) {
-        draw_native_minor_jungle(win, x, y);
-        return;
-    }
-
-    Buffer* canvas = &win->oMainWin.oCanvas;
-    load_minor_terrain_sprites(canvas);
-    if (!minor_sprite_ready[type]) {
-        return;
-    }
-
-    long px = 0;
-    long py = 0;
-    MapWin_tile_to_pixel(win, x, y, &px, &py);
-    const int tile_width = win->PixelsPerTileX;
-    if (tile_width > 0 && win->PixelsPerTileY > 0) {
-        const int draw_width = max(1, tile_width * 3 / 4);
-        Sprite_draw_2(&minor_sprites[type], canvas, 253,
-            (int)px + (tile_width - draw_width) / 2,
-            (int)py + win->PixelsPerTileY / 8, draw_width, 104);
+    for (const MinorTerrainEntry& entry : minor_landmark_entries_at(x, y)) {
+        const MinorLandmark type = static_cast<MinorLandmark>(entry.type);
+        if ((type == MINOR_JUNGLE && conf.minor_native_jungle)
+            || (type == MINOR_URANIUM && conf.minor_native_uranium)
+            || (type == MINOR_TITANIUM && conf.minor_native_titanium)) {
+            continue;
+        }
+        if (type == MINOR_JUNGLE && conf.minor_native_jungle_preview) {
+            draw_native_minor_jungle(win, x, y);
+            continue;
+        }
+        Buffer* canvas = &win->oMainWin.oCanvas;
+        load_minor_terrain_sprites(canvas);
+        if (!minor_sprite_ready[type]) {
+            continue;
+        }
+        long px = 0, py = 0;
+        MapWin_tile_to_pixel(win, x, y, &px, &py);
+        const int tile_width = win->PixelsPerTileX;
+        if (tile_width > 0 && win->PixelsPerTileY > 0) {
+            const int draw_width = max(1, tile_width * 3 / 4);
+            Sprite_draw_2(&minor_sprites[type], canvas, 253,
+                (int)px + (tile_width - draw_width) / 2,
+                (int)py + win->PixelsPerTileY / 8, draw_width, 104);
+        }
     }
 }
 
@@ -2374,12 +2608,16 @@ static void draw_minor_terrain_map(Console* win)
     for (int id = 0; id < *MapAreaTiles; ++id) {
         const int y = id / *MapHalfX;
         const int x = 2 * (id % *MapHalfX) + (y & 1);
-        const MinorLandmark type = minor_landmark_at(x, y);
-        if (type > MINOR_NONE && type < MINOR_TYPE_COUNT) {
-            counts[type]++;
+        if (minor_landmark_any_at(x, y)) {
+            for (const MinorTerrainEntry& entry : minor_landmark_entries_at(x, y)) {
+                if (entry.type > MINOR_NONE && entry.type < MINOR_TYPE_COUNT) {
+                    ++counts[entry.type];
+                }
+            }
             draw_minor_terrain_tile(win, x, y);
         }
     }
+
     if (first_scan) {
         first_scan = false;
         for (int id = MINOR_JUNGLE; id < MINOR_TYPE_COUNT; ++id) {

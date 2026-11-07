@@ -22,7 +22,7 @@ int __cdecl near_landmark(int x, int y) {
             | (conf.modified_landmarks ? LM_URANIUM : 0);
         const int landmarks = sq->lm_items();
         // Minor terrain has an independent ID; zero-code tiles still count.
-        const bool minor_tile = minor_landmark_at(x2, y2) != MINOR_NONE;
+        const bool minor_tile = minor_landmark_any_at(x2, y2);
         if ((sq->code_at() && (landmarks & ~minor))
             || (i < TableRange[2] && ((landmarks & minor) || minor_tile))) {
             return true;
@@ -500,10 +500,10 @@ void __cdecl world_rainfall() {
             } else if (*MapCloudCover - alt + temperature + 5 >= 2 && moisture_mod > 0) {
                 ++moisture;
             }
-            const bool minor_jungle = minor_landmark_at(x, y) == MINOR_JUNGLE;
+            const bool minor_jungle = minor_landmark_has(x, y, MINOR_JUNGLE);
             if (((landmarks & (LM_DISABLE | LM_JUNGLE)) == LM_JUNGLE || minor_jungle)
                 && !is_ocean(sq) && alt < 6) {
-                int code = minor_jungle ? minor_landmark_code_at(x, y) : landmarks >> 24;
+                int code = minor_jungle ? minor_landmark_code_at(x, y, MINOR_JUNGLE) : landmarks >> 24;
                 if (code < 0) { code = -code; }
                 if (code >= 49) {
                     if (code >= 81 || alt >= 5) { ++moisture; }
@@ -646,7 +646,7 @@ void __cdecl world_rocky() {
                         if (is_ocean(sq)) {
                             bit_set(x, y, BIT_ENERGY_RES, 1);
                         } else if (flag || (!(sq->landmarks & LM_JUNGLE)
-                            && minor_landmark_at(x, y) != MINOR_JUNGLE)) {
+                            && !minor_landmark_has(x, y, MINOR_JUNGLE))) {
                             if (sq->is_rainy() || sq->alt_level() > ALT_ONE_ABOVE_SEA) {
                                 bit_set(x, y, BIT_MINERAL_RES, 1);
                             }
@@ -846,7 +846,7 @@ void __cdecl mod_world_monsoon(int x, int y) {
     auto eligible = [&](int tx, int ty) -> bool {
         MAP* tile = mapsq(tx, ty);
         return tile && ty >= y_a && ty <= y_b && !tile->lm_items()
-            && minor_landmark_at(tx, ty) == MINOR_NONE
+            && !minor_landmark_any_at(tx, ty)
             && (tile->alt_level() == ALT_SHORE_LINE
                 || tile->alt_level() == ALT_ONE_ABOVE_SEA);
     };
@@ -856,7 +856,7 @@ void __cdecl mod_world_monsoon(int x, int y) {
     auto separated = [&](int tx, int ty) -> bool {
         for (auto& tile : iterate_tiles(tx, ty, 0, TableRange[2])) {
             if ((tile.sq->landmarks & LM_JUNGLE)
-                || minor_landmark_at(tile.x, tile.y) == MINOR_JUNGLE) {
+                || minor_landmark_has(tile.x, tile.y, MINOR_JUNGLE)) {
                 return false;
             }
         }
@@ -1249,19 +1249,24 @@ separate RNG streams so neither can overwrite an existing minor feature.
 */
 static bool place_minor_geology_patch(MinorLandmark type, GameRandom& rng,
     std::vector<Point>& centers) {
-    const int patch_sizes[17] = {
-        3, 4, 4, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 8, 8, 9
-    };
+    // Smaller, more dispersed deposits: 3–5 tiles, weighted 1:3:1.
+    // Average = 4 rather than 6 tiles; patch target scales up by 50%.
+    const int patch_sizes[5] = {3, 4, 4, 4, 5};
     auto eligible = [&](int tx, int ty) -> bool {
         MAP* tile = mapsq(tx, ty);
+        // Titanium is a dispersed, weaker mineral deposit: do not stack it
+        // with a normal mineral resource. mod_bonus_at resolves both flagged
+        // and procedural resource squares, unlike BIT_MINERAL_RES alone.
+        // Nutrient/energy resource overlaps and Uranium are unchanged.
         return tile && !is_ocean(tile) && !tile->lm_items()
-            && minor_landmark_at(tx, ty) == MINOR_NONE;
+            && !minor_landmark_any_at(tx, ty)
+            && (type != MINOR_TITANIUM || mod_bonus_at(tx, ty) != RES_MINERAL);
     };
     auto separated = [&](int tx, int ty) -> bool {
         // Same two-tile buffer around completed minor/major patches.
         for (auto& tile : iterate_tiles(tx, ty, 0, TableRange[2])) {
             if (tile.sq->lm_items()
-                || minor_landmark_at(tile.x, tile.y) != MINOR_NONE) {
+                || minor_landmark_any_at(tile.x, tile.y)) {
                 return false;
             }
         }
@@ -1299,7 +1304,7 @@ static bool place_minor_geology_patch(MinorLandmark type, GameRandom& rng,
         if (seed_x < 0) {
             return false;
         }
-        const int target = patch_sizes[rng.get(17)];
+        const int target = patch_sizes[rng.get(5)];
         std::vector<Point> patch;
         std::set<Point> selected;
         patch.push_back({seed_x, seed_y});
@@ -1357,8 +1362,8 @@ static bool place_minor_geology_patch(MinorLandmark type, GameRandom& rng,
                     type, p.x, p.y);
                 return false;
             }
-            // Match the working Uranium generator: clear fungus for both.
-            bit_set(p.x, p.y, BIT_FUNGUS, false);
+            // Preserve existing fungus. It currently masks geological
+            // bonuses in the live yield branches until the player clears it.
         }
         centers.push_back({seed_x, seed_y});
         debug("minor geology type=%d patch=%d tiles at %d,%d\n",
@@ -1378,7 +1383,11 @@ static void generate_minor_geology() {
     if (!uranium_enabled && !titanium_enabled) {
         return;
     }
-    const int patch_count = max(2, min(6, (*MapAreaTiles + 400) / 800));
+    const int previous_patch_count = max(2, min(6, (*MapAreaTiles + 400) / 800));
+    // Increase patch count ~50% while holding average geological tile
+    // coverage constant (6 old tiles/patch -> 4 new tiles/patch).
+    // Existing separation can still cause some attempts to fail.
+    const int patch_count = (3 * previous_patch_count + 1) / 2;
     GameRandom uranium_rand, titanium_rand;
     uranium_rand.reseed(pair_hash((uint32_t)*MapRandomSeed ^ 0x5552414Eu,
         (uint32_t)*MapAreaTiles));
@@ -2060,8 +2069,8 @@ void world_generate(uint32_t seed) {
         if (tile.lm_items() && *MapHalfX > 0) {
             const int ty = tile_id / *MapHalfX;
             const int tx = 2 * (tile_id % *MapHalfX) + (ty & 1);
-            if (minor_landmark_at(tx, ty) != MINOR_NONE) {
-                minor_landmark_clear(tx, ty);
+            if (minor_landmark_any_at(tx, ty)) {
+                minor_landmark_clear_all(tx, ty);
             }
         }
     }
@@ -2089,39 +2098,38 @@ void world_generate(uint32_t seed) {
     generate_minor_landmarks(MINOR_GENERATE_LATE);
 
 #ifdef BUILD_DEBUG
-    // Generated minor features must not consume native landmark flags.
-    // This summary also makes independent Jungle/Uranium testable while
-    // their separate sprite rendering and tile-inspector path are unfinished.
-    int minor_counts[4] = {};
-    int minor_native_overlap = 0;
-    int minor_bad_codes = 0;
+    // Count each type; procedural generation must still have zero stacking.
+    int minor_counts[MINOR_TYPE_COUNT] = {};
+    int minor_native_overlap = 0, minor_bad_codes = 0, minor_stacks = 0;
     if (*MapHalfX > 0) {
         for (int tile_id = 0; tile_id < *MapAreaTiles; ++tile_id) {
             const int ty = tile_id / *MapHalfX;
             const int tx = 2 * (tile_id % *MapHalfX) + (ty & 1);
-            const MinorLandmark type = minor_landmark_at(tx, ty);
-            if (type == MINOR_NONE) {
+            const auto& entries = minor_landmark_entries_at(tx, ty);
+            if (entries.empty()) {
                 continue;
             }
-            const int index = static_cast<int>(type);
-            if (index < 1 || index > 3) {
-                minor_bad_codes++;
-                continue;
-            }
-            minor_counts[index]++;
-            if ((*MapTiles)[tile_id].lm_items()) {
-                minor_native_overlap++;
-            }
-            const int code = minor_landmark_code_at(tx, ty);
-            if ((type == MINOR_JUNGLE && code > 120)
-                || (type != MINOR_JUNGLE && code > 8)) {
-                minor_bad_codes++;
+            minor_stacks += entries.size() > 1;
+            minor_native_overlap += (*MapTiles)[tile_id].lm_items() != 0;
+            for (const MinorTerrainEntry& entry : entries) {
+                const int index = entry.type;
+                if (index < 1 || index >= MINOR_TYPE_COUNT) {
+                    ++minor_bad_codes;
+                    continue;
+                }
+                ++minor_counts[index];
+                if ((index == MINOR_JUNGLE && entry.code > 120)
+                    || (index != MINOR_JUNGLE && entry.code > 8)) {
+                    ++minor_bad_codes;
+                }
             }
         }
     }
-    debug("minor generation Jungle=%d Uranium=%d Titanium=%d native_overlap=%d bad_codes=%d\n",
+    debug("minor generation Jungle=%d Uranium=%d Titanium=%d native_overlap=%d stacks=%d bad_codes=%d\n",
         minor_counts[MINOR_JUNGLE], minor_counts[MINOR_URANIUM],
-        minor_counts[MINOR_TITANIUM], minor_native_overlap, minor_bad_codes);
+        minor_counts[MINOR_TITANIUM], minor_native_overlap, minor_stacks,
+        minor_bad_codes);
+
 #endif
 
     if (!*GameHalted) {

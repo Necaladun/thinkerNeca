@@ -1957,6 +1957,23 @@ GOODY_NEXT:
             && !(*GameRules & RULES_SCN_UNITY_PODS_NO_RESOURCES)) {
                 bit_set(x, y, BIT_BONUS_RES, 1);
                 int bonus_val = bonus_at(x, y);
+                if (bonus_val == RES_MINERAL
+                    && minor_landmark_has(x, y, MINOR_TITANIUM)) {
+                    // A pod must not turn dispersed Titanium into a full
+                    // mineral-resource jackpot. Reroll only this pod reward;
+                    // keep Uranium and ordinary resource generation unchanged.
+                    // The native resource decoder requires BIT_NUTRIENT_RES to
+                    // force its explicit nutrient/energy selection branch,
+                    // regardless of the tile's coordinate-derived resource.
+                    const bool choose_energy = goody_rand(2) != 0;
+                    bit_set(x, y, BIT_NUTRIENT_RES | BIT_MINERAL_RES
+                        | BIT_ENERGY_RES, false);
+                    bit_set(x, y, BIT_NUTRIENT_RES
+                        | (choose_energy ? BIT_ENERGY_RES : 0), true);
+                    bonus_val = bonus_at(x, y);
+                    debug("Titanium pod resource at %d,%d: mineral -> %d\n",
+                        x, y, bonus_val);
+                }
                 site_radius(x, y);
                 if (is_player && bonus_val) {
                     TextLabel label = TL_Bonus;

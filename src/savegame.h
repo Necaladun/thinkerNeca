@@ -15,12 +15,16 @@ enum MinorLandmark : uint8_t {
     MINOR_TYPE_COUNT = 4,
 };
 
-// Independent per-tile type and type-specific code, without native LM_* bits.
-struct MinorTerrainTile {
+// Sparse feature/code pairs. Each tile can hold several independent types.
+struct MinorTerrainEntry {
     uint8_t type;
     uint8_t code;
 };
-static_assert(sizeof(MinorTerrainTile) == 2, "Minor terrain save layout");
+static_assert(sizeof(MinorTerrainEntry) == 2, "Minor entry save layout");
+
+struct MinorTerrainTile {
+    std::vector<MinorTerrainEntry> features;
+};
 
 enum MinorGenerationPhase : uint8_t {
     MINOR_GENERATE_NEVER = 0,
@@ -37,12 +41,21 @@ struct MinorTerrainDefinition {
     MinorGenerationPhase generation_phase;
 };
 const MinorTerrainDefinition& minor_terrain_definition(MinorLandmark type);
-const char* minor_terrain_name_at(int x, int y);
+struct MinorTerrainYield {
+    int nutrient = 0;
+    int mineral = 0;
+    int energy = 0;
+};
+MinorTerrainYield minor_terrain_yields_at(int x, int y);
+std::string minor_terrain_names_at(int x, int y);
 
-MinorLandmark minor_landmark_at(int x, int y);
-uint8_t minor_landmark_code_at(int x, int y);
+const std::vector<MinorTerrainEntry>& minor_landmark_entries_at(int x, int y);
+bool minor_landmark_any_at(int x, int y);
+bool minor_landmark_has(int x, int y, MinorLandmark type);
+uint8_t minor_landmark_code_at(int x, int y, MinorLandmark type);
 bool minor_landmark_set(int x, int y, MinorLandmark type, uint8_t code = 0);
-void minor_landmark_clear(int x, int y);
+void minor_landmark_clear(int x, int y, MinorLandmark type);
+void minor_landmark_clear_all(int x, int y);
 void minor_landmark_reset();
 
 enum SaveLoadStatus {

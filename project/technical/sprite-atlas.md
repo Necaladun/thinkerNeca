@@ -1,5 +1,8 @@
 # thinkerNeca indexed sprite atlas
 
+> **Branch scope (2026-11-07):** This reference describes experimental terrain/rendering code on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4), **not yet merged into `master`**. The default branch still has earlier Ironstone and map behaviour; verify implementation against the working branch.
+
+
 **Scope:** tested native resource-art pipeline on [draft PR #4](https://github.com/Necaladun/thinkerNeca/pull/4). See [rendering](rendering.md), [configuration](configuration.md) and [runtime tests](../TESTING.md).
 
 ## Current source format

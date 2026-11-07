@@ -190,6 +190,9 @@ struct Config {
     // Draw custom Titanium during the native special-resource stage;
     // uses a runtime-verified renderer bonus_at callsite in Develop.
     int minor_native_titanium = 1;
+    // Experimental Develop-only native LM_URANIUM-style geological underlay.
+    // Absent-option default off; distributed test profile enables it.
+    int minor_geology_underlay = 0;
     // Develop-only Titanium sprite test: 0=native Uranium,
     // 1=external Uranium control, 2=legacy Titanium, 3=external Titanium
     // (both external graphics use user-supplied neca_sprites.pcx).

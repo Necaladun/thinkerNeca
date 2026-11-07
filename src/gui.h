@@ -70,11 +70,27 @@ int __thiscall mod_calc_dim(Console* This);
 int __thiscall mod_gen_map(Console* This, int faction_id, int units_only);
 #ifndef BUILD_REL
 void minor_graphics_startup_trace();
+void minor_graphics_underlay_native_probe();
+void minor_graphics_underlay_hook_result(int mask_site, int draw_site, bool active);
 void minor_graphics_inspector_hook_result(int addr, bool active);
 extern bool minor_native_titanium_sprite_installed;
 void minor_graphics_titanium_hook_result(int bonus_site, int draw_site,
     int candidates, int target);
 extern "C" uintptr_t minor_titanium_native_draw_target;
+#if defined(__GNUC__) && defined(__i386__)
+extern "C" int __cdecl minor_render_geology_xy(int x, int y);
+// The native landmark-mask hook knows the tile. Carry that classification
+// to its immediately following Sprite_draw_3 call rather than assuming
+// the later resource-sprite callback shares the same frame arguments.
+extern "C" int minor_geology_underlay_current_type;
+extern "C" int minor_geology_underlay_current_x;
+extern "C" int minor_geology_underlay_current_y;
+extern "C" void minor_native_geology_underlay_mask_hook();
+extern "C" Sprite* __cdecl minor_select_geology_underlay_sprite(
+    Sprite* original, Buffer* canvas, const int* frame);
+extern "C" void minor_native_geology_underlay_sprite_hook();
+extern "C" uintptr_t minor_geology_underlay_draw_target;
+#endif
 #if defined(__GNUC__) && defined(__i386__)
 extern "C" Sprite* __cdecl minor_titanium_select_native_sprite(
     Sprite* original, Buffer* canvas, const int* frame);

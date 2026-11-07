@@ -1,6 +1,8 @@
 # thinkerNeca — project guide
 
-This repository is **Necaladun's fork of Thinker Mod for Sid Meier's Alpha Centauri: Alien Crossfire (SMAC/X)**. It builds on [Induktio's Thinker](https://github.com/induktio/thinker); it is not an upstream release. The fork currently targets **fresh single-player games**, with independent minor terrain, world-generation changes and experimental rules. See [Readme.md](Readme.md) for an introduction.
+This repository is **Necaladun's fork of Thinker Mod for Sid Meier's Alpha Centauri: Alien Crossfire (SMAC/X)**. It builds on [Induktio's Thinker](https://github.com/induktio/thinker); it is not an upstream release. The fork primarily targets **fresh single-player games**; ongoing experimental work includes independent minor terrain, map generation, native rendering and UI changes. See [Readme.md](Readme.md) for an introduction.
+
+> **Branch status (7 November 2026):** Independent Jungle/Uranium/Titanium generation, rendering and the experimental test profile **merged to `master` in [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4)** ([`0f05fdb`](https://github.com/Necaladun/thinkerNeca/commit/0f05fdbd5509616cb5fea598a68ab74d3fd13d8b)). The native Empire Report is **still unmerged**, parked on [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5), which requires ancestry reconciliation. Release/PRACX native-art parity, long-game AI acceptance and selected rare compatibility cases remain deferred; merging is not runtime certification.
 
 ## Where to start
 
@@ -11,7 +13,7 @@ This repository is **Necaladun's fork of Thinker Mod for Sid Meier's Alpha Centa
 5. [Ideas](project/IDEAS.md) — proposals that are **not** commitments.
 6. [Testing](project/TESTING.md) — evidence, untested cases and regression criteria.
 
-Technical references: [minor terrain](project/technical/minor-terrain.md), [native rendering](project/technical/rendering.md), [sprite atlas](project/technical/sprite-atlas.md), [map generation](project/technical/map-generation.md), [configuration](project/technical/configuration.md). The inherited Thinker references remain [Details.md](Details.md), [Technical.md](Technical.md) and [Changelog.md](Changelog.md).
+Technical references: [minor terrain](project/technical/minor-terrain.md), [rendering](project/technical/rendering.md), [sprite atlas](project/technical/sprite-atlas.md), [map generation](project/technical/map-generation.md), [configuration](project/technical/configuration.md), [unit combat and costs](project/technical/unit-combat-and-costs.md), [air combat](project/technical/aircraft-combat.md), [special abilities](project/technical/special-abilities.md), [telemetry and AI-only automation](project/technical/telemetry-automation.md), [AI strategy and operations](project/technical/ai-strategy-operations.md). The inherited Thinker references remain [Details.md](Details.md), [Technical.md](Technical.md) and [Changelog.md](Changelog.md).
 
 ## Rules of the repository
 
@@ -29,8 +31,9 @@ Technical references: [minor terrain](project/technical/minor-terrain.md), [nati
 
 - **Thinker Mod is not Thinker difficulty.** Separate vanilla mechanics, mod changes, difficulty modifiers and AI behavior.
 - No compatibility obligation for **old saves or custom scenarios** as the fork evolves. A *new* game must still save, reload and continue correctly on the same build.
-- The distributed [`docs/thinker.ini`](docs/thinker.ini) is presently a **user-selected test profile** rather than a neutral upstream default. `thinker_user.ini` overrides settings locally if present.
+- The working PR #4 [`docs/thinker.ini`](https://github.com/Necaladun/thinkerNeca/blob/feature/minor-terrain-generation-migration/docs/thinker.ini) is an **experimental user-selected test profile**; the `master` copy may differ. `thinker_user.ini` overrides settings locally if present.
 - In-game acceptance is required for native x86 hooks, rendering and resource behavior. Green compilation/static CI is necessary but not sufficient.
+- **Native patch order matters:** `thinker.exe` starts `terranx.exe` and loads `thinker.dll`; `src/patch.cpp::patch_setup()` applies Scient's Patch v2.0 (`AXPatchData` in `src/patchdata.h`) **before** Thinker's own hooks. When auditing hardcoded x86 addresses, compare the original executable, post-Scient instructions and post-Thinker hooks rather than assuming raw on-disk disassembly matches the hook sites. Example: Scient's `#ABANDONBASE` fix changes the original `base_hurry` call at `0x4F7A34` into a call at `0x4F7A38`, which is the address Thinker subsequently patches. A raw address mismatch alone does not prove a broken hook.
 - Keep maintainer planning under `project/`: `docs/` is copied into the game distribution by packaging scripts.
 
 ## Next handoff

@@ -1,0 +1,97 @@
+# Campaign telemetry and automated AI games — accepted design, not implemented
+
+**Scope:** optional historical logging of the *whole* SMAC/X game and unattended AI-vs-AI campaigns. This document defines the implementation contract; it is not evidence that features already exist. Relevant source: `src/main.cpp` / `src/main.h` (configuration and command line), `src/gameturn.cpp` (turn controller and faction upkeep), `src/game.cpp` (setup and victory), `src/savegame.cpp` (save/reload), `src/gui.cpp` (developer shortcuts and dialogs), `src/patch.cpp` (native hooks).
+
+Accepted constraints:
+- **Never modify, replace, redirect, or reinterpret legacy `debug.txt`.** It remains available for existing Thinker Debug diagnostics and crash output. New files live under campaign-specific folders.
+- Capture all factions, world/ecology, diplomacy, combat, research, economic/production history, and AI decisions with actual inputs/rationales where instrumented. Human-played campaigns use the same recorder.
+- Preserve gameplay, RNG calls, turn sequence, game rules, score and save compatibility for the *same build*. No global popup suppression; classify and handle each interaction.
+- Prefer a GUI-based unattended run over true headless; it is acceptable to begin with a manual human-to-AI handover in Scenario Editor. Then automate it.
+- Preserve build identity, configuration overrides and run/save lineage for interpretation and reproduction.
+- Work in focused stages with Windows runtime acceptance rather than one large invasive turn-controller rewrite.
+
+## 1. Separate campaign data and execution sessions
+
+Proposed layout (names and file formats are subject to implementation validation):
+
+```text
+campaigns/
+  <campaign-id>/
+    campaign.json              # stable campaign identity, origin/save lineage
+    sessions/
+      <session-id>/
+        manifest.json           # build, mode, settings, start/end, process identity
+        turns.jsonl             # complete-turn snapshots, one object per turn
+        events.jsonl            # game-wide significant changes, ordered
+        decisions.jsonl         # instrumented AI evaluations and choices
+        diagnostics/            # anomalous movement, crash/stall evidence
+    saves/                      # checkpoint files with turn/session lineage
+    reports/                    # generated graphs, timelines, comparisons
+```
+
+A **campaign** is the historical identity of a game. A **session** is one running process's segment of that game. A new game gets a fresh campaign ID; loading a recorded save resumes its campaign with a new session if identity is known; loading an earlier turn creates a branch, not duplicate 'official' events. Initially support an explicit campaign ID/profile or accompanying checkpoint metadata; automatic save identity resolution may come later. If lineage is unknown, create a new session/campaign and mark the source save rather than silently merging histories.
+
+Parallel instances must never share writers or overwrite files. Use exclusive creation of unique session IDs and atomic finalisation where practical. Separate game directories are an acceptable first multi-instance strategy. Filename sanitisation, recoverable partial JSONL, file-error reporting and maximum diagnostic budgets are required.
+
+The manifest should record mod version/commit/build type, executable and DLL hashes where possible, game rules and difficulty, faction identities, starting/map seeds where observable, source save, configuration files or their fingerprints (`thinker.ini`, `thinker_user.ini`, `alphax.txt`), active profile, time, and telemetry schema version. Distinguish observed effective values from config file text and inferred values.
+
+## 2. Capture at consistent game phases
+
+**First deliverable: snapshots for every completed game turn**, across all factions. Prefer a post-all-factions boundary in `control_turn()` rather than an arbitrary intermediate `faction_upkeep()` state. Include phase and sequential event index; avoid counting a turn twice after reload. Log a baseline after scenario setup if safe and meaningful.
+
+Initial snapshot fields (names illustrative): `turn`, `mission_year`, `phase`, `faction_id`, `alive`, `human_control`, `bases`, `population`, `units`, `energy_credits`, `research_target`, `research_progress`, `technologies`, `SE_choices`, and appropriate faction totals. Add native/wildlife, climate, sea level, map counts and production/economy counters as fidelity is established. Preserve raw values; do not silently replace them with derived ratios.
+
+Event stream: construction and capture/destruction of bases; troop production/loss; research and projects; diplomacy and pacts/wars; Social Engineering changes; terraforming, fungal and climate changes; council outcomes; victories/defeats; disasters and unusual events. Introduce stable instance identity for bases/vehicles; native array indices are reused and are not permanent identifiers.
+
+Decision stream: **why an action was chosen** as structured source-backed inputs, candidate evaluations and selected option, followed by observable outcome. Never label post-hoc narrative as actual AI reasoning. When vanilla engine decisions lack inspectable rationale, state that explicitly. High-volume candidate logs must be optional.
+
+Instrument without calls to `game_rand`, `next_rand` or any other game RNG; no extra expensive evaluation functions with possible state changes. Keep writes outside sensitive combat/AI loops wherever possible and buffer as appropriate.
+
+## 3. Automated simulation profiles and launch
+
+Proposed runtime profiles: `normal`, `diagnostic`, `observer`, `autosim`. Profile selection through launch arguments/Windows shortcuts and, where safe, a development control section in the in-game menu. Option names and hotkeys must be checked for collisions before implementation. Existing command-line options are `-smac`, `-native`, `-screen`, `-windowed`, and a save path; proposed profile arguments are **not implemented**.
+
+Start with the already user-tested manual sequence: human-controlled faction -> Scenario Editor -> switch faction while retaining AI control. Source investigation must establish how this changes the human bitset and display ownership. **First automation proof** permits a manual handover, then advances successive turns without calling a human input loop. Later, offer an automatic handover at game start. Do not assume setting all factions AI without a display owner is safe. Do not couple read-only observer status, developer editing capability, human-control status, and scenario victory rules more than necessary.
+
+The unattended mode must:
+- Use the ordinary `turn_upkeep`, `faction_upkeep`, `mod_enemy_turn`, game RNG and victory mechanisms.
+- Distinguish informational dialogs (can log/suppress), choices (must execute the appropriate AI/deterministic game path or stop with diagnostics), fatal/error dialogs (stop), and endgame handling (record result, checkpoint, exit or return cleanly).
+- Avoid requiring mouse, keypress, focus or visible movie playback for progress; apply an explicit non-interactive preference profile such as disabling Secret Project movies/interludes where supported.
+- Support pause/resume/stop, turn limit, optional speed/animation reduction, and a graceful exit after victory. Unknown modal dialogs must halt with evidence rather than blindly click a default.
+- Allow autosaves/checkpoints in a campaign-specific location without overwriting or removing ordinary user saves. A temporary copy of an existing autosave is an acceptable early prototype only if made after the save finishes.
+- Avoid gameplay-affecting Debug-mode flags unless explicitly requested; existing `Alt+D` toggles `STATE_DEBUG_MODE` and fast battle resolution, so treat a Debug-vs-Develop run as a distinct test environment.
+
+## 4. Reliability and multi-instance operation
+
+A heartbeat should include campaign/session ID, process ID, current turn, phase/faction, last progress timestamp, last successful save and cumulative writer error count. An external watchdog is preferable for detecting a truly hung game process; in-process telemetry cannot reliably report if the engine is stuck inside a blocking native call.
+
+Checkpoints every configurable N turns; optional on suspicious stall or endgame. On relaunch, resume from the latest *complete and validated* checkpoint and a new session. Restarts must not silently fork or duplicate events. Begin with **one unattended instance** on Windows, then run multiple isolated game directories. Evaluate shared Windows preference keys, temporary files, window focus, renderer/display mode, file locking and actual throughput before calling multi-instance safe.
+
+Do not require true headless operation. An unattended windowed process is sufficient for the first release.
+
+## 5. Targeted movement-loop diagnostics
+
+User-observed case: roughly 50 Spartan units repeatedly oscillated on unlimited magtubes, contributing to faction defeat. This is a reported symptom, **not a proven pathfinder root cause**.
+
+Keep a bounded recent-movement ring buffer per unit or faction and flag repeated position/target/order signatures with no net progress. Distinguish oscillation *within one turn* from recurrence across turns, and intentional patrol or redeployment from an actual stalemate. Dump exact moves, chosen destinations, order/target changes, candidate movement priorities where available, movement points/roads/tubes, nearby occupancy, faction plan and relevant route costs. Include a faction-level detector for units exchanging places. Normal runs should not log every step indefinitely.
+
+## 6. Analysis output and narrative layer
+
+Generate offline reports from captured data, not from hidden in-engine UI history: per-turn faction comparison, major event timeline, wars, economic and research changes, unit losses, strategic objective outcomes, anomaly summaries and cross-build A/B experiments. Reports can be refreshed during long runs.
+
+A later intelligence/flavour layer may render a logged event as e.g. 'Gaians adopted Planned economics', with faction-appropriate narration, but must respect in-game intelligence visibility for player-facing output. Narration never becomes evidence for the AI's motivation.
+
+## 7. Ordered implementation and acceptance
+
+The actionable backlog lives only in [WORK-QUEUE](../WORK-QUEUE.md).
+
+1. **TEL-001:** independent recorder, campaign/session files, manifest, complete-turn snapshots. Build, schema and IO tests; Windows save/reload checks; confirm `debug.txt` unchanged.
+2. **AUTO-001:** manual handover-compatible auto turn driver, single campaign, controlled stop.
+3. **AUTO-002:** dialog classification and policy, movie preference handling, automated victory/stop; achieve 100+ unattended turns.
+4. **AUTO-003:** campaign checkpoints, restart lineage and watchdog; repeat across save/reload and force a stall/crash test.
+5. **TEL-002:** events and meaningful AI reasoning instrumentation; begin with a short set of source-backed decisions and broaden.
+6. **DIAG-001:** pathfinding ring buffer and stuck-movement detectors, validated with synthetic signatures and real repeatable case when available.
+7. **AUTO-004 / TEL-003:** concurrent isolated campaigns and offline comparative reports.
+8. **DEV-001:** optional CI Debug artifact and diagnostic tooling, separate from enabling legacy extended Debug mode.
+
+**Evidence hierarchy:** source inspection; Windows x86 compilation/CI; synthetic recorder tests; **actual Windows SMAC/X in-game trial**. CI passing does not prove unattended gameplay, popup coverage, rendering safety, RNG neutrality, or save/reload continuity.

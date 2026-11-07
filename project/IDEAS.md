@@ -2,6 +2,12 @@
 
 **Not commitments.** This is a parking place for possible gameplay/engineering directions. If a proposal is accepted for investigation or implementation, create/advance a stable ID in [WORK-QUEUE](WORK-QUEUE.md). Record only actual decisions in [DECISIONS](DECISIONS.md).
 
+## Additional deferred reference reviews
+
+- **Special abilities:** [29-ability review](technical/special-abilities.md) covers combat/economic value, AI selection, navy interactions and deferred balance concepts. No implementation is authorised by preserving the reference.
+- **Air combat and aircraft design:** [aircraft mechanics review](technical/aircraft-combat.md) documents Air Superiority and SAM/AAA interactions, armour economics, transports and a low-priority proposed Heavy-Artillery Needlejet bomber. The armour-as-speed/weight proposal was considered but not adopted.
+- **Operational AI and formations:** [strategy/operations discussion](technical/ai-strategy-operations.md) captures inherited staging, land-combat coordination, raids, operational failure, faction doctrine and observer-game evidence; this is **not** an approved implementation programme. The separate [telemetry/automation plan](technical/telemetry-automation.md) is accepted foundational work.
+
 ## Terraforming and terrain economics
 
 - **Less universal Forests:** reduce Forest from 1 nutrient / 2 minerals / 1 energy to 1/1/1 to increase the relevance of dedicated Farms, Mines and Solar Collectors. Needs evaluation alongside Tree Farms, upkeep, terraforming turns and Thinker AI choices. See BAL-002.
@@ -30,13 +36,67 @@
 
 Old-save/scenario compatibility is not a target. Strong Solar output by itself is not a bug. Changing `tile_output_limit` to 3/3/3 is **already an active trial** (BAL-001), not merely a hypothetical.
 
-## Empire Report — production access and future queue interaction
 
-**Implemented on draft PR #5:** Current-build icon/name opens native Change Production for the selected base. The next queued item is displayed read-only; Windows testing confirmed the existing picker, cancel, change and preview. A straightforward sequential full-colony open in `bd334ba` failed in-game: `BaseWin_zoom` is modal, so the picker opened only after the colony closed. The new source-only `96e0eba`/`5a671ca` defers the picker into that modal event loop via a one-shot registered message; Windows testing remains pending.
+## Military chassis, artillery and unit economics — exploratory (BAL-004)
 
-**Now source-staged, not yet Windows-verified:** Next in Queue (including empty `None`) opens the actual colony and dispatches a click to the native Queue title region (`BaseWindow.rcQueueTitle`), intending to launch the game's queue-editing Production Readout. This separate action was requested on 6 November; its mapped native click target must be verified on the actual Windows executable. It does not copy the native editor into Empire Report or mutate `queue_items` directly.
+**Status: ideas only.** The existing mechanics are documented in [unit combat and costs](technical/unit-combat-and-costs.md). None of the following chassis bonuses, technology progression, artillery rules or cost formulas are implemented or agreed balance values. BUG-004 is a *separate existing correctness defect*, not an argument for a reactor-based HP bonus.
 
-**Still speculative:** a fully integrated, independently drawn queue editor inside the report, rather than a shortcut into the native editor. Not selected for implementation.
+### Economic problem and intended roles
+
+Current construction costs strongly reward high-weapon/low-armour units, particularly Impact and Missile Rovers. An armoured mobile unit can cost as much as two naked attackers, while a surviving durable unit can save replacement minerals, preserve experience and continue an offensive campaign. Analyse **single-battle mineral efficiency** separately from **campaign endurance and repair**.
+
+| Chassis | Proposed specialisation |
+| --- | --- |
+| Infantry | Economical positional defence, garrisons and base assaults |
+| Rover | Fast, replaceable mobile attacker, exploitation and raiding |
+| Tank | Costly durable land unit designed to survive counterattacks and sustained offensives |
+| Foil | Light patrol/interception/attack vessel |
+| Cruiser | More expensive durable fleet unit, escort and transport support |
+
+This does not assume the current Tank or Cruiser has extra HP. Existing mobile open-ground attack bonuses are **speed-based** and can apply to Tanks; making them Rover-only would require an explicit combat change.
+
+### Possible land mobility progression
+
+- Early Rover speed 2 (existing baseline).
+- Unlock a conventional Tank earlier than the current Hovertank, possibly speed 2 with normal terrain movement.
+- Later allow Rover speed 3, without granting early access to greatly increased Unity Pod exploration.
+- Later allow Tank speed 2 **all-terrain** movement rather than simply giving it superior top speed.
+- Determine technology prerequisites, coexistence with current chassis, pathfinding and AI valuation **before** any rule changes.
+
+### Chassis endurance versus armour economics
+
+Test **+1 and +2 effective HP** for Tanks and perhaps Cruisers **independently** of any cost reduction. In an idealised equal-strength 10-HP-versus-10-HP round-by-round battle, moving one participant to 11 HP changes its win chance from 50% to about 58.8%; 12 HP gives about 66.8%. Those are analytic illustrations, not runtime measurements.
+
+The bonus supports repeated engagements and survival of expensive experienced units, but also improves **unarmoured** offensive Tanks. A naked 6-1 Tank should not simply replace a cheaper Rover. Test costs, movement, exposed counterattacks, repairs and AI design decisions, not win probability alone.
+
+An **alternative**, not an automatic additional bonus, is removing/reducing the mobile combined weapon-and-armour cost surcharges for Tanks. Under the current Fission formula a 4-2 Impact Tank costs 70 minerals; a hypothetical removal of both surcharge increments would give 50. Compare this with a +HP Tank before stacking benefits.
+
+Another **lower-priority alternative** is an armour-derived offensive Tank bonus (for example +5% per armour point above 1). This risks making armour a cheap surrogate for weapons at higher reactors, and introduces another specialist modifier. No coefficient is approved.
+
+### Land and naval artillery-duel armour
+
+Current artillery duels use weapon versus weapon, ignoring installed armour as the defender's ordinary resistance. This particularly undermines armoured Cruisers fighting cheap armed Foils at range, but also affects **land counterbattery artillery**.
+
+Possible *symmetric* duel changes to investigate:
+- Add a **fraction of armour above 1** to each participant's effective duel strength, with a cap or diminishing returns if needed.
+- Make armour reduce incoming duel damage rather than modify per-round win probability.
+- Consider a bounded counterbattery-protection bonus for armour-equipped artillery.
+
+A possible mathematical **example only**, not a settled design: `duel strength = weapon + 0.5 × (armour - 1)`. Under it, 6-1 uses 6, 6-3 uses 7, and 6-8 uses 9.5 (before any chosen integer/fixed-point implementation). Test both combatants symmetrically, compare morale/altitude, and avoid changing ordinary direct attacks or air intercepts accidentally.
+
+Naval armour is already cheaper in the existing cost formula, but ships lack forest/rocky or anti-Rover ECM defences. Qualifying sensors, AAA and port defences remain relevant; **these do not protect an ordinary open-sea weapon-only artillery duel through the standard armour path**. Before altering Cruiser HP or price, compare direct naval attacks, ship artillery duels, bombardment against transports and air threats. Extra HP can help duels without making armour itself useful, so it does not solve the whole problem.
+
+### Other related construction ideas
+
+- Investigate finer-than-ten-mineral unit price granularity only if the game and AI can consistently support it.
+- Measure rounding plateaus and nominally free equipment upgrades across Fission/Fusion/Quantum/Singularity.
+- Compare component-based costing models such as WTP's for inspiration, **without** importing their entire balance assumptions.
+- Separately evaluate limited mineral overflow carryover or multi-unit production where cheap-unit spam causes production inefficiencies.
+- Avoid altering these unrelated systems in the first chassis experiment.
+
+### Investigation and test requirements
+
+BAL-004 first needs a cost and win-rate comparison spanning weapon/armour combinations, reactors, terrain, artillery, ship/land roles and repair opportunities. Then select one minimal experimental rule set and verify actual gameplay, AI behaviour, same-build save/reload and adverse edge cases. See [WORK-QUEUE](WORK-QUEUE.md) for the single actionable entry.
 
 ## Native ecology and fungal forests — future exploration
 
@@ -94,58 +154,19 @@ State should be **local to an ecological network/region**, not a single global �
 
 **Scope boundary:** Keep this as exploratory design until explicitly selected for a later project phase. Do not blend it into the ongoing PR #4 terrain-rendering acceptance work or put speculative subtasks in `WORK-QUEUE.md`.
 
-## Empire Turn Report — original management objective (7 November 2026)
+## Empire Turn Report (UI-002) — future workflow, not present in PR #5
 
-**Approved direction, implementation deferred (UI-002).** This is **not** the general Empire Overview implemented on draft PR #5. Empire Overview is a reopenable live-state landing page; the future **Turn Report** is an automatically presented, reopenable *post-upkeep event and decision summary*. The user's original aim was to stop having to visit every colony/popup in sequence while treasury, labs and base values change underneath early choices, particularly hurrying production before later income and expenses have resolved.
+The parked native Empire Report (UI-001, [draft PR #5](https://github.com/Necaladun/thinkerNeca/pull/5)) is a manually opened **live-state** view. The desired **start-of-turn Turn Report** is distinct: finish all relevant faction-wide upkeep first, then present the **results and pending player decisions together**, instead of asking for sequential colony orders while energy and labs are still changing.
 
-### Intended player experience
+- Headline: **“X colonies finished production and need new orders.”** For each genuine completion, list the colony, exact item completed, the next queue/current order and a native **Change Production / Queue** action. It must handle 30 or more completions with independent scrolling, not rely on the current Stockpile Energy listing.
+- Show opening/closing treasury, credited income/maintenance, research progress and breakthroughs, population changes, major incidents, riots/starvation, and actionable colony exceptions. Distinguish routine advisories such as habitation caps from urgent decisions.
+- **Stockpile Energy** already serves as a native fallback for some unqueued facility/Secret Project completions; keep that behaviour while deferring later choices. A base intentionally stockpiling does *not* prove that it completed production this turn. Do not overwrite valid queued items or governor decisions.
+- **Secret Project completed** is an exceptional notification. Offer **“View movie?”** using the existing playback route; current game preferences gate the automatic playback. The proposal must not suppress project rewards, council/victory effects, interludes or normal project completion rules.
+- Implement in stages: **capture true events and snapshots without changing upkeep**, then distinguish safe routine notifications from mechanically significant decisions, then integrate an automatic reopenable post-upkeep report. The game's `production_phase() -> mod_base_upkeep()` processes colonies sequentially and can invoke native `BaseWin_zoom()` during processing; a mid-loop report would show partial totals. Guard same-build save/reload, eliminated bases, research breakthroughs, upkeep order and multiplayer/PBEM differences.
 
-1. Process the faction's normal turn and each colony's production, upkeep and growth using established game rules.
-2. Consolidate completed production, resource accounting, population/riot/Golden Age/ecology changes, and other turn events across all colonies. Routine completions should not require a separate colony popup each.
-3. Show one start-of-player-turn Turn Report with **opening and closing treasury**, credited income and costs where exact source data supports them, research target/progress/labs credited and research results, production completions and current queues, and exceptional bases needing attention.
-4. Offer context actions into the existing native colony/Change Production/Queue/Hurry interfaces and a reopenable report. Cases that genuinely require player decisions should be surfaced together rather than silently defaulted.
-5. After review, proceed with normal orders and spending from the completed, stable upkeep state.
+This design is deferred under [UI-002](WORK-QUEUE.md) and **does not hold up merging the currently functional manual Empire Report**.
 
-**Source-level finding:** `src/gameturn.cpp:production_phase()` resets faction-wide income/labs counters and iterates through owned colonies calling `mod_base_upkeep()`. `src/base.cpp:mod_base_upkeep()` may open `BaseWin_zoom()` immediately for a flagged base; per-base research and treasury credits occur during that sequence. `faction_upkeep()` continues with additional faction costs/choices before player control. Therefore a UI opened *during* the per-base loop would display partial totals, and merely suppressing popups could change rules or remove required decisions. The correct post-upkeep presentation point is conceptually after faction upkeep and before ordinary human orders, but exact hook placement and all interrupt semantics need dedicated source/runtime investigation.
 
-### Turn Report presentation and Secret Project handling (7 November follow-up)
+## Further manual Empire Report interactions — exploratory
 
-- Lead with a production-action headline such as **“X colonies finished production and need new orders”**, followed by the actual finished item, colony, queued successor (if any) and an immediate **Change Production / Queue** action for each. Count only actual completion events, not bases currently on Stockpile Energy; those may be deliberately stockpiling or have inherited that order from other causes.
-- The existing `mod_base_production()` already selects **Stockpile Energy** for certain human, non-governor-managed facility/Secret Project completions with no next item. Treat that as the normal fallback to preserve while deciding orders after upkeep, not as an excuse to overwrite any queued productions or governor decisions. Verify unit-production and multi-completion cases separately.
-- Keep **Secret Project completed** as a highlighted exceptional event; show **“View movie?”** instead of forcing playback every time. Source currently checks `PREF_AV_SECRET_PROJECT_MOVIES` and calls `amovie_project(project_id)` followed by `help_project(project_id)` in `src/base.cpp`. Decide how an explicit one-time manual playback request interacts with the global preference; never suppress project rewards, victory triggers, other interludes or diplomacy.
-- The live Overview's **Stockpile Energy** listing is a useful current-order shortcut, not the Turn Report. It must not claim that stockpiling necessarily indicates a recent completion.
-
-### Implementation split and constraints
-
-- **Stage 1: Observability only.** Capture pre/post faction treasury and labs, stable base identities, actual completion/event records and an accurate post-upkeep snapshot. Initial version can leave all original popups intact and be invoked manually for testing. Avoid reconstructing completed productions solely from final `queue_items`, or lab generation solely from accumulated-progress differences after breakthroughs.
-- **Stage 2: Safe batching.** Identify existing interruptions that are informational versus those that affect upkeep outcomes. Aggregate routine notices while deferring actual player choices into a dedicated post-upkeep decision phase. Preserve queue rules, built facility/project effects, production overflow, retool/hurry costs and any order-dependent tech effects.
-- **Stage 3: Integrated start-of-turn screen.** Present automatically at the correct player-control boundary and make it reopenable through Empire Report. Prefer concise summaries and actionable exceptions over listing every routine base every turn.
-
-**Do not implement during the current UI visual-prototype test.** Validate the existing navigation/appearance changes first. Multiplayer/PBEM, event popups, new-game arrival, game-over, autosave, base elimination and save/load are edge cases; defer broad support until the single-player path is verified. No new save format or session-only history presented as persistent without an explicit design.
-
-## Future Empire Report information (proposals only)
-
-Requested: colour-coded values; Garrison facility indicators; eco damage, growth ETA/boom, habitation cap, maintenance and Golden Age; empire integrity/might, commerce, council votes, energy sliders, game year/perihelion and current Social Engineering; eventual Diplomacy standings, relationships, mood, votes and category leaders. Do not implement these yet.
-
-Garrison facility indicators proposed: Perimeter Defense, Tachyon Field, Command Center, Naval Yard (sea training), Aerospace Complex, Bioenhancement Center and Geosynchronous Survey Pod (GSP). Growth display should distinguish normal growth, population boom, stagnation, starvation and Hab Complex/Dome caps.
-
-Further candidates: energy inefficiency, stalled production, satellite totals, sanctions remaining, missing-facility filters and unit support. Historical trends require retained event history.
-
-### Empire Report candidates confirmed for later evaluation (5 Nov)
-
-- Prioritise visible energy inefficiency, stalled base production, sanctions remaining, home-base unit support burden, and each base's percentage contribution to faction economy, labs and psych. These are readouts/calculations over existing state, with costs and upkeep timing to be checked.
-- Consider a missing-facility checklist/filter, without committing to its layout.
-- Consider a dedicated Orbital view for existing satellite totals and associated effects.
-- A Problems/Attention view could filter starving, rioting, stalled and eco-damaged bases, with optional severity sorting; it should not replace the ordinary base list.
-- Personal empire trends are desired, but population/income/labs/minerals trend lines need turn-by-turn snapshots unless existing history can be verified. FactionTurnMight exists, but does not establish the availability of these other series. Future design must specify post-upkeep sampling, bounded retention and same-build save/reload persistence; do not implement history yet.
-
-### Further report and interaction ideas (5 November)
-
-**Ideas only. No code work or new actionable work item yet.**
-
-- **Empire trends: very low priority / maybe.** Recording population, income, research and other values over multiple turns would require reliable turn-by-turn data and an explicit save/reload persistence design. Current live-state readouts take precedence. Do not implement a session-only history as if it were a durable trend.
-- **Problems / Attention: positive candidate.** A filterable exception view for starving, rioting, stalled-production, eco-damage, habitation-cap and other bases needing review. Consider a **nearby enemies** warning if cheap and reliable. Enemy markers must respect the player's **current map visibility and contact/hostility information** rather than scanning hidden positions as if known; choose a sensible radius and distinguish simple proximity from a genuine combat-threat calculation.
-- **Full Unit Register:** consider a dedicated tab comparable to the game's existing unit listing. Potential columns: unit design/name, triad, location, assigned home base, movement left, damage, morale, orders and support burden. Filters/sorting for idle, damaged, combat/noncombat, away-from-home and land/sea/air. Validate unit selection/navigation against changing vehicle indices after deaths and captures.
-- **Contextual right-click menus:** use on base rows and potentially unit entries for appropriate actions: visit/centre, Change Production, Hurry, governor settings, queue review or unit selection as supported. The engine's native window has right-button callbacks, but each action still needs verified target identity, relevant base/unit context, availability rules and safe focus/modal return. Do not make every row trigger actions or silently modify orders on right-click.
-- A right-click context menu and direct click-to-Change Production are related but not identical ideas; retain both as possibilities until actual interaction semantics are selected.
-
+The source history of PR #5 discusses possible **contextual right-click actions** on base/unit rows, a missing-facility checklist, a separate orbital/satellite summary, and additional filters for stalled production, energy inefficiency, sanctions and unit support. These are **unapproved candidates**, not UI-001 acceptance requirements; existing native Change Production, Queue, Hurry, Governor and the current twelve report views must not be mistaken for unfinished work. Trends in population, economy, research or orbital investment would require explicit event/history capture and save/reload policy, potentially reusing the later TEL-* recorder. Preserve player-known fog-of-war information for any future threat/proximity display. UI-002's actual post-upkeep completion summary remains the separately deferred design above.
