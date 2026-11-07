@@ -1,5 +1,6 @@
 
 #include "faction.h"
+#include "gui_dialog.h"
 
 static char PlrBuf[StrBufLen] = {};
 
@@ -370,7 +371,7 @@ void __cdecl set_treaty(int faction_id_1, int faction_id_2, uint32_t status, boo
                 if (faction_id_1 == MapWin->cOwner) {
                     ParseNumTable[0] = turns;
                     parse_says(0, get_noun(faction_id_2), -1, -1);
-                    NetMsg_pop(NetMsg, "SPYRENEW", 5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "SPYRENEW", 5000, 0, 0);
                 }
             }
         } else {
@@ -737,7 +738,7 @@ int __cdecl steal_tech(int faction_id, int faction_id_tgt, int is_steal) {
             StrBuffer[0] = '\0';
             say_tech(StrBuffer, tech_id, 0);
             parse_says(1, StrBuffer, -1, -1);
-            NetMsg_pop(NetMsg, "STOLETECH", 5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "STOLETECH", 5000, 0, 0);
         }
         tech_achieved(faction_id, tech_id, faction_id_tgt, 0);
         if (!is_human(faction_id) && tech_id != 9999) {
