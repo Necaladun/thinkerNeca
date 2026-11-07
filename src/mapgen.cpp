@@ -1249,9 +1249,9 @@ separate RNG streams so neither can overwrite an existing minor feature.
 */
 static bool place_minor_geology_patch(MinorLandmark type, GameRandom& rng,
     std::vector<Point>& centers) {
-    const int patch_sizes[17] = {
-        3, 4, 4, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 8, 8, 9
-    };
+    // Smaller, more dispersed deposits: 3–5 tiles, weighted 1:3:1.
+    // Average = 4 rather than 6 tiles; patch target scales up by 50%.
+    const int patch_sizes[5] = {3, 4, 4, 4, 5};
     auto eligible = [&](int tx, int ty) -> bool {
         MAP* tile = mapsq(tx, ty);
         return tile && !is_ocean(tile) && !tile->lm_items()
@@ -1299,7 +1299,7 @@ static bool place_minor_geology_patch(MinorLandmark type, GameRandom& rng,
         if (seed_x < 0) {
             return false;
         }
-        const int target = patch_sizes[rng.get(17)];
+        const int target = patch_sizes[rng.get(5)];
         std::vector<Point> patch;
         std::set<Point> selected;
         patch.push_back({seed_x, seed_y});
@@ -1357,8 +1357,8 @@ static bool place_minor_geology_patch(MinorLandmark type, GameRandom& rng,
                     type, p.x, p.y);
                 return false;
             }
-            // Match the working Uranium generator: clear fungus for both.
-            bit_set(p.x, p.y, BIT_FUNGUS, false);
+            // Preserve existing fungus. It currently masks geological
+            // bonuses in the live yield branches until the player clears it.
         }
         centers.push_back({seed_x, seed_y});
         debug("minor geology type=%d patch=%d tiles at %d,%d\n",
@@ -1378,7 +1378,11 @@ static void generate_minor_geology() {
     if (!uranium_enabled && !titanium_enabled) {
         return;
     }
-    const int patch_count = max(2, min(6, (*MapAreaTiles + 400) / 800));
+    const int previous_patch_count = max(2, min(6, (*MapAreaTiles + 400) / 800));
+    // Increase patch count ~50% while holding average geological tile
+    // coverage constant (6 old tiles/patch -> 4 new tiles/patch).
+    // Existing separation can still cause some attempts to fail.
+    const int patch_count = (3 * previous_patch_count + 1) / 2;
     GameRandom uranium_rand, titanium_rand;
     uranium_rand.reseed(pair_hash((uint32_t)*MapRandomSeed ^ 0x5552414Eu,
         (uint32_t)*MapAreaTiles));

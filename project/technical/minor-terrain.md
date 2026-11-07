@@ -16,8 +16,8 @@ Independent minor terrain is now represented per map tile as `MinorTerrainTile {
 | Type | Current bonus | Phase | Distribution |
 | --- | --- | --- | --- |
 | Jungle | +1 nutrient | Early | Climate-/moisture-sensitive patches, generally 8–16 tiles, occasionally larger |
-| Uranium | +1 energy | Late | Dispersed 3–9 tile deposits, lowland preference |
-| Titanium | +1 mineral | Late | Dispersed 3–9 tile deposits; currently identical lowland preference to Uranium |
+| Uranium | +1 energy | Late | Dispersed 3–5 tile deposits, lowland preference; existing fungus retained |
+| Titanium | +1 mineral | Late | Dispersed 3–5 tile deposits, identical lowland preference to Uranium; existing fungus retained |
 
 **Source implementation on PR #4 (TERR-004; Windows runtime not yet tested):** each tile may now hold several independent minor types with per-type codes. Jungle uses a climate/rainfall pattern; Uranium and Titanium use patch-local indices (0–8). The `minor_landmark_has/any_at/entries_at` queries, type-specific `minor_landmark_set/clear` and `minor_landmark_clear_all` replace the former single-valued lookup. Do not conflate *representability* with procedural overlap placement, and do not infer that every original native `LM_*` combination is mechanically/renderably valid.
 
@@ -47,7 +47,7 @@ For the intended independent-feature maps, use `new_world_builder=1`, `modified_
 
 1. The early phase generates Jungle before the native-major landmark placement loop and final climate/rainfall pass. Major landmarks can overwrite parts of those patches; the post-placement cleanup removes overlapping independent minor tiles.
 2. The modified world generator then finalises climate and rockiness.
-3. The late phase uses **one shared geological generator**, alternating Uranium then Titanium for each round (when enabled). Both use the same land eligibility, lowland preference, 3–9-tile weighted patch sizes, two-tile separation from existing patches/landmarks and fungus clearing. Independent RNG streams and a shared centre-spacing score keep the types separate and distributed. Each type targets 2–6 patches depending on map area; attempts can fail.
+3. The late phase uses **one shared geological generator**, alternating Uranium then Titanium for each round (when enabled). In the approved **new distribution trial on draft PR #4**, patch sizes are **3–5 tiles** weighted 1:3:1 (mean 4, down from 6); targets scale from the old 2–6 deposits to **3–9 patches per type**, depending on map area. Both retain the same lowland preference, two-tile separation from existing patches/landmarks, independent RNG streams, shared centre-spacing score and land eligibility. **Existing fungus is preserved**, not cleared. The generator still makes at most eight attempts to complete each patch and discards incomplete candidate patches; actual successful counts can fall below targets on crowded maps. This modifies new-map RNG outcomes but not saves, yields, or current terrain overlap policy.
 4. Mirrored map modes skip independent minor generation (symmetry is not implemented).
 
 **Configuration:** all three minor types currently require `modified_landmarks=1` and the `new_world_builder=1` path. Geological types can be switched independently with `minor_uranium` and `minor_titanium`; the same shared routine handles either one alone. Mirrored worlds remain unsupported.
@@ -56,7 +56,7 @@ The legacy `LM_JUNGLE` / `LM_URANIUM` generator paths remain available in some u
 
 ## Resource yields and AI
 
-The registry currently defines **unconditional +1 basic-resource bonuses** (subject to the actual resource-calculation branch and restrictions). Normal land, base squares and Forests generally preserve their minor bonuses. Some special improvement branches overwrite calculated values: notably, a Thermal Borehole suppresses Jungle's nutrient and Titanium's mineral bonus, whereas Uranium's energy bonus can survive. Fungus and other special cases require individual checks. Ordinary resource restrictions can cap the realised bonus.
+The registry currently defines **unconditional +1 basic-resource bonuses** (subject to the actual resource-calculation branch and restrictions). Normal land, base squares and Forests generally preserve their minor bonuses. Some special improvement branches overwrite calculated values: notably, a Thermal Borehole suppresses Jungle's nutrient and Titanium's mineral bonus, whereas Uranium's energy bonus can survive. Fungus takes its own resource-yield branch in the current live calculation: on a fungus-covered Uranium/Titanium tile, the +1E/+1M geological bonus does **not** increase the displayed fungus yield; clearing fungus exposes the underlying bonus through the normal land calculation. This is now intentional for the distribution trial. Other special cases require individual checks. Ordinary resource restrictions can cap the realised bonus.
 
 Thinker's worker selection, crawler logic and former scoring consume modified actual tile yields in several paths. Settlement scoring also explicitly recognises independent terrain, but uses coarse fixed bonuses. The projected `item_yield()` calculation is not fully identical to actual `mod_crop_yield()`, `mod_mine_yield()` and `mod_energy_yield()` for certain future improvements (especially Titanium/Jungle plus a Thermal Borehole). These discrepancies should be fixed in the later AI/terraform pass, once extraction rules are finalised.
 

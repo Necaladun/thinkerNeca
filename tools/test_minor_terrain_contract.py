@@ -92,8 +92,24 @@ def main() -> None:
             and 'for (int round = 0; round < patch_count; ++round)' in geology
             and geology.index('place_minor_geology_patch(MINOR_URANIUM')
                 < geology.index('place_minor_geology_patch(MINOR_TITANIUM')
-            and 'bit_set(p.x, p.y, BIT_FUNGUS, false)' in geology,
-            'The two geological types must alternate, keep separation, and clear fungus')
+            and 'bit_set(p.x, p.y, BIT_FUNGUS, false)' not in geology,
+            'Geological types must alternate and preserve pre-existing fungus')
+    sizes_match = re.search(
+        r'const int patch_sizes\[5\]\s*=\s*\{([^}]+)\};', geology)
+    require(sizes_match is not None,
+            'Geological deposit sizes must use the approved five-entry distribution')
+    sizes = [int(x.strip()) for x in sizes_match.group(1).split(',')]
+    require(sizes == [3, 4, 4, 4, 5]
+            and 'const int target = patch_sizes[rng.get(5)];' in geology,
+            'Geology must generate 3–5-tile patches with a weighted mean of 4')
+    require('max(2, min(6, (*MapAreaTiles + 400) / 800))' in geology
+            and 'const int patch_count = (3 * previous_patch_count + 1) / 2;' in geology
+            and 'for (int attempt_patch = 0; attempt_patch < 8; ++attempt_patch)' in geology
+            and 'for (int attempt = 0; attempt < 96; ++attempt)' in geology
+            and 'if ((int)patch.size() != target) {' in geology
+            and geology.index('if ((int)patch.size() != target) {')
+                < geology.index('minor_landmark_set(p.x, p.y, type'),
+            'Geology count must scale 50% while failed patches leave no partial features')
     require('new_landmark(' not in jungle + geology,
             'Minor terrain may not create native named landmarks')
     require('minor_landmark_clear_all(tx, ty)' in mapgen,

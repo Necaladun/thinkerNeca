@@ -27,6 +27,10 @@ Other current test-profile values include `base_capture_fix=0` (probe workaround
 
 - User reports all six requested combined PR #4 + PR #5 Develop checks passing with binary `3c08b52`: save/reload/advance, Empire Report, terrain graphics, Inspector, map generation and compatibility. The same build's Develop/Release cross-builds passed CI; **only Develop has in-game verification**. No exact seed list, detailed Inspector/resource-overlap trace or Release test was supplied. Details: [TESTING](TESTING.md).
 
+## Pending revised geology distribution trial
+
+- [TERR-002](WORK-QUEUE.md): after user approval, new experimental Uranium/Titanium generator settings shrink each patch to 3–5 tiles and increase per-type patch attempts ~50% (3–9), maintaining roughly the same expected total geological area. Existing fungus is retained. **Source/CI and fresh-map Windows verification are distinct:** a new game with the trial build is needed before accepting the resulting distribution and fungus/yield interactions. No new INI options or save changes.
+
 ## Remaining before PR #4 can merge
 
 - [TERR-001](WORK-QUEUE.md): broad same-build save→reload→continue, fog/redraw and UI smoke now reported passing on combined Develop; finish any specifically identified edge-case evidence on the final integrated binary.
