@@ -755,7 +755,7 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
                     } else if (pop_left) {
                         popp(ScriptFile, "HOMELESS", 0, "alienref_sm.pcx", 0);
                     }
-                    interlude(25, base->name, 1, 0);
+                    autosim_interlude(25, base->name, 1, 0);
                 }
                 if (faction_id == player_id) {
                     if (pop_left == 1) {
@@ -771,7 +771,7 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
                     } else if (pop_left) {
                         popp(ScriptFile, "HOMELESS", 0, "humanref_sm.pcx", 0);
                     }
-                    interlude(37, base->name, 1, 0);
+                    autosim_interlude(37, base->name, 1, 0);
                 }
                 if (faction_id == player_id) {
                     if (pop_left == 1) {
@@ -779,7 +779,7 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
                     } else if (pop_left) {
                         popp(ScriptFile, "HOMELESS", 0, "humanref_sm.pcx", 0);
                     }
-                    interlude(24, base->name, 1, 0);
+                    autosim_interlude(24, base->name, 1, 0);
                 }
             }
             // Fix diplomacy dialog appearing multiple times when both human and alien factions are
@@ -903,7 +903,7 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
         parse_says(4, dir_label, -1, -1);
         strcpy_n(base->name, 25, MFactions[player_id].assistant_city);
         make_base_unique(base_id);
-        interlude(7, 0, 1, 1);
+        autosim_interlude(7, 0, 1, 1);
         draw_map(1);
         // removed text_close();
     }
@@ -1098,7 +1098,7 @@ void __cdecl mod_base_change(int base_id, int item_id) {
                 plr->secret_project_intel[bm_word] |= bm_val;
             }
             if (abs(item_id) == FAC_VOICE_OF_PLANET) {
-                interlude(11, 0, 1, 0);
+                autosim_interlude(11, 0, 1, 0);
                 *GameInterludeState |= 400u;
             }
         } else {
@@ -3070,7 +3070,7 @@ void __cdecl mod_base_ecology() {
             if (faction_id == player_id) {
                 Console_focus(MapWin, nx, ny, faction_id);
                 if (plr->clean_minerals_modifier < 2) {
-                    interlude(3, 0, 1, 0);
+                    autosim_interlude(3, 0, 1, 0);
                 }
                 boom_tile(nx, ny, 0x80);
             }
@@ -3096,7 +3096,7 @@ void __cdecl mod_base_ecology() {
             }
         }
         if (faction_id == player_id && plr->clean_minerals_modifier >= 2) {
-            interlude(5, base->name, 1, 0);
+            autosim_interlude(5, base->name, 1, 0);
         }
     }
     if (!is_human(faction_id)) {
@@ -3115,7 +3115,7 @@ void __cdecl mod_base_ecology() {
         return;
     }
     if (faction_id == player_id) {
-        interlude(8, 0, 1, 0);
+        autosim_interlude(8, 0, 1, 0);
     }
     if (!(game_rand() & 3) && *ExpansionEnabled && conf.spawn_fungal_towers) {
         if (!is_ocean(mapsq(spawn_x, spawn_y))) {
@@ -3389,7 +3389,7 @@ int __cdecl mod_base_production() {
             }
             if (unit_id == BSC_MIND_WORMS) {
                 if (faction_id == player_id && !(*GameInterludeState & 0x10)) {
-                    interlude(4, base->name, 1, 0);
+                    autosim_interlude(4, base->name, 1, 0);
                     veh->state |= VSTATE_ASSISTANT_WORM;
                 }
             }
@@ -3688,7 +3688,7 @@ int __cdecl mod_base_production() {
         if (faction_id == player_id) {
             uint32_t ann_byte, ann_bit;
             if (facility_id == FAC_SUBSPACE_GENERATOR) {
-                interlude(38, 0, 1, 0);
+                autosim_interlude(38, 0, 1, 0);
                 int val = 0;
                 parse_num(0, generators(faction_id, &val));
                 parse_num(1, val);
@@ -3773,7 +3773,7 @@ int __cdecl mod_base_production() {
             if (facility_id == FAC_SUBSPACE_GENERATOR) {
                 if (full_game_turn()) {
                     if (!MFactions[player_id].is_alien()) {
-                        interlude(26, base->name, 1, 0);
+                        autosim_interlude(26, base->name, 1, 0);
                     }
                     int val = 0;
                     parse_num(0, generators(faction_id, &val));
@@ -3834,9 +3834,9 @@ int __cdecl mod_base_production() {
         mon_built_preserve(faction_id);
         if (faction_id == player_id) {
             if (*GameInterludeState & 0x20) {
-                interlude(9, 0, 1, 0);
+                autosim_interlude(9, 0, 1, 0);
             } else {
-                interlude(5, 0, 1, 0);
+                autosim_interlude(5, 0, 1, 0);
             }
         }
     }
@@ -3849,7 +3849,7 @@ int __cdecl mod_base_production() {
     }
     if (project_id >= 0) {
         if (facility_id == FAC_VOICE_OF_PLANET) {
-            interlude(12, 0, 1, 0);
+            autosim_interlude(12, 0, 1, 0);
         }
         if (faction_id == player_id) {
             if ((*GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES) && !*MultiplayerActive) {
@@ -3907,10 +3907,10 @@ int __cdecl mod_base_production() {
                     draw_tile(tx, ty, 2);
                 }
             }
-            interlude(13, 0, 1, 0);
+            autosim_interlude(13, 0, 1, 0);
             parse_says(5, get_name(faction_id), -1, -1);
             CharUpperA(ParseStrBuffer[5].str);
-            interlude(14, 0, 0, 0);
+            autosim_interlude(14, 0, 0, 0);
         }
 
         mon_secret_project(faction_id, project_id);
@@ -3926,7 +3926,7 @@ int __cdecl mod_base_production() {
                 }
             }
             if (faction_id == player_id) {
-                interlude(17, 0, 2, 0);
+                autosim_interlude(17, 0, 2, 0);
                 *GameVictoryType = VIC_TRANSCEND_PLR;
             } else {
                 *GameVictoryType = VIC_TRANSCEND_LOSS;
@@ -3934,9 +3934,9 @@ int __cdecl mod_base_production() {
                 parse_num(2, game_year(*CurrentTurn + 100));
                 parse_num(3, (*CurrentTurn + 100) / 100);
                 if (!plr_alien) {
-                    interlude(18, 0, 3, 0);
+                    autosim_interlude(18, 0, 3, 0);
                 } else {
-                    interlude(27, 0, 4, 0);
+                    autosim_interlude(27, 0, 4, 0);
                 }
             }
             *GameState |= STATE_GAME_DONE;
