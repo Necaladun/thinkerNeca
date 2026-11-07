@@ -38,6 +38,41 @@ int autosim_notice_netmsg(NetMessage* msg, const char* label, int delay,
     return NetMsg_pop(msg, label, delay, style, image);
 }
 
+// Source-audited, return-unused intelligence messages; do not intercept
+// probe action menus or prompts with meaningful return values.
+int autosim_notice_netmsg2(const char* label, const char* image) {
+    if (autosim_ui_active()) {
+        telemetry_record_ui_notice("netmsg2", label, "suppressed_notice");
+        return 0;
+    }
+    return NetMsg_pop_2(label, image);
+}
+
+// Third-party diplomacy reports retain foreign_treaty_popup behaviour when
+// AUTO-002 is inactive. All source call sites ignore the returned integer.
+int autosim_notice_diplomacy(NetMessage* msg, const char* label, int delay,
+    int style, const char* image) {
+    if (autosim_ui_active()) {
+        telemetry_record_ui_notice("diplomacy", label, "suppressed_notice");
+        return 0;
+    }
+    return mod_NetMsg_pop(msg, label, delay, style, image);
+}
+
+// The UI event handler only posts a request; the driver consumes it after
+// a completed turn, never inside combat, diplomacy or base upkeep.
+static AutosimControlRequest autosim_control_request = AUTOSIM_CTL_NONE;
+void autosim_request_control(AutosimControlRequest request) {
+    if (!autosim_ui_active()) return;
+    if (request == AUTOSIM_CTL_STOP || autosim_control_request != AUTOSIM_CTL_STOP)
+        autosim_control_request = request;
+}
+AutosimControlRequest autosim_take_control_request() {
+    const AutosimControlRequest value = autosim_control_request;
+    autosim_control_request = AUTOSIM_CTL_NONE;
+    return value;
+}
+
 int autosim_notice_popp(const char* filename, const char* label,
     const char* image) {
     // Only use where caller *ignores* return value. Do not use for
