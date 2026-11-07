@@ -348,8 +348,10 @@ void __cdecl control_turn() {
                 // We do not silently overwrite an autosave or change the
                 // selected filename. A saved all-AI game must be reloaded
                 // and advanced on Windows before treating this as verified.
-                OutputDebugStringA("thinkerNeca AUTO-002: turn cap reached; offering Save Game\n");
-                telemetry_record_ui_notice("autosim", "TURN_LIMIT", "save_dialog");
+                OutputDebugStringA("thinkerNeca AUTO-002: completed turn; offering Save Game\n");
+                telemetry_record_ui_notice("autosim",
+                    action == AUTO_CYCLE_STOP ? "TURN_LIMIT" : "OPERATOR_STOP",
+                    "save_dialog");
                 save_game(0);
                 *ControlTurnA = 1;
                 *ControlTurnB = 1;
