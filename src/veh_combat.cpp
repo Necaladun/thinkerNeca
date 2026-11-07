@@ -2425,7 +2425,7 @@ END_BATTLE:
     unit_atk->combat_factions |= (1 << faction_id_def);
     unit_def->combat_factions |= (1 << faction_id_atk);
     if (interlude_base_attack) {
-        interlude(0, 0, 1, 0);
+        autosim_interlude(0, 0, 1, 0);
     }
     if (!atk_alive) {
         return 0;
