@@ -115,12 +115,14 @@ def main() -> None:
     require('minor_landmark_clear_all(tx, ty)' in mapgen,
             'Major landmark footprints must clear earlier minor terrain')
 
-    for metric, func in [('nutrient', 'mod_crop_yield'),
-                         ('mineral', 'mod_mine_yield'),
-                         ('energy', 'mod_energy_yield')]:
-        require(re.search(r'const int minor_\w+\s*=\s*minor_terrain_yields_at'
-                          r'\(x, y\)\.' + metric, yields) is not None,
-                f'Expected central minor {metric} bonus in {func}')
+    # Geology contributions are intentionally conditional on non-Forest
+    # terrain; Jungle nutrients retain the original unconditional route.
+    require('const int minor_nutrients = minor_terrain_yields_at(x, y).nutrient;' in yields
+            and 'const int minor_minerals = (sq->items & BIT_FOREST)' in yields
+            and '? 0 : minor_terrain_yields_at(x, y).mineral;' in yields
+            and 'const int minor_energy = (sq->items & BIT_FOREST)' in yields
+            and '? 0 : minor_terrain_yields_at(x, y).energy;' in yields,
+            'Live nutrient/geology sources must match the Forest exclusion policy')
     require('const MinorTerrainYield minor = minor_terrain_yields_at(x, y);' in yields
             and 'N += minor.nutrient;' in yields
             and 'if (item != BIT_FOREST) {' in yields
