@@ -18,7 +18,7 @@ Source implementation: opt-in `telemetry_enabled=0` default, separate `campaigns
 
 The unmerged TEL-001 branch adds `tools/Campaign Analyzer.pyw`, intended to sit next to `tools/campaign_report.py` in the installed game's `campaigns/` folder. A Tkinter picker lists each campaign/session, player faction, MY span, colony/unit totals, status and update time. It can regenerate/open a report, open an existing report or open the campaign folder. The CLI report path remains supported.
 
-**Synthetic acceptance:** Python syntax check, preview of human and year/turn metadata, last-committed-turn filtering, truncated JSONL tail, missing/invalid metadata and empty sessions. GUI runtime interaction and Windows double-click launch are still untested. No new native game hooks are involved.
+**Synthetic acceptance:** Python syntax check, preview of human and year/turn metadata, last-committed-turn filtering, truncated JSONL tail, missing/invalid metadata and empty sessions. **Windows user smoke (7 November 2026):** user reports the installed GUI works correctly, after copying the launcher and backend to the game `campaigns/` folder. This establishes general Windows GUI launch/use, not a comprehensive test of every picker control or malformed-recording path. No new native game hooks are involved.
 
 ## PR #4 closeout report and user-selected deferrals — 7 November 2026
 
