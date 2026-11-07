@@ -4,7 +4,7 @@
 
 **Scope:** existing mechanics in the current thinkerNeca source, plus explicitly identified defects. This is **not** a specification of approved balance changes. See [BUG-004 and BAL-004](../WORK-QUEUE.md) and [exploratory military ideas](../IDEAS.md).
 
-**Source authority:** [`src/veh.cpp`](../../src/veh.cpp) (cost and artillery eligibility), [`src/veh_combat.cpp`](../../src/veh_combat.cpp) (combat types, strengths and damage), [`src/engine_veh.h`](../../src/engine_veh.h) (unit HP), [`docs/alphax.txt`](../../docs/alphax.txt) (chassis, weapons, armour, rules), [`docs/thinker.ini`](../../docs/thinker.ini) (distributed test settings). The installed `thinker_user.ini` can override the distributed test profile. Combat code is currently identical between `master` and the PR #4 branch; the distributed data/config profiles may differ.
+**Source authority:** [`src/veh.cpp`](../../src/veh.cpp) (cost and artillery eligibility), [`src/veh_combat.cpp`](../../src/veh_combat.cpp) (combat types, strengths and damage), [`src/engine_veh.h`](../../src/engine_veh.h) (unit HP), [`docs/alphax.txt`](../../docs/alphax.txt) (chassis, weapons, armour, rules), [`docs/thinker.ini`](../../docs/thinker.ini) (distributed test settings). The installed `thinker_user.ini` can override the distributed test profile. `master` includes PR #4 and PR #5; PR #10 changes ordinary bombardment only. Actual installed game settings can differ from the distributed profile.
 
 ## Baseline: chassis and direct combat
 
@@ -48,13 +48,13 @@ The same distinction applies to ships, although naval armour is already cheaper 
 | --- | --- | --- | --- |
 | Conventional direct attack | Attacker weapon vs defender armour | Repeated combat rounds | Yes when configured |
 | Weapon-versus-weapon artillery duel | Attacker weapon vs defender weapon | Repeated combat rounds, potentially lethal | Yes when configured |
-| Ordinary ranged bombardment | Artillery offence vs target's relevant defence | Random damage and location-specific cap | **Missing: BUG-004** |
+| Ordinary ranged bombardment | Artillery offence vs target's relevant defence | Random damage and location-specific cap | **BUG-004 corrected in PR #10; positive targeted Windows smoke, further cases deferred** |
 
 The source chooses `CT_WEAPON_ONLY` for applicable ranged artillery duels when both units can use artillery. A normal adjacent attack between ships in open ocean is not automatically a weapon-only artillery duel; the chosen attack mode matters. The duel path can eliminate a participant and does not use the ordinary bombardment damage caps.
 
 The defending artillery unit's **weapon**, not purchased armour, currently sets its duel strength. This applies to land and naval counterbattery combat. Whether armour should improve artillery-duel resistance is an **unapproved balance proposal**, not BUG-004.
 
-In the ordinary bombardment path, the game calculates damage from artillery offence against relevant defence, then enforces a location-dependent floor on the target's remaining HP. The current test-branch `alphax.txt` has maximum cumulative bombardment damage of **50% in a base/bunker, 99% in open terrain, and 100% at sea**. Integer rounding of the HP floor matters near the limit.
+In the ordinary bombardment path, the game calculates damage from artillery offence against relevant defence, then enforces a location-dependent floor on the target's remaining HP. The distributed `alphax.txt` has maximum cumulative bombardment damage of **50% in a base/bunker, 99% in open terrain, and 100% at sea**. Integer rounding of the HP floor matters near the limit.
 
 ## Reactors: intended effective HP versus stored HP
 
@@ -71,9 +71,9 @@ In the ordinary bombardment path, the game calculates damage from artillery offe
 
 The larger stored number **is not intended as additional real HP**. The same round-damage scaling occurs in the weapon-versus-weapon duel path.
 
-### BUG-004: ordinary bombardment violates the policy
+### BUG-004: ordinary bombardment violated the policy before PR #10
 
-In `mod_battle_fight_2()`, ordinary bombardment computes `damage_value` from `offense_out`, `defense_out` and `artillery_dmg_numerator/denominator`, applies its HP cap, and then executes:
+Before PR #10, `mod_battle_fight_2()` computed `damage_value` from `offense_out`, `defense_out` and `artillery_dmg_numerator/denominator`, applied its HP cap, and then executed:
 
 ```cpp
 veh_def->damage_taken += damage_value;
@@ -92,7 +92,7 @@ Illustrative **fixed raw 2-point bombardment result** (not a claim that every hi
 
 An intended two-*effective*-HP bombardment hit should remove **20%** from all four. Damage caps and RNG mean real combat outcomes vary.
 
-**Likely correction to investigate:** scale raw bombardment damage using the *defender's* reactor level before applying the final HP-based cap when `ignore_reactor_power=1`. This is **not implemented**; audit integer rounding, cap enforcement, special units, native artillery, direct/duel behaviour, both config modes, repairs and UI before accepting it.
+**Source correction in [PR #10](https://github.com/Necaladun/thinkerNeca/pull/10):** multiply ordinary bombardment damage by the *defender's* reactor level when `ignore_reactor_power=1`. Apply base/bunker (50%), open terrain (99%) and sea (100%) damage floors in 10 effective HP first, then convert to stored HP. This matters at the 99% floor: on the master baseline a Fusion defender may be left at 1/20 stored HP, whereas correct ignored-reactor behaviour leaves 2/20; Quantum/Singularity floors are 3/30 and 4/40. `ignore_reactor_power=0` retains the pre-existing raw-damage and stored-HP cap behaviour. The source fix passed C++11 and x86 build CI, with **positive user Windows combat smoke** (Fission/Fusion comparison, Spore vs Fusion, base/bunker caps). The exact untested cases and later monitoring are recorded in [TESTING](../TESTING.md), not silently marked verified.
 
 ### Native units and Spore Launchers
 
@@ -102,6 +102,25 @@ Spore Launchers are explicitly special-cased in the artillery/psi calculation. A
 
 **Player observation:** late-game Spore Launcher bombardment felt ineffective against Fusion targets. BUG-004 provides a plausible source explanation, **not yet a controlled Windows confirmation** that it caused every reported case.
 
+## Trial fractional weak bombardment — BAL-005 (PR #10)
+
+This is a **new balance rule**, not a correction required to preserve original SMAC/X behaviour. The current `alphax.txt` artillery numerator/denominator is **3/2**. The previous bombardment RNG was uniform `0..floor(A/D)`, where `A = offense_out × numerator` and `D = defense_out × denominator`; adjusted morale, terrain, sensors, facilities, psi effects and other modifiers already enter `offense_out` and `defense_out`.
+
+PR #10 retains that entire distribution for **A ≥ D**. Only for **A < D**, it allows 1 effective HP with probability **A/(A+D)**, otherwise zero. This matches the 50% 1-damage probability at A=D and does **not** use WTP's different full-range stochastic-rounding variant. The weak-attack mechanism is adapted from [WTP/thinker-doer](https://github.com/tnevolin/thinker-doer/blob/master/src/wtp_mod.cpp).
+
+| Unmodified weapon vs armour | Previous expected HP per shot | Proposed expected HP per shot |
+| --- | ---: | ---: |
+| Gun 1 vs Synthmetal 2 | 0 | 0.429 |
+| Gun 1 vs Plasma 3 | 0 | 0.333 |
+| Gun 1 vs Stasis 12 | 0 | 0.111 |
+| Laser 2 vs Plasma 3 | 0.5 | 0.5 (unchanged) |
+| Laser 2 vs Silksteel 4 | 0 | 0.429 |
+| Laser 2 vs Stasis 12 | 0 | 0.200 |
+
+These are **illustrative unmodified relative strengths**, not exact odds in arbitrary terrain. Cheap 1-weapon Fission infantry Artillery costs approximately 10 minerals and 2-weapon Laser Artillery approximately 20. Ten Gun Artillery bombarding an otherwise unmodified Stasis target would average ~1.11 effective HP damage per full volley; multiple defenders on one tile are each eligible for bombardment. More advanced weapons can be more mineral-efficient, but massed cheap guns may become strategically useful. Explicitly test the stack/massed-battery exploit risk, counterbattery survival and repairs before approving the balance outcome.
+
+This experiment does **not** alter artillery duels, land versus naval artillery prices, direct attacks, production AI weights or artillery attack range.
+
 ## Proposed chassis HP: engineering constraints only
 
 A hypothetical +1/+2 **effective** Tank/Cruiser HP bonus would need internally consistent reactor-scaled storage and damage. Changing a single displayed number would not suffice. Audit `VEH::max_hitpoints()`, `cur_hitpoints()`, damage thresholds, repair rates, monolith healing, conventional/psi/artillery damage, collateral damage, combat-odds displays, defender scoring, AI unit design, serialization and same-build save/reload.
@@ -110,4 +129,4 @@ No custom chassis-HP rule is currently implemented. Numerical balance examples a
 
 ## Evidence boundary
 
-The reactor discrepancy and the combat-path selection above are **source-inspection findings**. No Windows runtime reproduction, compiled correction or regression pass has yet been recorded for BUG-004. See [TESTING](../TESTING.md). The existing experimental test INI is not a promise that every installed game uses the same effective settings.
+The reactor discrepancy was a **source-inspection finding**; [PR #10](https://github.com/Necaladun/thinkerNeca/pull/10) contains a proposed correction with C++11 regression and Windows Develop/Release compilation passed ([CI run 42339591860](https://github.com/Necaladun/thinkerNeca/actions/runs/42339591860)). **User Windows Develop preliminary smoke (7 Nov):** Impact 4 artillery occasionally damaged armour 8; Fusion level-2 defenders sometimes lost comparable effective HP to Fission level-1; the 50% base/bunker cap held; and Spore Launchers damaged Fusion targets. This is a user-reported qualitative test, not source/CI proof or measured statistical parity. **The user approved merging on 7 November while accepting formal new-game same-build save/reload, 99% open/100% sea caps, alternate reactor mode and broader counterbattery/stack cases as deferred monitoring rather than completed tests.** See [TESTING](../TESTING.md). The installed INI or `thinker_user.ini` can override the distribution.
