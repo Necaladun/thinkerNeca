@@ -28,6 +28,7 @@ def main() -> None:
     mapgen = source('src/mapgen.cpp')
     yields = source('src/map.cpp')
     renderer = source('src/gui.cpp')
+    former_ai = source('src/move.cpp')
     patches = source('src/patch.cpp')
     ini = source('docs/thinker.ini')
 
@@ -143,6 +144,33 @@ def main() -> None:
             'Actual and AI future Forest yields must not benefit from independent geology')
     require('if (bonus_mineral || bonus_landmark || minor_minerals)' in mine,
             'Keep existing single Mine enhancement for the 3–5-tile balance trial')
+    # AI-002: source-level checks, not actual AI-controlled Windows testing.
+    mine_choice = body_between(former_ai, 'bool can_mine(', 'bool can_forest(')
+    solar_choice = body_between(former_ai, 'bool can_solar(', 'static int projected_mine_nutrients(')
+    selection = body_between(former_ai, 'int select_item(', 'int former_tile_score(')
+    former_score = body_between(former_ai, 'int former_tile_score(', 'int former_move(')
+    require('minor_landmark_has(x, y, MINOR_TITANIUM)' in mine_choice
+            and 'if (!sea && !sq->is_rocky() && !titanium)' in mine_choice
+            and 'projected_mine_nutrients(x, y, faction_id) < 1' in mine_choice
+            and 'BIT_FARM | BIT_CONDENSER | BIT_SOIL_ENRICHER' in mine_choice
+            and 'mod_mine_yield(faction_id, -1, x, y, 1)' in mine_choice,
+            'Titanium-only nonrocky Mine eligibility must protect Flat food')
+    require('>= conf.tile_output_limit[1]' in mine_choice
+            and '>= conf.tile_output_limit[2]' in solar_choice,
+            'Former Mine/Solar pre-tech gates must use configured caps')
+    require('int titanium_mine_val = 0;' in selection
+            and 'int mine_n = projected_mine_nutrients(' in selection
+            and 'int solar_total = mod_crop_yield(' in selection
+            and 'mine_total > solar_total' in selection
+            and 'borehole_val, titanium_mine_val' in selection
+            and 'titanium_mine_val == max_val' in selection
+            and 'return FORMER_MINE;' in selection
+            and 'score += 4;' in former_score,
+            'AI-002 Mine must compete with Forest/Solar and have modest priority')
+    require('tile_output_limit=3,4,4' in ini,
+            'Distributed experimental caps should be 3/4/4')
+    require([(n - 1 if n > 1 else n) for n in (0, 1, 2, 3)] == [0, 1, 1, 2],
+            'Synthetic Mine nutrient penalty: only above one nutrient')
     require('(type != MINOR_TITANIUM || mod_bonus_at(tx, ty) != RES_MINERAL)' in geology
             and 'BIT_MINERAL_RES alone' in geology,
             'Titanium generation must reject both flagged and procedural mineral resources')
