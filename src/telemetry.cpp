@@ -10,6 +10,7 @@ namespace {
 
 FILE* turns_file = NULL;
 FILE* bases_file = NULL;
+FILE* ui_notices_file = NULL;
 std::string campaign_dir;
 std::string session_dir;
 int last_committed_turn = -1;
@@ -144,6 +145,10 @@ void close_files() {
         fclose(bases_file);
         bases_file = NULL;
     }
+    if (ui_notices_file) {
+        fclose(ui_notices_file);
+        ui_notices_file = NULL;
+    }
 }
 
 void recorder_failure() {
@@ -213,6 +218,7 @@ void telemetry_begin_session(const char* source_save) {
         manifest << "null";
     }
     manifest << ",\"autosim_manual_turns\":" << conf.autosim_manual_turns;
+    manifest << ",\"autosim_suppress_notices\":" << conf.autosim_suppress_notices;
     manifest << ",\"mod_version\":" << json_string(MOD_VERSION)
              << ",\"mod_date\":" << json_string(MOD_DATE)
              << ",\"build_kind\":";
@@ -246,12 +252,30 @@ void telemetry_begin_session(const char* source_save) {
     }
     turns_file = fopen((session_dir + "/turns.jsonl").c_str(), "wb");
     bases_file = fopen((session_dir + "/bases.jsonl").c_str(), "wb");
-    if (!turns_file || !bases_file) {
+    ui_notices_file = fopen((session_dir + "/ui_notices.jsonl").c_str(), "wb");
+    if (!turns_file || !bases_file || !ui_notices_file) {
         recorder_failure();
         return;
     }
     recording = true;
     if (!atomic_write(session_dir + "/status.json", status_json("recording"))) {
+        recorder_failure();
+    }
+}
+
+void telemetry_record_ui_notice(const char* source, const char* label, const char* action) {
+    // UI telemetry is a separate, append-only stream and does not modify
+    // committed faction/base snapshots. No RNG or game decision functions.
+    if (!recording || !ui_notices_file) {
+        return;
+    }
+    std::ostringstream event;
+    event << "{\"schema\":1,\"turn\":" << *CurrentTurn
+          << ",\"faction\":" << *CurrentFaction
+          << ",\"source\":" << json_string(source)
+          << ",\"label\":" << json_string(label)
+          << ",\"action\":" << json_string(action) << "}";
+    if (!append_line(ui_notices_file, event.str())) {
         recorder_failure();
     }
 }
