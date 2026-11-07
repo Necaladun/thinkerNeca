@@ -1955,8 +1955,17 @@ int select_item(int x, int y, int faction_id, FormerMode mode, MAP* sq) {
         int solar_total = mod_crop_yield(faction_id, -1, x, y, 0)
             + mod_mine_yield(faction_id, -1, x, y, 0)
             + mod_energy_yield(faction_id, -1, x, y, 1);
-        if (solar_need <= 0 || !can_solar(x, y, faction_id, bonus, sq)
-        || mine_total > solar_total) {
+        // On Flat terrain a Farm can recover food that mining would
+        // sacrifice. Let it win ties in projected total resource output.
+        bool flat_farm_wins = !sq->is_rolling()
+            && can_farm(x, y, faction_id, bonus, sq)
+            && mod_crop_yield(faction_id, -1, x, y, 0)
+                + ResInfo->improved_land.nutrient
+                + mod_mine_yield(faction_id, -1, x, y, 0)
+                + mine_e >= mine_total;
+        if (!flat_farm_wins
+        && (solar_need <= 0 || !can_solar(x, y, faction_id, bonus, sq)
+            || mine_total > solar_total)) {
             titanium_mine_val = 2*mine_total;
         }
     }
