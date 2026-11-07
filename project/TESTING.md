@@ -209,11 +209,22 @@ Prioritise one normal Windows Develop test game before changing INI options or a
 **Evidence handling:** `minor_terrain_render.log` is written beside the game executable and **truncated on DLL startup**; copy it before restarting when a repro occurs. Hover and append diagnostics are capped per process. For failures, supply DLL commit, effective INI (including `thinker_user.ini`), map size/seed/year, tile coordinates, what happened versus expected, and a screenshot or a copied log. Do not alter your original `terranx.exe` for negative hook tests.
 
 
-## Artillery bombardment reactor scaling and fractional weak hits — draft PR #10, Windows pending
+## Artillery bombardment reactor scaling and fractional weak hits — PR #10, initial Windows smoke positive
 
 **BUG-004:** The master baseline with `ignore_reactor_power=1` removes effective reactor endurance in conventional direct combat and artillery duels, but ordinary bombardment subtracts unscaled damage from `10 × reactor` stored HP. [Draft PR #10](https://github.com/Necaladun/thinkerNeca/pull/10) implements a source fix: multiply damage by the **defender reactor** and normalize the 50/99/100% floors to effective HP before converting to stored units. `ignore_reactor_power=0` preserves existing behaviour. The user's previously reported Spore Launcher weakness against Fusion is consistent with the source bug, but not proven causal in-game.
 
 **BAL-005 (experimental):** The same PR adds WTP-style `A/(A+D)` one-damage probability **only below 1:1**, while preserving the original uniform distribution at ratios ≥1 (no full-range stochastic rounding). The distributed `alphax.txt` uses **3/2**; Laser 2 vs Plasma 3 already has 50% 1-damage probability and is unchanged. Evaluate whether massed 10-mineral Gun Artillery becomes an excessive stack-bombardment strategy, including defender repairs and counterbattery risk. No AI preference change.
+
+**CI evidence:** [CI run 42339591860](https://github.com/Necaladun/thinkerNeca/actions/runs/42339591860) passed both Windows x86 Develop/Release cross-compilation and the C++11 artillery regression on commit `e7a5224c5`. CI does not execute SMAC/X.
+
+**User-reported Windows Develop combat smoke (7 November 2026; presumably the supplied PR #10 build, installed DLL and effective INI not independently inspected):**
+- **Fractional impact artillery:** Impact weapon strength 4 bombarding armour 8 occasionally inflicted damage; user described hits as rare. This supports removing the absolute zero-damage threshold, but is not a measured hit frequency. Under nominal unmodified 3/2 artillery parameters, the proposed rule would predict `12/(12+16) = 42.9%` one-effective-HP hit chance; terrain, morale, other defence modifiers or finite sampling can change the observed result.
+- **Reactor:** Fusion-reactor (level 2) targets sometimes appeared to take comparable *effective* damage to Fission (level 1); preliminary positive evidence for BUG-004, **not** a controlled statistical Fission/Fusion parity test.
+- **Cap:** Bombardment stopped at 50% damage in bases and bunkers, as expected.
+- **Native:** Spore Launchers damaged Fusion units successfully.
+- **General:** User reported no apparent regression in their exercised cases; this is not evidence that all combat paths were exercised.
+
+**Not yet evidenced for this exact build:** `ignore_reactor_power=0` negative-control path, quantitative reactor parity through Quantum/Singularity, 99% open-terrain and 100% sea cap edges, direct-versus-duel control, extended cheap artillery against stacks, and formal same-DLL new-game save→reload→continue. Distinguish **positive functional smoke** from exhaustive validation or approval of the balance outcome.
 
 **Automated test:** A pure C++11 helper regression is included in `tools/test_artillery_damage.cpp` and wired into the Windows Develop CI workflow. It enumerates strong/weak outcomes and reactor cap rounding for levels 1–4 under both reactor options. A passing CI test is **not a Windows game runtime test**. Run: `g++ -std=c++11 -Wall -Wextra -pedantic tools/test_artillery_damage.cpp -o /tmp/test_artillery && /tmp/test_artillery`.
 
