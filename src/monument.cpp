@@ -1,5 +1,7 @@
 
 #include "monument.h"
+#include "gui_dialog.h"
+#include "autosim.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
@@ -7,6 +9,17 @@
 int* const dword_7FD634 = (int*)0x7FD634;
 
 void __cdecl monument(int is_new_event) {
+    // Preserve all Monuments[faction].events and latest_event_id writes
+    // performed by the caller. Only the new-achievement modal is skipped;
+    // explicit inspection of the Monument screen remains available.
+    if (autosim_suppress_monument(autosim_ui_active(), is_new_event)) {
+        const int owner = MapWin->cOwner;
+        char label[48];
+        snprintf(label, sizeof(label), "MONUMENT_EVENT_%d",
+            Monuments[owner].latest_event_id);
+        telemetry_record_ui_notice("monument", label, "suppressed_notice");
+        return;
+    }
     if (!MFactions[MapWin->cOwner].is_alien()
     && !*MultiplayerActive
     && (!is_new_event
