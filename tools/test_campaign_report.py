@@ -84,6 +84,48 @@ class CampaignReportTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Unsupported"):
                 load_session(session)
 
+    def test_ui_notice_log_export_and_html(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session = fixture(Path(tmp))
+            notices = [
+                {"schema": 1, "turn": 2, "faction": 3,
+                 "source": "netmsg", "label": "GOODYRESOURCE",
+                 "action": "suppressed_notice"},
+                {"schema": 1, "turn": 2, "faction": 3,
+                 "source": "x_pop", "label": "ASKSEEDESIGN",
+                 "action": "declined_optional_human_ui"},
+            ]
+            (session / "ui_notices.jsonl").write_text(
+                "\n".join(json.dumps(v) for v in notices) + "\n", encoding="utf-8")
+            output = generate(campaign)
+            import csv
+            with (output / "ui_notices.csv").open(encoding="utf-8", newline="") as fp:
+                rows = list(csv.DictReader(fp))
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0]["label"], "GOODYRESOURCE")
+            self.assertEqual(rows[1]["action"], "declined_optional_human_ui")
+            html_text = (output / "index.html").read_text(encoding="utf-8")
+            self.assertIn("AUTO-002 UI handling (2 recorded actions)", html_text)
+            self.assertIn("GOODYRESOURCE", html_text)
+            self.assertIn("ui_notices.csv", html_text)
+
+    def test_legacy_session_without_ui_log_remains_supported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, _ = fixture(Path(tmp))
+            output = generate(campaign)
+            self.assertEqual(
+                (output / "ui_notices.csv").read_text(encoding="utf-8").splitlines(),
+                ["turn,faction,source,label,action"],
+            )
+
+    def test_ui_notice_log_bad_schema_fails_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session = fixture(Path(tmp))
+            (session / "ui_notices.jsonl").write_text(
+                '{"schema":99,"turn":1}\n', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "UI notice"):
+                generate(campaign)
+
     def test_gui_summary_reads_human_year_range_and_session(self):
         with tempfile.TemporaryDirectory() as tmp:
             campaign, session = fixture(Path(tmp), turns=(12, 13))
