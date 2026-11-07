@@ -47,10 +47,40 @@ static void test_resume_mid_cycle_and_reenable_human() {
     assert(driver.on_cycle(0, true, true) == AUTO_CYCLE_NORMAL);
 }
 
+
+static void test_notice_suppression_guards() {
+    assert(!auto_ui_eligible(false, 10, 0, false, false, false, 3, true));
+    assert(!auto_ui_eligible(true, 0, 0, false, false, false, 3, true));
+    assert(!auto_ui_eligible(true, 10, 1u << 3, false, false, false, 3, true));
+    assert(!auto_ui_eligible(true, 10, 0, true, false, false, 3, true));
+    assert(!auto_ui_eligible(true, 10, 0, false, true, false, 3, true));
+    assert(!auto_ui_eligible(true, 10, 0, false, false, true, 3, true));
+    assert(!auto_ui_eligible(true, 10, 0, false, false, false, 0, false));
+    assert(auto_ui_eligible(true, 10, 0, false, false, false, 3, true));
+}
+
+static void test_popup_allowlist_fails_closed() {
+    for (const char* label : {"REACTORUPGRADE", "THESECRET0", "THESECRET1", "TREETIME"}) {
+        assert(autosim_xpop_policy(label, false) == AUTO_UI_NOTICE);
+        assert(autosim_xpop_policy(label, true) == AUTO_UI_NATIVE);
+    }
+    for (const char* label : {"SOCIETY", "ASKSEEDESIGN"}) {
+        assert(autosim_xpop_policy(label, false) == AUTO_UI_DECLINE_OPTIONAL);
+        assert(autosim_xpop_policy(label, true) == AUTO_UI_NATIVE);
+    }
+    for (const char* label : {"MIMIMI", "ESCAPE", "DIPLO", "HASTY",
+                              "UNKNOWN", "ASKSEEDESIGN2"}) {
+        assert(autosim_xpop_policy(label, false) == AUTO_UI_NATIVE);
+    }
+    assert(autosim_xpop_policy(nullptr, false) == AUTO_UI_NATIVE);
+}
+
 int main() {
     test_entry_guards();
     test_full_turn_limit_and_reset();
     test_resume_mid_cycle_and_reenable_human();
+    test_notice_suppression_guards();
+    test_popup_allowlist_fails_closed();
     std::puts("AUTO-001 host policy tests passed");
     return 0;
 }
