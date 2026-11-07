@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from campaign_report import generate, load_session, read_jsonl
+from campaign_report import generate, load_session, read_jsonl, summarize_session, scan_campaigns
 
 
 def fixture(root, turns=(1, 2), incomplete=False):
@@ -83,6 +83,56 @@ class CampaignReportTests(unittest.TestCase):
             status.write_text(json.dumps(doc), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "Unsupported"):
                 load_session(session)
+
+    def test_gui_summary_reads_human_year_range_and_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session = fixture(Path(tmp), turns=(12, 13))
+            info = summarize_session(session)
+            self.assertIsNone(info["error"])
+            self.assertEqual(info["player"], "Faction 1")
+            self.assertEqual(info["years"], "MY 2112–2113")
+            self.assertEqual(info["turns"], "2 span")
+            self.assertEqual(info["status"], "Closed")
+            self.assertEqual(info["source_save"], "Not recorded")
+            rows = scan_campaigns(Path(tmp))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["campaign_dir"], campaign)
+            self.assertEqual(rows[0]["session_id"], "session-001")
+
+    def test_gui_summary_respects_last_committed_turn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, session = fixture(Path(tmp), turns=(12, 13, 14))
+            path = session / "status.json"
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            doc["last_committed_turn"] = 13
+            path.write_text(json.dumps(doc), encoding="utf-8")
+            info = summarize_session(session)
+            self.assertEqual(info["years"], "MY 2112–2113")
+            self.assertEqual(info["turns"], "2 span")
+
+    def test_gui_summary_handles_truncated_tail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, session = fixture(Path(tmp), turns=(12, 13), incomplete=True)
+            info = summarize_session(session)
+            self.assertIsNone(info["error"])
+            self.assertEqual(info["years"], "MY 2112–2113")
+
+    def test_gui_summary_reports_corrupt_session_without_crashing_list(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session = fixture(Path(tmp))
+            (session / "status.json").write_text("bad JSON", encoding="utf-8")
+            info = scan_campaigns(campaign.parent)
+            self.assertEqual(len(info), 1)
+            self.assertEqual(info[0]["status"], "Error")
+            self.assertIn("Expecting value", info[0]["error"])
+
+    def test_gui_summary_handles_empty_telemetry_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, session = fixture(Path(tmp), turns=())
+            row = summarize_session(session)
+            self.assertIsNone(row["error"])
+            self.assertEqual(row["player"], "Awaiting first turn")
+            self.assertEqual(row["years"], "No snapshots")
 
     def test_trailing_incomplete_record_ignored(self):
         with tempfile.TemporaryDirectory() as tmp:
