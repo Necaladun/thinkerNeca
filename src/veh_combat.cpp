@@ -2408,17 +2408,17 @@ END_BATTLE:
     case 1:
         parse_says(0, m_atk->adj_name_faction, -1, -1);
         parse_says(1, get_noun(faction_id_def), -1, -1);
-        NetMsg_pop_2("VENDETTAREPORT", 0);
+        autosim_notice_netmsg2("VENDETTAREPORT", 0);
         break;
     case 2:
         parse_says(0, m_atk->adj_name_faction, -1, -1);
         parse_says(1, get_noun(faction_id_def), -1, -1);
-        NetMsg_pop_2("PACTATTACKED", 0);
+        autosim_notice_netmsg2("PACTATTACKED", 0);
         break;
     case 3:
         parse_says(0, get_noun(faction_id_atk), -1, -1);
         parse_says(1, get_noun(faction_id_def), -1, -1);
-        NetMsg_pop_2("PACTATTACKING", 0);
+        autosim_notice_netmsg2("PACTATTACKING", 0);
         break;
     }
     // Fix: avoid using expired pointers for vehicles
