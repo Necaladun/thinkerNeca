@@ -54,11 +54,14 @@ struct AutoScopedAutosimFastPrefs : AutoScopedCombatPrefs {
     AutoScopedAutosimFastPrefs()
         : AutoScopedCombatPrefs(autosim_fast_combat_active(),
             GamePreferences, GameMorePreferences,
-            PREF_ADV_FAST_BATTLE_RESOLUTION,
+            PREF_ADV_FAST_BATTLE_RESOLUTION | PREF_ADV_NO_CENTER_VEH_ORDERS,
             PREF_BSC_DONT_QUICK_MOVE_ENEMY_VEH
-                | PREF_BSC_DONT_QUICK_MOVE_ALLY_VEH | PREF_AV_MAP_ANIMATIONS,
-            MPREF_ADV_QUICK_MOVE_ALL_VEH | MPREF_ADV_QUICK_MOVE_VEH_ORDERS,
-            MPREF_ADV_PAUSE_AFTER_BATTLES) {}
+                | PREF_BSC_DONT_QUICK_MOVE_ALLY_VEH | PREF_AV_MAP_ANIMATIONS
+                | PREF_BSC_MOUSE_EDGE_SCROLL_VIEW,
+            MPREF_ADV_QUICK_MOVE_ALL_VEH | MPREF_ADV_QUICK_MOVE_VEH_ORDERS
+                | MPREF_MAP_HIDE_ACTIVE_VEH_GOTO_PATH,
+            MPREF_ADV_PAUSE_AFTER_BATTLES | MPREF_AV_WHOLE_VEH_BLINKS
+                | MPREF_MAP_SHOW_BASE_NAMES | MPREF_MAP_SHOW_PROD_WITH_BASE_NAMES) {}
 };
 AutosimControlRequest autosim_take_control_request();
 void autosim_notice_pop2(const char* label, const char* image, int recipient);
