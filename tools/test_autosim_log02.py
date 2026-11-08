@@ -52,6 +52,19 @@ check("research target is observed with cycle-time qualification",
 check("no new engine RNG or AI work in telemetry",
     "game_rand(" not in tel and "random_get(" not in tel
     and "tech_advance(" not in tel)
+check("stockpile credit event follows the real energy mutation",
+    base.index("plr->energy_credits += stockpile_credits;") <
+    base.index("telemetry_production_stockpile(*CurrentBaseID, stockpile_credits);"))
+check("upkeep hurry observation follows native hurry action",
+    "mod_base_hurry();\n    telemetry_production_hurry(" in base)
+check("vehicle upgrade is observed after unit prototype mutation",
+    veh.index("veh->unit_id = new_unit_id;") <
+    veh.index("telemetry_unit_upgraded((int)(veh - Vehs)"))
+check("capture is checked after the new colony state is computed",
+    "telemetry_combat_base_captured(base_id, base_x, base_y," in base
+    and "b.faction_id != new_owner" in tel
+    and "result_scope" in tel)
+
 check("UI notice stream remains distinct", "ui_notices.jsonl" in tel
     and "tel02_row(" in tel)
 
