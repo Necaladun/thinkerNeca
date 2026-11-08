@@ -55,3 +55,11 @@ checks = {
 for name, ok in checks.items():
     print(("PASS" if ok else "FAIL") + ": " + name)
 assert all(checks.values())
+
+# Preserve errors even when the game dies before the recorder can start.
+assert 'pause' in bat and 'exit code %result%' in bat
+assert 'Start-Transcript' in ps and 'automation\\logs' in ps
+assert 'AUTOMATION LAUNCH ERROR:' in ps and 'ScriptStackTrace' in ps
+assert 'thinker.exe exited without creating' in ps
+assert 'GuiSelfTest' in ps and 'launcher-windows-smoke' in workflow
+print('AUTO-LAUNCH persistent console/diagnostic and Windows GUI smoke contracts passed')

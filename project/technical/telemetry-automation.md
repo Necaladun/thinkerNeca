@@ -428,3 +428,21 @@ Run-local settings are not saved into the ordinary player INI.
 Successful invariant validation skips the old in-game START prompt.
 No custom roster/fixed seed yet, no victory lifecycle or multi-run
 scheduler. **Native Windows setup and AI parity unverified.**
+
+
+### Early-start launcher diagnostics (8 Nov 2026)
+
+After an early-console-exit report, `Run Automation.bat` now shows
+PowerShell's exit code and **waits for a keypress on all exit paths**,
+including a crash/cancel. `Run Automation.ps1` starts a timestamped
+independent `automation/logs/launcher-*.log` transcript before showing
+WinForms. It logs the immutable `automation/profiles/<id>.ini` path,
+`thinker.exe` PID, and the expected `<profile>.pid` and
+`<profile>.status` paths. A dead Thinker launcher with no game PID
+is reported explicitly; early PowerShell exceptions and stack traces
+also print in the console. Run with `-GuiSelfTest` for an actual
+Windows PowerShell 5.1 WinForms-construction check in Windows CI.
+The resulting console log is independent of campaign telemetry because
+`campaigns/` is only created after the game successfully initialises.
+This is diagnosis and observability, not proof that the previous
+game-start failure was fixed.

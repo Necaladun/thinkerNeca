@@ -829,3 +829,30 @@ parity, map seed and settings; first turn, 100-turn run, F10, saves,
 same-build reload, normal thinker.exe unchanged. The explicit faction
 roster and fixed seed are not yet available in this GUI. Native world
 creation can still have untested UI coupling despite compiling.
+
+
+### AUTO-LAUNCH premature console exit — diagnostic correction (8 Nov 2026)
+
+**Windows user-reported:** choosing both Load SAV and New Game showed a console
+that closed without useful explanation and produced no new campaign.
+Review of code established: the batch automatically exits after PowerShell
+returns; the previous monitor did not preserve a diagnostic transcript,
+and `telemetry_begin_session()` creates `campaigns/` only after game
+initialisation. Absence of a campaign therefore supports an *early exit*,
+but is NOT evidence by itself of a game renderer or generator bug.
+
+Draft PR #11 now has unconditional batch exit-code/pause; independent
+timestamped `automation/logs/launcher-*.log` started before the GUI,
+run-profile, thinker.exe and terranx PID diagnostics; and full
+PowerShell exception/stack output. If thinker.exe exits without a
+terranx PID handoff, the monitor explains that specifically.
+A `windows-latest` CI job executes Windows PowerShell 5.1 GUI
+control construction with `-GuiSelfTest` without needing a game
+binary; this does NOT run WinForms ShowDialog or SMAC/X itself.
+
+**Open acceptance:** capture the user's next Windows diagnostic log;
+determine whether failure was launcher, injection, DLL profile
+validation, game setup or native renderer; verify Load SAV and New Game
+start and create campaign telemetry when enabled; normal thinker.exe
+continues unchanged. Preserve any relevant `debug.txt` from the
+installation. No diagnosis of the original early termination yet.

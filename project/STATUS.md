@@ -183,3 +183,12 @@ Experimental native New Game quick-start clears human control before initial
 AI setup, omits player planetfall, and skips its redundant in-game Start
 prompt; no official runtime acceptance yet. Save ZIP, victory, observer
 elimination and multi-game batches remain deferred.
+
+
+**AUTO-LAUNCH diagnostic patch (8 Nov, PR #11 draft):** user observed
+instant console closure and no campaigns on both Load and New Game.
+The .bat now remains open after all exits and prints return code;
+PowerShell writes `automation/logs/launcher-*.log` before starting
+the game and logs PID handoff/errors. Windows-native launcher-GUI
+construction CI added. Root cause of the game failing to start is
+**not yet established**; subsequent Windows evidence required.
