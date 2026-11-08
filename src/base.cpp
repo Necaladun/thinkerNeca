@@ -239,10 +239,10 @@ void __cdecl mod_base_kill(int base_id) {
                 plr->corner_market_turn = 0;
                 plr->corner_market_cost = 0;
                 if (faction_id == *CurrentPlayerFaction) {
-                    popp(ScriptFile, "CORNERFOILED", 0, "econwin_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "CORNERFOILED", "econwin_sm.pcx");
                 } else {
                     parse_says(0, get_adjective(faction_id), -1, -1);
-                    popp(ScriptFile, "CORNERTHEMFOILED", 0, "econwin_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "CORNERTHEMFOILED", "econwin_sm.pcx");
                 }
             }
         }
@@ -546,10 +546,10 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
                 plr_def->corner_market_cost = 0;
                 plr_def->corner_market_turn = 0;
                 if (faction_id == player_id) {
-                    popp(ScriptFile, "CORNERFOILED", 0, "econwin_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "CORNERFOILED", "econwin_sm.pcx");
                 } else {
                     parse_says(0, get_adjective(faction_id), -1, -1);
-                    popp(ScriptFile, "CORNERTHEMFOILED", 0, "econwin_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "CORNERTHEMFOILED", "econwin_sm.pcx");
                 }
             }
         }
@@ -758,33 +758,33 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
             if (!MFactions[faction_id_atk].is_alien()) {
                 if (faction_id_atk == player_id) {
                     if (pop_left == 1) {
-                        popp(ScriptFile, "HOMELESSONE", 0, "alienref_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "HOMELESSONE", "alienref_sm.pcx");
                     } else if (pop_left) {
-                        popp(ScriptFile, "HOMELESS", 0, "alienref_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "HOMELESS", "alienref_sm.pcx");
                     }
                     autosim_interlude(25, base->name, 1, 0);
                 }
                 if (faction_id == player_id) {
                     if (pop_left == 1) {
-                        popp(ScriptFile, "HOMELESSONE", 0, "alienref_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "HOMELESSONE", "alienref_sm.pcx");
                     } else if (pop_left) {
-                        popp(ScriptFile, "HOMELESS", 0, "alienref_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "HOMELESS", "alienref_sm.pcx");
                     }
                 }
             } else {
                 if (faction_id_atk == player_id) {
                     if (pop_left == 1) {
-                        popp(ScriptFile, "HOMELESSONE", 0, "humanref_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "HOMELESSONE", "humanref_sm.pcx");
                     } else if (pop_left) {
-                        popp(ScriptFile, "HOMELESS", 0, "humanref_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "HOMELESS", "humanref_sm.pcx");
                     }
                     autosim_interlude(37, base->name, 1, 0);
                 }
                 if (faction_id == player_id) {
                     if (pop_left == 1) {
-                        popp(ScriptFile, "HOMELESSONE", 0, "humanref_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "HOMELESSONE", "humanref_sm.pcx");
                     } else if (pop_left) {
-                        popp(ScriptFile, "HOMELESS", 0, "humanref_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "HOMELESS", "humanref_sm.pcx");
                     }
                     autosim_interlude(24, base->name, 1, 0);
                 }
