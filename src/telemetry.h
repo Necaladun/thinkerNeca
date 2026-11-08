@@ -4,6 +4,9 @@
 // campaign labels/links only modifies recorder metadata and sidecar files.
 void telemetry_begin_session(const char* source_save);
 void telemetry_record_completed_turn();
+// Terminal result is recorded once at the exact faction/phase boundary,
+// without pretending an incomplete turn was a completed cycle.
+void telemetry_record_terminal_result(const char* save_path, const char* save_status);
 void telemetry_record_ui_notice(const char* source, const char* label, const char* action);
 // Dedicated session Council trace, flushed before native modal processing.
 void telemetry_record_council_event(const char* phase, int actor, const char* detail);
