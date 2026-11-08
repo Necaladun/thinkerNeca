@@ -211,6 +211,59 @@ draw();
 """ % (title, title, state, len(turns), last_turn, manifest["starting_turn"], body_rows, base_rows, len(notices), notice_rows, data, metrics)
 
 
+def render_automation_diagnostics(timings, checkpoints):
+    """Supplementary independent wall timing and SAV archive view.
+
+    Timings for full cycles include their child phases, so phase totals must
+    not be added together as if they were mutually exclusive CPU costs.
+    """
+    grouped = {}
+    for entry in timings:
+        key = (str(entry.get("phase", "unknown")), int(entry.get("faction", 0)))
+        duration = max(0, int(entry.get("elapsed_ms", 0)))
+        data = grouped.setdefault(key, [0, 0, 0])
+        data[0] += 1
+        data[1] += duration
+        data[2] = max(data[2], duration)
+    timing_rows = "\n".join(
+        "<tr><td>{}</td><td>{}</td><td>{:,}</td><td>{:,}</td>"
+        "<td>{:,.1f}</td><td>{:,}</td></tr>".format(
+            html.escape(phase), faction, count, total, total / count, slowest)
+        for (phase, faction), (count, total, slowest) in sorted(
+            grouped.items(), key=lambda pair: pair[1][1], reverse=True)
+    )
+    if not timing_rows:
+        timing_rows = '<tr><td colspan="6">No phase timing entries in this session</td></tr>'
+    save_rows = "\n".join(
+        "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+            html.escape(str(entry.get("utc", ""))),
+            entry.get("turn", ""), entry.get("mission_year", ""),
+            html.escape(str(entry.get("status", ""))),
+            html.escape(Path(str(entry.get("path") or "")).name or "(not saved)"))
+        for entry in checkpoints[-100:]
+    )
+    if not save_rows:
+        save_rows = '<tr><td colspan="5">No archived SAV checkpoint events</td></tr>'
+    return (
+        '<h2>Native phase timings</h2>'
+        '<p class="muted">Measured elapsed wall-clock time in milliseconds, '
+        'including any UI or disk waits inside a phase. Full-cycle and AI '
+        'phase timings overlap; do not sum their totals as unique CPU time.</p>'
+        '<div class="scroll"><table><thead><tr>'
+        '<th>Phase</th><th>Faction</th><th>Samples</th><th>Total ms</th>'
+        '<th>Mean ms</th><th>Max ms</th></tr></thead><tbody>'
+        + timing_rows + '</tbody></table></div>'
+        '<h2>Archived game saves</h2>'
+        '<p class="muted">Checkpoints are inside this session’s saves/ directory '
+        'and included in whole-campaign ZIP exports. Failed attempts are shown.</p>'
+        '<div class="scroll"><table><thead><tr><th>UTC</th><th>Turn</th>'
+        '<th>Year</th><th>Status</th><th>SAV filename</th>'
+        '</tr></thead><tbody>' + save_rows + '</tbody></table></div>'
+        '<p><a href="timings.csv">Download timing samples</a> · '
+        '<a href="checkpoints.csv">Download checkpoint index</a></p>'
+    )
+
+
 def campaign_display_name(campaign_dir):
     """Use an editable label when present; legacy campaigns keep folder names."""
     path = campaign_dir / "campaign.json"
@@ -248,7 +301,20 @@ def generate(campaign_dir, session_id=None, output_dir=None):
         if notice.get("schema") != SCHEMA:
             raise ValueError("UI notice: unsupported record schema")
     write_csv(output / "ui_notices.csv",
-              ("turn", "processing_faction", "source", "label", "action"), notices)
+              ("utc", "turn", "mission_year", "processing_faction", "source", "label", "action"), notices)
+    timing_path = session_dir / "timings.jsonl"
+    checkpoint_path = session_dir / "checkpoints.jsonl"
+    timings = read_jsonl(timing_path) if timing_path.is_file() else []
+    checkpoints = read_jsonl(checkpoint_path) if checkpoint_path.is_file() else []
+    for label, rows in (("timings", timings), ("checkpoints", checkpoints)):
+        if any(row.get("schema") != SCHEMA for row in rows):
+            raise ValueError(f"{label}: unsupported record schema")
+    write_csv(output / "timings.csv",
+              ("phase", "faction", "turn", "mission_year", "observer",
+               "started_utc", "ended_utc", "elapsed_ms"), timings)
+    write_csv(output / "checkpoints.csv",
+              ("utc", "turn", "mission_year", "kind", "status", "source", "path"),
+              checkpoints)
     faction_rows = (
         {"turn": record["turn"], "mission_year": record["mission_year"], **f}
         for record in turns for f in record["factions"]
@@ -261,9 +327,12 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     write_csv(output / "factions.csv", faction_fields, faction_rows)
     base_rows = ({"turn": record["turn"], **base} for record in bases for base in record["bases"])
     write_csv(output / "bases.csv", BASE_FIELDS, base_rows)
-    (output / "index.html").write_text(
-        render_html(campaign_display_name(campaign_dir), session_dir.name, manifest, status, turns, bases, notices),
-        encoding="utf-8")
+    document = render_html(campaign_display_name(campaign_dir), session_dir.name,
+                           manifest, status, turns, bases, notices)
+    document = document.replace('<script id="turn-data"',
+                                render_automation_diagnostics(timings, checkpoints)
+                                + '<script id="turn-data"', 1)
+    (output / "index.html").write_text(document, encoding="utf-8")
     return output
 
 
