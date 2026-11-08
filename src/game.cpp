@@ -763,6 +763,8 @@ int __cdecl map_menu(int flag) {
             case 0:
             case 1:
                 if (size_of_planet(flag)) {
+                    // An unattended launch cannot retry a menu without input.
+                    if (autosim_auto_new_game) return 1;
                     restart_outer = true;
                     break;
                 }
@@ -771,6 +773,7 @@ int __cdecl map_menu(int flag) {
                 }
                 if (choice == 1) {
                     if (custom_planet(1, flag)) {
+                        if (autosim_auto_new_game) return 1;
                         retry = true;
                     }
                 } else {
@@ -835,6 +838,7 @@ int __cdecl map_menu(int flag) {
             world_climate();
         }
         if (config_game(flag)) {
+            if (autosim_auto_new_game) return 1;
             continue;
         }
         return 0;
