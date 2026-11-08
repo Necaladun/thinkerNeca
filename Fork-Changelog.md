@@ -1,5 +1,9 @@
 # thinkerNeca — fork changelog
 
+## Unmerged TEL-ORBIT — defer routine orbital inventories until first satellite (9 November 2026)
+
+- Stop writing all-zero `orbit.jsonl` inventory snapshots on every pre-spaceflight turn. The first satellite launch emits an immediate inventory baseline; existing satellite stock in a loaded save activates the session-start snapshot. Continue completed-turn inventories after activation, even if all satellites are subsequently lost. Underlying launch, attack, environmental-loss and UI-suppression paths are untouched. Source regression added; runtime acceptance pending.
+
 ## Unmerged AUTO-LAUNCH — campaign-name folders and pause-excluded run duration (9 November 2026)
 
 - New campaigns use `<sanitized campaign display name>-YYYYMMDD-HHMMSS` (local timestamp, collision suffix) instead of observed-faction/MY folder names. Existing campaign-link sidecars and session identities remain compatible and immutable.
