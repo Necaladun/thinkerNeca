@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Synthetic host-side tests for TEL-001's offline report reader."""
 import json
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -48,6 +50,38 @@ def fixture(root, turns=(1, 2), incomplete=False):
 
 
 class CampaignReportTests(unittest.TestCase):
+    def test_launcher_headless_scan_and_generate_cli(self):
+        # Single launcher GUI consumes a JSON scan of the existing, unchanged
+        # reporter metadata; generating a specific session remains CLI-only.
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session = fixture(Path(tmp))
+            script = Path(__file__).with_name("campaign_report.py")
+            scan = subprocess.run(
+                [sys.executable, str(script), "--scan-json", str(Path(tmp))],
+                capture_output=True, text=True, check=True,
+            )
+            rows = json.loads(scan.stdout)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["campaign_dir"], str(campaign))
+            self.assertEqual(rows[0]["session_id"], session.name)
+            self.assertEqual(rows[0]["status"], "Closed")
+            self.assertIsNone(rows[0]["error"])
+            report = subprocess.run(
+                [sys.executable, str(script), str(campaign),
+                 "--session", session.name],
+                capture_output=True, text=True, check=True,
+            )
+            self.assertIn("Created ", report.stdout)
+            self.assertTrue((campaign / "reports" / session.name / "index.html").is_file())
+            invalid = subprocess.run(
+                [sys.executable, str(script), "--scan-json", str(Path(tmp)),
+                 "--session", session.name],
+                capture_output=True, text=True,
+            )
+            self.assertNotEqual(invalid.returncode, 0)
+            self.assertIn("cannot be combined", invalid.stderr)
+
+
     def test_generate_complete_report(self):
         with tempfile.TemporaryDirectory() as tmp:
             campaign, _ = fixture(Path(tmp))
