@@ -822,7 +822,11 @@ void telemetry_council_initialized(const CouncWindow* win, int arg1, int arg2) {
             // native_vote_weight_raw may be zero or modified in Council.
             << ",\"choice_raw\":" << win->faction_vote[fc]
             << ",\"weight_raw\":" << win->faction_vote_count[fc]
-            << ",\"reason\":null,\"reason_status\":\"native_ai_reason_not_instrumented\"}";
+            << ",\"alive\":" << (is_alive(fc) ? "true" : "false")
+            << ",\"human\":" << (is_human(fc) ? "true" : "false")
+            << ",\"reason\":null,\"reason_status\":"
+            << json_string(is_human(fc) ? "human_choice_not_instrumented"
+                : "native_ai_reason_not_instrumented") << "}";
     }
     ballot_row << "]}";
     council_append(ballot_row.str());
