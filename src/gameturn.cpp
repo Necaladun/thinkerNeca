@@ -108,19 +108,19 @@ void __cdecl control_turn() {
             *PbemActive != 0, (*GameState & STATE_GAME_DONE) != 0,
             owner, owner >= 1 && owner < MaxPlayerNum && is_alive(owner));
     };
-    // A consented, fingerprint-linked game may have been saved while the
-    // installed INI had autosim_manual_turns=0. Show preflight instead of
-    // entering an unusable native human console with zero human factions.
-    auto linked_preflight_ready = [&]() {
+    // Any fresh/loaded single-player game with zero human factions must
+    // reach an operator confirmation, even if thinker.ini has auto turns=0
+    // or this was a plain native autosave without a campaign sidecar.
+    // Never fall into a native human console with nobody human-controlled.
+    auto autosim_preflight_ready = [&]() {
         const int owner = MapWin->cOwner;
-        return telemetry_resumed_linked_campaign()
-            && ((unsigned)FactionStatus[0] & 0xFEu) == 0
+        return ((unsigned)FactionStatus[0] & 0xFEu) == 0
             && !*MultiplayerActive && !*PbemActive
             && !(*GameState & STATE_GAME_DONE)
             && owner >= 1 && owner < MaxPlayerNum && is_alive(owner);
     };
     if (*ControlTurnMove && !is_human(MapWin->cOwner)
-    && !autosim_ready() && !linked_preflight_ready()) {
+    && !autosim_ready() && !autosim_preflight_ready()) {
         Console_human_turn(MapWin);
     }
     bool run_upkeep = true;
@@ -130,7 +130,7 @@ void __cdecl control_turn() {
         // further AI processing. This is before upkeep and faction actions,
         // not inside a native UI/combat callback. A mid-cycle reload still
         // excludes its first partial cycle from the requested turn count.
-        if ((autosim_ready() || linked_preflight_ready()) && !startup_confirmed) {
+        if (autosim_preflight_ready() && !startup_confirmed) {
             AutosimDialogState preflight;
             autosim_fill_dialog_state(&preflight, AUTOSIM_DIALOG_STARTUP);
             telemetry_record_ui_notice("autosim", "STARTUP", "preflight");
