@@ -1,5 +1,6 @@
 
 #include "veh.h"
+#include "gui_dialog.h"
 
 
 int __cdecl can_arty(int unit_id, bool allow_sea_arty) {
@@ -835,7 +836,10 @@ int __cdecl battle_kill(int veh_id, int* num_killed, int* num_relics, int* num_c
     if ((veh->state & VSTATE_ASSISTANT_WORM)
     && veh_id_atk >= 0
     && Vehs[veh_id_atk].faction_id
-    && !(*GamePreferences & PREF_AV_INTERLUDES_DISABLED)) {
+    && (!(*GamePreferences & PREF_AV_INTERLUDES_DISABLED) || autosim_ui_active())) {
+        // The assistant-worm story chain sets base/faction flags below.
+        // Suppress only the presentation in eligible all-AI simulations;
+        // do not skip these flags merely because interludes are disabled.
         VEH* veh_atk = &Vehs[veh_id_atk];
         int atk_faction_id = veh_atk->faction_id;
         int base_id = veh_atk->home_base_id;
@@ -847,7 +851,7 @@ int __cdecl battle_kill(int veh_id, int* num_killed, int* num_relics, int* num_c
             Factions[atk_faction_id].player_flags |= PFLAG_UNK_1000;
             parse_says(6, get_name(atk_faction_id), -1, -1);
             parse_says(7, get_noun(atk_faction_id), -1, -1);
-            interlude(6, Bases[base_id].name, 1, 0);
+            autosim_interlude(6, Bases[base_id].name, 1, 0);
         }
     }
     if (!veh->faction_id && veh_id_atk >= 0 && Vehs[veh_id_atk].faction_id && num_credits) {
@@ -3796,7 +3800,7 @@ void __cdecl spot_all(int veh_id, int flag) {
             GraphicWin_redraw(WorldWin);
         }
         if (nexus_count > 8 && faction_id == MapWin->cOwner && MFactions[faction_id].is_alien()) {
-            interlude(41, 0, 1, 0);
+            autosim_interlude(41, 0, 1, 0);
         }
         if (encounter_mask & 1) {
             encounter(faction_id, 0, veh_x, veh_y, has_tower, has_native);
