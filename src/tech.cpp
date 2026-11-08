@@ -1014,8 +1014,8 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
     }
     // Modify diplomacy to skip social engineering choices dialog SOCIETY
     // while DiploWinState is active, otherwise use the previous conditions.
-    if (faction_id == MapWin->cOwner && plr->diff_level > 1
-    && !*MultiplayerActive && !*DiploWinState) {
+    if (faction_id == MapWin->cOwner && is_human(faction_id)
+    && plr->diff_level > 1 && !*MultiplayerActive && !*DiploWinState) {
         for (int sf = 0; sf < 4; ++sf) {
             for (int sm = 0; sm < 4; ++sm) {
                 if (tech_id == SocialField[sf].soc_preq_tech[sm] && society_avail(sf, sm, faction_id)) {
