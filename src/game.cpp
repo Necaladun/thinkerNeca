@@ -709,6 +709,12 @@ int __cdecl size_of_planet(int setup_mode) {
             }
         }
     } else {
+        if (autosim_auto_new_game) {
+            MessageBoxA(*phWnd,
+                "The installed alpha(x).txt has no #WORLDSIZE list.",
+                "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+            return 1;
+        }
         *MapSizePlanet = 2;
         width = 40;
         *MapAreaY = 80;
