@@ -1575,7 +1575,8 @@ CONF_PICK:
         load_faction_art(i);
     }
     load_flags();
-    if (*ExpansionEnabled && !*MultiplayerActive && !*PbemActive && MFactions[plr_id].is_alien()) {
+    if (*ExpansionEnabled && !*MultiplayerActive && !*PbemActive
+    && !autosim_auto_new_game && MFactions[plr_id].is_alien()) {
         *GameRules &= ~RULES_BLIND_RESEARCH;
         *GameRules |= RULES_NO_UNITY_SURVEY|RULES_INTENSE_RIVALRY;
     }
