@@ -416,6 +416,7 @@ void telemetry_begin_session(const char* source_save) {
     }
     manifest << ",\"autosim_manual_turns\":" << conf.autosim_manual_turns;
     manifest << ",\"archive_interval\":" << conf.autosim_archive_interval;
+    manifest << ",\"timing_enabled\":" << (conf.autosim_timing_enabled ? "true" : "false");
     manifest << ",\"autosim_unlimited_expansion\":"
              << (conf.autosim_unlimited_expansion ? "true" : "false");
     manifest << ",\"autosim_suppress_notices\":" << conf.autosim_suppress_notices;
@@ -524,7 +525,7 @@ void telemetry_record_council_event(const char* phase, int actor, const char* de
 
 TelemetryPhaseStamp telemetry_phase_begin() {
     TelemetryPhaseStamp stamp;
-    if (!recording || !timings_file) return stamp;
+    if (!recording || !timings_file || !conf.autosim_timing_enabled) return stamp;
     // Tick count measures actual elapsed wall time, including any blocking
     // UI/disk calls within the timed phase. It is not the CPU time of AI code.
     stamp.started_ticks = (unsigned long long)GetTickCount();
