@@ -239,3 +239,40 @@ The actionable backlog lives only in [WORK-QUEUE](../WORK-QUEUE.md).
 8. **DEV-001:** optional CI Debug artifact and diagnostic tooling, separate from enabling legacy extended Debug mode.
 
 **Evidence hierarchy:** source inspection; Windows x86 compilation/CI; synthetic recorder tests; **actual Windows SMAC/X in-game trial**. CI passing does not prove unattended gameplay, popup coverage, rendering safety, RNG neutrality, or save/reload continuity.
+
+
+### AUTO-002 Council execution/telemetry trial (8 November 2026)
+
+A separate `sessions/session-NNN/council.jsonl` file is opened with the
+campaign recorder and flushed per event so pre-modal state remains available
+if the process blocks. Each event contains turn/year, actor, processing faction,
+observed faction, human and alive masks, Council pending/Governor state,
+observer proposal/vote, the eight factions' current energy credits and a
+phase/detail value. It is deliberately separate from `ui_notices.jsonl`.
+The offline Campaign Analyzer has not yet been extended to visualise the
+new stream; raw JSONL can be filtered by turn, faction and phase.
+
+The native x86 experiment checks expected calls to `popp` at
+`0x4284A9` and `0x428542`, `X_pops_11` at
+`0x428115` and `0x42828A`, `CouncWin_init` at
+`0x4284CA`, and the six original virtual-call bytes
+`FF 90 E4 00 00 00` at `0x4282F2`. On a known build it patches
+those sites after Scient; otherwise *all* Council-specific hooks are skipped.
+Handlers check runtime all-AI eligibility and `autosim_suppress_notices=1`,
+forwarding normal human/opt-out execution to the native methods.
+
+The omitted notices have unused popup results. `VOTEFORME`/
+`VOTEFORMETECH` are human-only purchase offers: all-AI mode records
+`human_only_offer_omitted`, makes no transfer/technology award and does
+not fabricate a response. This is a **trial AI-parity assumption**, not
+proof that all native AI-vs-AI vote-buy interactions are represented.
+
+The virtual modal replacement only attempts Governor elections if every
+living participant already has a nonzero native ballot. It feeds the observed
+AI's **existing** ballot into native `CouncWin_set_vote`, which can invoke
+the native `CouncWin_make_resolution` and `council_action`.
+It neither guesses ballots nor calls `council_get_vote` again. All other
+proposals, incomplete ballots and unsupported modes log `modal_fallback`
+and use the original native window. This is an **experimental native hook**,
+not a claimed fully working headless Council. Existing UI-coupled effects
+and Council-action popups require actual Windows tests before merge.

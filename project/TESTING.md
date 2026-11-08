@@ -617,3 +617,30 @@ Record the exact unit prototypes, reactors, morale, tile, year, attack method, e
 [PR #4 Windows workflow](https://github.com/Necaladun/thinkerNeca/blob/feature/minor-terrain-generation-migration/.github/workflows/build-windows.yml): Develop and Release compilation (separate jobs); synthetic tests for the local-input [sprite atlas builder](technical/sprite-atlas.md), old legacy placeholder and source masks; source/INI/slot-10/Mesa contracts and synthetic save reader. **The artifact distributes DLL and EXE only**, not user/original-game art or the old placeholder PCX.
 
 Record the commit, effective INI including overrides, map/save coordinates and year, screenshot, PCX source and `minor_terrain_render.log` when investigating remaining problems.
+
+
+## AUTO-002 native Council headless implementation — 8 Nov 2026
+
+**On unmerged draft PR #11; no Windows game acceptance at implementation.**
+The uploaded 32-bit `terranx.exe` was statically disassembled. The guarded
+native calls are `0x4284A9`/`0x428542` (Council announcements),
+`0x428115`/`0x42828A` (human vote-sale prompt),
+`0x4284CA` (CouncWin_init tracing), and the six-byte virtual Council
+modal call at `0x4282F2`. The installer checks all sites before writing any.
+A mismatch leaves native Council unchanged. Eligibility requires positive
+all-AI simulation turns, suppression enabled, single-player, zero human bits,
+living observer and ongoing game. Native human and opt-out paths delegate.
+
+**Windows acceptance:** using `Autosave_2181(1).sav` and the same
+`terranx.exe`, run all-AI/telemetry with suppression. Before touching any
+Council modal collect `council.jsonl`; check paired
+`call_council` and `CouncWin_init` entry/exit and either
+`headless_native_resolution` or a documented `modal_fallback`.
+Confirm native Governor and per-faction ballot values, energy/tech balance,
+session progress for at least five subsequent turns and same-build SAV
+reload. Later reproduce Lal's interactive vote bribe; ensure there is no
+fabricated payment or tech gift. Repeat with normal-human and suppression-off
+settings, other Council proposals, veto, Supreme Leader and repeat elections.
+The headless path currently only attempts Governor elections and **may still
+encounter presentation inside native resolution**. A passing CI build is
+not sufficient to claim correctness, parity or absence of future blockers.
