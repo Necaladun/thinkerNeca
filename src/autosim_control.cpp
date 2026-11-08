@@ -184,7 +184,7 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
             ids[0] = ID_START; captions[0] = "Start Simulation";
             ids[1] = ID_TAKE_CONTROL; captions[1] = "Take Control";
             buttons = 2;
-        } else {
+        } else if (s.mode == AUTOSIM_DIALOG_RUNNING) {
             ids[0] = ID_SAVE_CONTINUE; captions[0] = "Save && Continue";
             ids[1] = ID_SAVE_EXIT; captions[1] = "Save && Exit";
             ids[2] = ID_TAKE_CONTROL; captions[2] = "Take Control";
