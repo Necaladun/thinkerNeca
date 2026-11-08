@@ -39,6 +39,15 @@ function New-Defaults {
         suppress_notices = '1'
         fast_combat = '1'
         unlimited_expansion = '1'
+        timing_enabled = '1'
+        archive_interval = '25'
+        faction_1 = 'GAIANS'
+        faction_2 = 'HIVE'
+        faction_3 = 'UNIV'
+        faction_4 = 'MORGAN'
+        faction_5 = 'SPARTANS'
+        faction_6 = 'BELIEVE'
+        faction_7 = 'PEACE'
         render_mode = '2'
         world_size = '3'
         world_ocean = '1'
@@ -77,7 +86,10 @@ function New-OptionLines($options, [bool]$includeSchema) {
     if ($includeSchema) { $lines.Add('schema=1') }
     foreach ($key in @('mode', 'source_save', 'campaign_name',
                       'turns', 'telemetry_enabled', 'suppress_notices', 'fast_combat',
-                      'unlimited_expansion', 'render_mode', 'world_size', 'world_ocean', 'world_erosion',
+                      'unlimited_expansion', 'timing_enabled', 'archive_interval',
+                      'faction_1', 'faction_2', 'faction_3', 'faction_4',
+                      'faction_5', 'faction_6', 'faction_7',
+                      'render_mode', 'world_size', 'world_ocean', 'world_erosion',
                       'world_cloud', 'world_life', 'difficulty', 'observer',
                       'monitor_seconds')) {
         $lines.Add($key + '=' + [string]$options[$key])
@@ -127,6 +139,9 @@ if ($SelfTest) {
             -not $lines.Contains('turns=100') -or
             -not $lines.Contains('render_mode=2') -or
             -not $lines.Contains('unlimited_expansion=1') -or
+            -not $lines.Contains('timing_enabled=1') -or
+            -not $lines.Contains('archive_interval=25') -or
+            -not $lines.Contains('faction_7=PEACE') -or
             -not $lines.Contains('world_size=3') -or
             -not $lines.Contains('monitor_seconds=45')) {
             throw 'run-profile snapshot mismatch'
