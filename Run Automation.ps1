@@ -1077,6 +1077,7 @@ try {
         $source.Enabled=$loadGame.Checked
         $browse.Enabled=$loadGame.Checked
         $worldTab.Enabled=$newGame.Checked
+        $rulesTab.Enabled=$newGame.Checked
         $factionTab.Enabled=$newGame.Checked
     }
     $newGame.Add_CheckedChanged($updateMode)
@@ -1123,6 +1124,26 @@ try {
                 }
                 $chosenFactions += $id
             }
+            # Explicit normal custom-game bits; the native checkbox for
+            # Unity Survey has opposite polarity to RULES_NO_UNITY_SURVEY.
+            $rulesMask = 0
+            foreach ($entry in $ruleControls) {
+                $selected = [bool]$entry.Control.Checked
+                if ($entry.Inverted) { $selected = -not $selected }
+                if ($selected) { $rulesMask = $rulesMask -bor [int]$entry.Bit }
+            }
+            $randomLeaderBits = 0
+            if ($randomPersonalities.Checked) { $randomLeaderBits = $randomLeaderBits -bor 1 }
+            if ($randomAgendas.Checked) { $randomLeaderBits = $randomLeaderBits -bor 2 }
+            if ($mode -eq 'new' -and $worldSource.SelectedIndex -gt 0) {
+                $mapName = if ($worldSource.SelectedIndex -eq 1) {
+                    'xplanet.mp'
+                } else { 'xplanetx.mp' }
+                $mapPath = Join-Path $gameRoot ('maps\' + $mapName)
+                if (-not [System.IO.File]::Exists($mapPath)) {
+                    throw ('Selected Planet map is missing: ' + $mapPath)
+                }
+            }
             $render=[int]$presentation.SelectedIndex
             $updated = @{
                 mode=$mode
@@ -1136,7 +1157,13 @@ try {
                 archive_interval=[string]$archiveChoices[$archiveCadence.SelectedIndex]
                 fast_combat=if ($render -ge 1) {'1'} else {'0'}
                 render_mode=[string]$render
+                world_source=[string][int]$worldSource.SelectedIndex
                 world_size=[string][int]$worldSize.SelectedIndex
+                custom_map_x=[string][int]$customX.Value
+                custom_map_y=[string][int]$customY.Value
+                rules_mode=if ($customRules.Checked) {'1'} else {'0'}
+                rules_mask=[string]$rulesMask
+                rules_random=[string]$randomLeaderBits
                 world_ocean=[string][int]$worldOcean.SelectedIndex
                 world_erosion=[string][int]$worldErosion.SelectedIndex
                 world_cloud=[string][int]$worldCloud.SelectedIndex
@@ -1161,13 +1188,18 @@ try {
         }
     })
     if ($GuiSelfTest) {
-        if ($tabs.TabPages.Count -ne 6 -or $factionCombos.Count -ne 7 -or
+        if ($tabs.TabPages.Count -ne 7 -or $factionCombos.Count -ne 7 -or
             $generateReport.Text -ne 'Generate + open report' -or
             $openExisting.Text -ne 'Open existing report' -or
             $sessionList.Columns.Count -ne 8 -or
             $rootBrowse.Text -ne 'Choose folder...' -or
             $presentation.Items.Count -ne 3 -or
-            $worldSize.Items.Count -ne 5 -or $factionCombos.Count -ne 7 -or
+            $worldSize.Items.Count -ne 7 -or $worldSource.Items.Count -ne 3 -or
+            $customX.Minimum -ne 16 -or $customX.Maximum -ne 512 -or
+            $customY.Minimum -ne 16 -or $customY.Maximum -ne 512 -or
+            $ruleControls.Count -ne 16 -or
+            $rulesTab.Text -ne 'Game rules & victory' -or
+            $factionCombos.Count -ne 7 -or
             $archiveCadence.Items.Count -ne 6 -or $turns.Maximum -ne 100000) {
             throw 'Windows WinForms launcher controls failed the GUI smoke test.'
         }
