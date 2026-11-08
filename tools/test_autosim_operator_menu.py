@@ -42,6 +42,12 @@ for label in ("AUTOSIM_DIALOG_SETUP", "AUTOSIM_DIALOG_STARTUP",
     assert label in dialog_h
     assert label in dialog
 assert dialog.count("DialogBoxIndirectParamA(") == 1
+# Win32-generated numeric IDOK=1/IDCANCEL=2 must not be mistaken for our
+# similarly numbered Resume/Save & Continue return codes.
+assert "if (id == IDCANCEL)" in dialog
+assert "if (id == IDOK) return TRUE;" in dialog
+assert "ctx->state->mode == AUTOSIM_DIALOG_SETUP" in dialog
+assert "ctx->state->allow_resume" in dialog
 for field in ("Campaign:", "Session:", "Telemetry:",
               "Campaign display name", "Completed AI turns per segment",
               "Suppress audited, noninteractive notices",
