@@ -91,6 +91,8 @@ jobs:
         run: python tools/test_autosim_lategame_notices.py
       - name: Check AUTO-002 orbital strike, defense and satellite lifecycle
         run: python tools/test_autosim_orbital_strikes.py
+      - name: Check TEL-ORBIT orbital JSONL event stream and native-result hook
+        run: python tools/test_autosim_orbit_logging.py
       - name: Check AUTO-002 missile, random-event and observed-AI movement notices
         run: python tools/test_autosim_missile_move_ui.py
       - name: Check AUTO-002 sea-level, tidal colony and atrocity notices
