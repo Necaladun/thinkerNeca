@@ -17,6 +17,7 @@ int autosim_new_world_cloud = 1;
 int autosim_new_world_life = 1;
 int autosim_new_difficulty = 3;
 int autosim_new_observer = 1;
+std::string autosim_new_roster[7];
 std::string autosim_launch_campaign_name;
 std::string autosim_launch_profile_path;
 std::vector<std::pair<std::string,std::string>> faction_pool;
@@ -474,11 +475,14 @@ struct AutosimRunProfile {
     int fast = -1;
     int render = -1;
     int unlimited_expansion = 0; // old run profiles retain normal AI colony cap
+    int archive_interval = 0; // no archive writes in older profiles
     int size = -1, ocean = -1, erosion = -1, cloud = -1, life = -1;
     int difficulty = -1, observer = -1, monitor = -1;
     std::string mode;
     std::string source_save;
     std::string name;
+    std::string faction_slots[7]; // explicit canonical game filenames
+    int faction_slot_count = 0;
 };
 
 static int autosim_profile_int(const char* s, int maxval, int* result) {
@@ -501,6 +505,24 @@ static int autosim_profile_option(void* data, const char* section,
     if (!strcmp(name, "fast_combat")) return autosim_profile_int(value, 1, &p->fast);
     if (!strcmp(name, "render_mode")) return autosim_profile_int(value, 2, &p->render);
     if (!strcmp(name, "unlimited_expansion")) return autosim_profile_int(value, 1, &p->unlimited_expansion);
+    if (!strcmp(name, "archive_interval")) return autosim_profile_int(value, 10000, &p->archive_interval);
+    if (!strncmp(name, "faction_", 8) && strlen(name) == 9
+    && name[8] >= '1' && name[8] <= '7') {
+        const char* const allowed[] = {
+            "GAIANS", "HIVE", "UNIV", "MORGAN", "SPARTANS", "BELIEVE", "PEACE",
+            "CYBORG", "PIRATES", "DRONE", "ANGELS", "FUNGBOY", "CARETAKE", "USURPER"
+        };
+        bool valid = false;
+        for (const char* id : allowed) {
+            if (!strcmp(value, id)) { valid = true; break; }
+        }
+        if (!valid) return 0;
+        std::string& selected = p->faction_slots[name[8] - '1'];
+        if (!selected.empty()) return 0; // duplicate option in one run profile
+        selected = value;
+        ++p->faction_slot_count;
+        return 1;
+    }
     if (!strcmp(name, "world_size")) return autosim_profile_int(value, 4, &p->size);
     if (!strcmp(name, "world_ocean")) return autosim_profile_int(value, 2, &p->ocean);
     if (!strcmp(name, "world_erosion")) return autosim_profile_int(value, 2, &p->erosion);
@@ -524,6 +546,8 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_fast_combat = 0;
     cf->autosim_render_mode = 0;
     cf->autosim_unlimited_expansion = 0;
+    cf->autosim_archive_interval = 0;
+    for (std::string& slot : autosim_new_roster) slot.clear();
     autosim_launcher_active = false;
     autosim_auto_new_game = false;
     autosim_launch_campaign_name.clear();
@@ -539,17 +563,26 @@ static bool autosim_apply_launch_profile(Config* cf) {
     if (ini_parse(path, autosim_profile_option, &p) != 0
     || p.schema != 1 || p.turns < 1 || p.turns > 100000
     || p.telemetry < 0 || p.notices < 0 || p.fast < 0
+    || (p.archive_interval > 0 && !p.telemetry)
     || p.name.empty() || p.name.size() > 88
     || (p.monitor != -1 && p.monitor < 30)
     || (p.mode == "new" && (p.size < 0 || p.ocean < 0 || p.erosion < 0
         || p.cloud < 0 || p.life < 0 || p.difficulty < 0 || p.observer < 1))
     || (p.mode != "new" && p.mode != "load")
+    || (p.faction_slot_count != 0 && p.faction_slot_count != 7)
     || (p.mode == "new" && !p.source_save.empty())
     || (p.mode == "load" && (p.source_save.size() < 4
         || _stricmp(p.source_save.c_str() + p.source_save.size() - 4, ".sav") != 0
         || !FileExists(p.source_save.c_str())))) return false;
     for (unsigned char ch : p.name)
         if (ch < 32 || ch == 127) return false;
+    if (p.faction_slot_count == 7) {
+        for (int i = 0; i < 7; ++i) {
+            for (int j = i + 1; j < 7; ++j) {
+                if (p.faction_slots[i] == p.faction_slots[j]) return false;
+            }
+        }
+    }
 
     cf->telemetry_enabled = p.telemetry;
     cf->autosim_manual_turns = p.turns;
@@ -557,6 +590,7 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_fast_combat = p.fast;
     cf->autosim_render_mode = p.render >= 0 ? p.render : (p.fast ? 1 : 0);
     cf->autosim_unlimited_expansion = p.unlimited_expansion;
+    cf->autosim_archive_interval = p.archive_interval;
     autosim_launch_campaign_name = p.name;
     autosim_launch_profile_path = path;
     autosim_auto_new_game = p.mode == "new";
@@ -568,6 +602,9 @@ static bool autosim_apply_launch_profile(Config* cf) {
         autosim_new_world_life = p.life;
         autosim_new_difficulty = p.difficulty;
         autosim_new_observer = p.observer;
+        if (p.faction_slot_count == 7) {
+            for (int i = 0; i < 7; ++i) autosim_new_roster[i] = p.faction_slots[i];
+        }
     }
     if (p.mode == "load") startup_load_path = p.source_save;
     autosim_launcher_active = true;
