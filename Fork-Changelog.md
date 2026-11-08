@@ -1,5 +1,11 @@
 # thinkerNeca — fork changelog
 
+## Unmerged AUTO-LAUNCH — native new-game world and custom-rule controls (9 November 2026)
+
+- Expanded the single WinForms Automation Launcher with **Very Huge** (the sixth native 80×160 preset), direct **Custom Map** native X/Y dimensions (16–512), the stock **Map of Planet** and **Huge Map of Planet** files, and the existing generated-world climate controls. Fixed-map selections use the game's original map loader rather than random map generation and fail clearly when the requested file is absent.
+- Added the **Game rules & victory** tab: all standard Custom Game Rules checkboxes (including five victory/cooperative toggles, inverted Unity Survey availability, Tech Stagnation, Blind Research, Spoils of War, Time Warp, Bell Curve, Ironman and other stock choices), plus random leader personalities/agendas. Optional per-run override of the native low-16-bit rule mask and those two `GameState` flags; stock defaults can be restored with one control.
+- `autosim_apply_launch_profile` validates extended world/rule fields. Old profiles retain their previous generated map/installed rules; normal launches, existing SAVs, game INIs, multiplayer and save formats are unchanged. Added source contracts and expanded Windows WinForms GUI smoke. Actual native world generation, rule effects, very large custom map performance and same-build save/reload remain unverified.
+
 ## Unmerged AUTO-002/TEL-ORBIT — active orbital popup suppression and basic event ledger (9 November 2026)
 
 - Corrected the initial, **ineffective** hook at original EXE callsite `0x4CF70F`: `patch.cpp` already replaces the native `action_sat_attack` at `0x4CF480` with C++ `basewin.cpp::action_sat_attack`. The four passive C++ hit/miss `popp` calls now use the existing `autosim_notice_popp` wrapper in eligible all-AI suppression mode. Removed the unreachable EXE hook and its wrapper; normal human/opt-out presentation, attack RNG, satellite counts and Geosynchronous effects remain unchanged.
