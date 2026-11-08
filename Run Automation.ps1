@@ -477,6 +477,27 @@ try {
     $worldLife = Add-Combo $worldTab 'Native life' 495 @('Low','Average','High') (Get-Selected 'world_life' 2)
     $observer = Add-Combo $worldTab 'Initial observer (not a human faction)' 579 @('Faction slot 1','Faction slot 2','Faction slot 3','Faction slot 4','Faction slot 5','Faction slot 6','Faction slot 7') ([Math]::Max(0,(Get-Selected 'observer' 7)-1))
 
+    [void](Add-Label $factionTab 'Seven specific faction slots. Each identity must be unique. Applies only to a New Game.' 28 10 900 34)
+    $factionIds = [string[]]@('GAIANS','HIVE','UNIV','MORGAN','SPARTANS','BELIEVE','PEACE',
+        'CYBORG','PIRATES','DRONE','ANGELS','FUNGBOY','CARETAKE','USURPER')
+    $factionTitles = [string[]]@(
+        'Gaians - Deirdre','Human Hive - Yang','University - Zakharov',
+        'Morgan Industries - Morgan','Spartan Federation - Santiago',
+        'Lord''s Believers - Miriam','Peacekeepers - Lal',
+        'Cybernetic Consciousness - Aki','Nautilus Pirates - Svensgaard',
+        'Free Drones - Domai','Data Angels - Roze','Cult of Planet - Cha Dawn',
+        'Manifold Caretakers - Hminee','Manifold Usurpers - Marr')
+    $factionCombos = @()
+    for ($slot = 1; $slot -le 7; ++$slot) {
+        $key = 'faction_' + $slot
+        $chosen = [Array]::IndexOf($factionIds, [string]$options[$key])
+        if ($chosen -lt 0) { $chosen = $slot - 1 }
+        $chooser = Add-Combo $factionTab ('Slot ' + $slot) (48 + ($slot-1)*81) $factionTitles $chosen
+        $chooser.SetBounds(28, (78 + ($slot-1)*81), 620, 30)
+        $factionCombos += $chooser
+    }
+    [void](Add-Label $factionTab 'The seven Alien Crossfire identities require SMAX enabled; the loader rejects unavailable expansion factions.' 28 645 900 58)
+
     [void](Add-Label $presentationTab 'Presentation mode' 30 30 860 26)
     $presentation = Add-Combo $presentationTab 'Select how much graphics to process' 74 @(
         'Normal - original presentation',
@@ -567,6 +588,17 @@ try {
                     -not [System.IO.File]::Exists($save) -or
                     $save -match '[\r\n]') { throw 'Select an existing SAV.' }
             }
+            if ($archiveCadence.SelectedIndex -gt 0 -and -not $telemetry.Checked) {
+                throw 'Checkpoint archiving requires campaign telemetry to be enabled.'
+            }
+            $chosenFactions = @()
+            foreach ($selector in $factionCombos) {
+                $id = [string]$factionIds[$selector.SelectedIndex]
+                if ($chosenFactions -contains $id) {
+                    throw ('Faction ' + $id + ' is assigned to multiple slots. Select seven different identities.')
+                }
+                $chosenFactions += $id
+            }
             $render=[int]$presentation.SelectedIndex
             $updated = @{
                 mode=$mode
@@ -589,6 +621,9 @@ try {
                 observer=[string]($observer.SelectedIndex + 1)
                 monitor_seconds=[string][int]$warning.Value
             }
+            for ($slot = 1; $slot -le 7; ++$slot) {
+                $updated['faction_' + $slot] = [string]$chosenFactions[$slot-1]
+            }
             Save-Options $prefsPath $updated $false
             $script:selectedProfile=New-RunProfile $gameRoot $updated
             $script:warningSeconds=[int]$warning.Value
@@ -603,7 +638,8 @@ try {
     })
     if ($GuiSelfTest) {
         if ($tabs.TabPages.Count -ne 6 -or $presentation.Items.Count -ne 3 -or
-            $worldSize.Items.Count -ne 5 -or $turns.Maximum -ne 100000) {
+            $worldSize.Items.Count -ne 5 -or $factionCombos.Count -ne 7 -or
+            $archiveCadence.Items.Count -ne 6 -or $turns.Maximum -ne 100000) {
             throw 'Windows WinForms launcher controls failed the GUI smoke test.'
         }
         $form.Dispose()
