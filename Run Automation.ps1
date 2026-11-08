@@ -263,6 +263,9 @@ public static class AutoMonitorWin32 {
                         ' (configured=' + $record['configured_render'] +
                         ', draws skipped=' + $record['draw_skipped'] +
                         ', presents skipped=' + $record['screen_skipped'] + ')')
+                    if ($record['phase'] -eq 'victory_paused') {
+                        Write-Host 'Victory reached. Use the game window to Save, Continue, Take Control or Exit.'
+                    }
                     $lastRecord = $signature
                     # SMAC takes foreground focus on launch, making the
                     # external console keyboard controls hard to reach.
@@ -283,11 +286,6 @@ public static class AutoMonitorWin32 {
                     }
                     $lastProgress = [DateTime]::UtcNow
                     $reportedStall = $false
-                }
-                if ($record['phase'] -eq 'victory_paused') {
-                    if ($signature -ne $lastRecord) {
-                        Write-Host 'Victory reached: choose Save, Continue, Take Control or Exit in the game window.'
-                    }
                 }
                 if ($record['phase'] -eq 'turn_driver_exit') {
                     Write-Host 'Simulation driver exited. Check game and campaign logs.'
