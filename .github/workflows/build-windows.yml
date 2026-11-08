@@ -97,6 +97,8 @@ jobs:
         run: python tools/test_autosim_sealevel_atrocity.py
       - name: Check AUTO-002 pact, intervention and Council notifications
         run: python tools/test_autosim_pact_intervention.py
+      - name: Check AUTO-OBS Stage 3 observer, expansion and terminal contracts
+        run: python tools/test_autosim_stage3.py
       - name: Check AUTO-002 first Mind Worm loss and alien interludes
         run: python tools/test_autosim_rare_interludes.py
       - name: Validate distributed thinker.ini options
