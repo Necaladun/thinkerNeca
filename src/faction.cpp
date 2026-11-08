@@ -2536,6 +2536,7 @@ int __cdecl mod_eliminate_player(int faction_id, int setup_id) {
             mon_killed_faction(setup_id, faction_id);
         }
         if (!*MultiplayerActive && !setup_val && setup_id == *CurrentPlayerFaction
+        && is_human(setup_id)
         && (*GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES)) {
             mod_amovie_project(&m->filename[0]);
         }
@@ -2571,7 +2572,8 @@ int __cdecl mod_eliminate_player(int faction_id, int setup_id) {
                 }
             }
         }
-        if (faction_id != *CurrentPlayerFaction && plr_alien && MFactions[*CurrentPlayerFaction].is_alien()) {
+        if (faction_id != *CurrentPlayerFaction && plr_alien
+        && is_human(*CurrentPlayerFaction) && MFactions[*CurrentPlayerFaction].is_alien()) {
             autosim_interlude(42, 0, 1, 0);
         }
     }
