@@ -3080,31 +3080,39 @@ void __cdecl mod_base_ecology() {
         if (is_known(nx, ny, player_id) || *GameState & STATE_OMNISCIENT_VIEW) {
             visible = true;
             if (faction_id == player_id) {
-                Console_focus(MapWin, nx, ny, faction_id);
+                // Presentation only: ecological mutation happened above.
+                // All-AI simulation must retain event/interlude bookkeeping.
+                if (!autosim_fast_combat_active()) {
+                    Console_focus(MapWin, nx, ny, faction_id);
+                }
                 if (plr->clean_minerals_modifier < 2) {
                     autosim_interlude(3, 0, 1, 0);
                 }
-                boom_tile(nx, ny, 0x80);
+                if (!autosim_fast_combat_active()) {
+                    boom_tile(nx, ny, 0x80);
+                }
             }
             synch_bit(nx, ny, player_id);
             draw_tile(nx, ny, 2);
         }
     }
     if (visible) {
-        if (!shift_key_down() && !*MultiplayerActive) {
+        if (!autosim_fast_combat_active() && !shift_key_down() && !*MultiplayerActive) {
             clock_wait(20);
         }
         if (faction_id == player_id || spawn_sq->veh_who() == player_id) {
-            MapWin_set_center(MapWin, spawn_x, spawn_y, 1);
-            Console_focus(MapWin, spawn_x, spawn_y, faction_id);
+            if (!autosim_fast_combat_active()) {
+                MapWin_set_center(MapWin, spawn_x, spawn_y, 1);
+                Console_focus(MapWin, spawn_x, spawn_y, faction_id);
+            }
             parse_says(0, base->name, -1, -1);
             if (improv_id < 0 || faction_id != player_id) {
-                POP2("FUNGUSGROWS", "fung_sm.pcx", -1);
+                autosim_notice_pop2("FUNGUSGROWS", "fung_sm.pcx", -1);
             } else {
                 const char* item = is_ocean(spawn_sq)
                     ? Terraform[improv_id].name_sea : Terraform[improv_id].name;
                 parse_says(1, item, -1, -1);
-                POP2("FUNGUSGROWS2", "fung_sm.pcx", *CurrentBaseID);
+                autosim_notice_pop2("FUNGUSGROWS2", "fung_sm.pcx", *CurrentBaseID);
             }
         }
         if (faction_id == player_id && plr->clean_minerals_modifier >= 2) {
