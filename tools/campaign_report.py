@@ -492,10 +492,27 @@ def scan_campaigns(root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("campaign", type=Path, help="Campaign directory")
+    parser.add_argument("campaign", type=Path, nargs="?",
+                        help="Campaign directory, or campaigns root with --scan-json")
+    parser.add_argument("--scan-json", action="store_true",
+                        help="Print campaign/session picker metadata as JSON; do not generate files")
     parser.add_argument("--session", help="Session directory name (default: last session)")
     parser.add_argument("--output", type=Path, help="Destination directory")
     args = parser.parse_args()
+    if args.scan_json:
+        if args.session or args.output:
+            parser.error("--scan-json cannot be combined with --session or --output")
+        root = args.campaign if args.campaign is not None else Path("campaigns")
+        try:
+            rows = scan_campaigns(root)
+            print(json.dumps([
+                {**row, "campaign_dir": str(row["campaign_dir"])} for row in rows
+            ], ensure_ascii=True))
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            parser.exit(1, f"Campaign scan error: {exc}\n")
+        return
+    if args.campaign is None:
+        parser.error("campaign directory is required unless --scan-json is used")
     try:
         output = generate(args.campaign, args.session, args.output)
     except (OSError, ValueError, KeyError, TypeError) as exc:
