@@ -1,5 +1,10 @@
 # thinkerNeca — fork changelog
 
+## Unmerged AUTO-LAUNCH — campaign-name folders and pause-excluded run duration (9 November 2026)
+
+- New campaigns use `<sanitized campaign display name>-YYYYMMDD-HHMMSS` (local timestamp, collision suffix) instead of observed-faction/MY folder names. Existing campaign-link sidecars and session identities remain compatible and immutable.
+- Record active all-AI wall-clock duration for the running process, excluding startup confirmation and operator controls, freezing at the exact native victory boundary *before* the post-victory UI/save, and resuming only after an explicit continue. In-game victory/turn-limit controls, status/result JSON and the integrated campaign report display the duration; old sessions without the metric remain readable. Source/synthetic tests added; no Windows runtime timing validation yet.
+
 ## Unmerged TEL-LOG-01 — Council political and Secret Project event histories (9 November 2026)
 
 - Replaced the high-volume Council native execution trace with `council.jsonl` gameplay records for real proposals, native faction ballot arrays and raw resolutions. Linked meeting IDs and ballot-level raw codes/weights are machine-readable; the motion proposer and each AI motive remain explicitly unverified, while the convening faction is recorded where the native `call_council` caller is known. No re-evaluation of votes, native hook/preflight change, modal fallback change or suppression behavior change.
