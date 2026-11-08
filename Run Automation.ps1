@@ -534,6 +534,147 @@ try {
     [void](Add-Label $monitorTab 'A warning means no observed progress, not proof of a deadlock. No automatic termination.' 30 455 860 55)
     [void](Add-Label $monitorTab 'Restoring rendering cannot make an already-blocked game thread draw a fresh frame.' 30 520 860 55)
 
+    [void](Add-Label $reportTab 'Reports, campaign archives and diagnostic files from one launcher.' 28 20 910 34)
+    [void](Add-Label $reportTab 'Selected recorded campaign' 28 77 850 25)
+    $campaignList = New-Object System.Windows.Forms.ComboBox
+    $campaignList.DropDownStyle = 'DropDownList'
+    $campaignList.SetBounds(28,107,700,32)
+    $reportTab.Controls.Add($campaignList)
+    $refreshCampaigns = New-Object System.Windows.Forms.Button
+    $refreshCampaigns.Text = 'Refresh'
+    $refreshCampaigns.SetBounds(749,107,150,34)
+    $reportTab.Controls.Add($refreshCampaigns)
+    $campaignRoot = Join-Path $gameRoot 'campaigns'
+    $archiveRoot = Join-Path $gameRoot 'automation\archives'
+    $refreshAction = {
+        $current = [string]$campaignList.SelectedItem
+        $campaignList.Items.Clear()
+        if ([System.IO.Directory]::Exists($campaignRoot)) {
+            Get-ChildItem -LiteralPath $campaignRoot -Directory |
+                Sort-Object LastWriteTime -Descending | ForEach-Object {
+                    [void]$campaignList.Items.Add($_.Name)
+                }
+        }
+        if ($campaignList.Items.Count -gt 0) {
+            $index = $campaignList.Items.IndexOf($current)
+            $campaignList.SelectedIndex = if ($index -ge 0) {$index} else {0}
+        }
+    }
+    $refreshCampaigns.Add_Click($refreshAction)
+    & $refreshAction
+    $reportAnalyzer = New-Object System.Windows.Forms.Button
+    $reportAnalyzer.Text = 'Open Python Campaign Analyzer'
+    $reportAnalyzer.SetBounds(28,180,300,49)
+    $reportTab.Controls.Add($reportAnalyzer)
+    $reportAnalyzer.Add_Click({
+        try {
+            $scriptPath = Join-Path $gameRoot 'tools\Campaign Analyzer.pyw'
+            if (-not [System.IO.File]::Exists($scriptPath)) {
+                throw 'Campaign Analyzer.pyw not installed. Install the tools/ folder from the automation build.'
+            }
+            $python = $null
+            $extra = @()
+            foreach ($candidate in @('pythonw.exe','pyw.exe','python.exe','py.exe')) {
+                $cmd = Get-Command $candidate -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+                if ($cmd) {
+                    $python = $cmd.Source
+                    if ($candidate -like 'py*' -and $candidate -ne 'pythonw.exe' -and $candidate -ne 'python.exe') {
+                        $extra = @('-3')
+                    }
+                    break
+                }
+            }
+            if (-not $python) { throw 'Install Python 3 (including Tkinter) to open Campaign Analyzer.' }
+            $argsList = @($extra) + @('"' + $scriptPath + '"', '"' + $campaignRoot + '"')
+            [void](Start-Process -FilePath $python -WorkingDirectory (Join-Path $gameRoot 'tools') -ArgumentList $argsList -PassThru)
+        } catch {
+            [void][System.Windows.Forms.MessageBox]::Show(
+                $_.Exception.Message, 'Campaign Analyzer',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning)
+        }
+    })
+    $openCampaign = New-Object System.Windows.Forms.Button
+    $openCampaign.Text = 'Open campaign folder'
+    $openCampaign.SetBounds(343,180,245,49)
+    $reportTab.Controls.Add($openCampaign)
+    $openCampaign.Add_Click({
+        if ($campaignList.SelectedIndex -ge 0) {
+            $directory = Join-Path $campaignRoot ([string]$campaignList.SelectedItem)
+            if ([System.IO.Directory]::Exists($directory)) { Invoke-Item -LiteralPath $directory }
+        }
+    })
+    $zipCampaign = New-Object System.Windows.Forms.Button
+    $zipCampaign.Text = 'Export selected campaign ZIP'
+    $zipCampaign.SetBounds(28,271,350,49)
+    $reportTab.Controls.Add($zipCampaign)
+    $zipCampaign.Add_Click({
+        try {
+            if ($campaignList.SelectedIndex -lt 0) {
+                throw 'Select an existing recorded campaign first.'
+            }
+            $campaignFolder = Join-Path $campaignRoot ([string]$campaignList.SelectedItem)
+            if (-not [System.IO.Directory]::Exists($campaignFolder)) {
+                throw 'Selected campaign folder no longer exists. Refresh the list.'
+            }
+            [void][System.IO.Directory]::CreateDirectory($archiveRoot)
+            $suggested = [string]$campaignList.SelectedItem + '-' +
+                (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip'
+            $picker = New-Object System.Windows.Forms.SaveFileDialog
+            try {
+                $picker.Filter = 'ZIP archive (*.zip)|*.zip'
+                $picker.FileName = $suggested
+                $picker.InitialDirectory = $archiveRoot
+                $picker.OverwritePrompt = $true
+                if ($picker.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) { return }
+                $destination = [System.IO.Path]::GetFullPath($picker.FileName)
+            } finally {
+                $picker.Dispose()
+            }
+            if ($destination.StartsWith(
+                [System.IO.Path]::GetFullPath($campaignFolder).TrimEnd('\') + '\',
+                [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'ZIP destination must be outside the campaign being archived.'
+            }
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $temporary = $destination + '.pending-' + [Guid]::NewGuid().ToString('N')
+            try {
+                [System.IO.Compression.ZipFile]::CreateFromDirectory(
+                    $campaignFolder, $temporary,
+                    [System.IO.Compression.CompressionLevel]::Optimal, $true)
+                if ([System.IO.File]::Exists($destination)) {
+                    [System.IO.File]::Delete($destination)
+                }
+                [System.IO.File]::Move($temporary, $destination)
+            } finally {
+                if ([System.IO.File]::Exists($temporary)) {
+                    [System.IO.File]::Delete($temporary)
+                }
+            }
+            [void][System.Windows.Forms.MessageBox]::Show(
+                ('Campaign ZIP created: ' + $destination),
+                'Campaign archive',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information)
+        } catch {
+            [void][System.Windows.Forms.MessageBox]::Show(
+                $_.Exception.Message, 'Campaign archive error',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error)
+        }
+    })
+    [void](Add-Label $reportTab 'A campaign ZIP includes its completed-cycle SAV checkpoints, reports, manifest, result, phase timings and all JSONL streams.' 28 355 890 62)
+    [void](Add-Label $reportTab 'If a session is still running, logs may be changing during ZIP creation. Prefer archiving after a clean pause or exit.' 28 430 890 58)
+    $openAutomationLogs = New-Object System.Windows.Forms.Button
+    $openAutomationLogs.Text = 'Open launcher logs'
+    $openAutomationLogs.SetBounds(28,535,290,45)
+    $reportTab.Controls.Add($openAutomationLogs)
+    $openAutomationLogs.Add_Click({
+        $folder = Join-Path $gameRoot 'automation\logs'
+        if ([System.IO.Directory]::Exists($folder)) { Invoke-Item -LiteralPath $folder }
+    })
+
     $start = New-Object System.Windows.Forms.Button
     $start.Text = 'Launch Simulation'
     $start.SetBounds(783,784,215,44)
@@ -637,7 +778,9 @@ try {
         }
     })
     if ($GuiSelfTest) {
-        if ($tabs.TabPages.Count -ne 6 -or $presentation.Items.Count -ne 3 -or
+        if ($tabs.TabPages.Count -ne 6 -or $factionCombos.Count -ne 7 -or
+            $reportAnalyzer.Text -ne 'Open Python Campaign Analyzer' -or
+            $presentation.Items.Count -ne 3 -or
             $worldSize.Items.Count -ne 5 -or $factionCombos.Count -ne 7 -or
             $archiveCadence.Items.Count -ne 6 -or $turns.Maximum -ne 100000) {
             throw 'Windows WinForms launcher controls failed the GUI smoke test.'
