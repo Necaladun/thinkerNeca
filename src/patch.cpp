@@ -902,6 +902,12 @@ bool patch_setup(Config* cf) {
     write_jump(0x5BF010, (int)is_sensor);
     write_jump(0x5BF1F0, (int)has_abil);
     write_jump(0x5BF310, (int)X_pop);
+    // Native satellite results may use alternate portrait/popup variants.
+    // Exact-label filtering is inside the wrappers; all other labels and
+    // human/opt-out routes retain their native calls.
+    write_jump(0x5BF330, (int)X_pop_2);
+    write_jump(0x5BF5D0, (int)X_pops);
+    write_jump(0x5BF7D0, (int)X_pops_11);
     write_jump(0x5C03D0, (int)veh_init);
     write_jump(0x5C08C0, (int)veh_kill);
     write_jump(0x5C0B00, (int)kill);
