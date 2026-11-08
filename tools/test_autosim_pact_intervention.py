@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """AUTO-002 pact/intervention reports and Council result source contract.
 
-Structural checks only; native pact-termination and CouncWindow dialogs
-require separate Windows x86 tracing and real-game state comparison.
+Structural checks only; native pact-termination replacement and CouncWindow
+still require separate Windows x86 gameplay/state comparison.
 """
 from pathlib import Path
 
@@ -13,6 +13,7 @@ turn = (ROOT / "src/gameturn.cpp").read_text(encoding="utf-8")
 policy = (ROOT / "src/autosim.h").read_text(encoding="utf-8")
 ui = (ROOT / "src/gui_dialog.cpp").read_text(encoding="utf-8")
 engine = (ROOT / "src/engine.cpp").read_text(encoding="utf-8")
+patch = (ROOT / "src/patch.cpp").read_text(encoding="utf-8")
 
 # Intervention status must not be invented: current source declares war
 # for the third party only when at least one original belligerent is human.
@@ -36,6 +37,13 @@ assert 'autosim_notice_diplomacy(NetMsg, "ENEMYPACTENDS", 5000, 0, 0);' in event
 rupture = events[events.index("void __cdecl enemies_unpact("):events.index("void __cdecl enemies_team_up(")]
 assert rupture.index("autosim_notice_diplomacy(NetMsg, \"ENEMYPACTENDS\"") < rupture.index("plr1.diplo_status[faction_id_2] &= ")
 assert "plr2.diplo_status[faction_id_1] &= " in rupture
+# The source-owned ENEMYPACTENDS filter was not effective until the native
+# third-party breakup entrypoint used this audited equivalent implementation.
+# No native pact_ends/net_pact_ends entrypoint or withdrawal action is changed.
+assert "Fenemies_unpact enemies_unpact = (Fenemies_unpact)0x55CE20;" in engine
+assert "write_jump(0x55CE20, (int)enemies_unpact);" in patch
+assert "write_jump(0x53C650, (int)pact_ends);" in patch
+assert "write_jump(0x539660, (int)net_pact_ends);" in patch
 assert "Fpact_ends pact_ends = (Fpact_ends)0x53C650;" in engine
 assert "Fnet_pact_ends net_pact_ends = (Fnet_pact_ends)0x539660;" in engine
 
@@ -49,4 +57,4 @@ assert "clear_council_notify(MapWin->cOwner);" in turn
 assert "CouncWin_init(win, faction_id, faction_id_2);" in turn
 assert 'telemetry_record_council_event("CouncWin_init", faction_id, action);' in turn
 
-print("AUTO-002 pact/intervention source contract passed (native Council and pact dialogs remain unverified)")
+print("AUTO-002 pact/intervention source contract passed (native Windows behavioural parity unverified)")
