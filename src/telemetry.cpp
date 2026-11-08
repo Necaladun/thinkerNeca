@@ -609,7 +609,10 @@ void telemetry_record_completed_turn() {
 // particular, a Council or production victory may fire during one AI's
 // upkeep. No score/vote calculators, RNG or native UI are invoked here.
 void telemetry_record_terminal_result(const char* save_path, const char* save_status) {
-    if (!recording || terminal_result_recorded) return;
+    if (!recording) return;
+    // A later operator-requested save updates result.json for the SAME win,
+    // but only the initial win emits an append-only history entry.
+    const bool new_victory = !terminal_result_recorded;
 
     const int victory = *GameVictoryType;
     const char* reason = "unknown";
@@ -734,12 +737,34 @@ void telemetry_record_terminal_result(const char* save_path, const char* save_st
     }
     result << "]}";
     if (atomic_write(session_dir + "/result.json", result.str())) {
+        if (new_victory) {
+            // Persist the achievement before the operator decides whether
+            // to continue playing. Each new post-victory win gets one event.
+            FILE* history = fopen((session_dir + "/victories.jsonl").c_str(), "ab");
+            if (history) {
+                if (!append_line(history, result.str()))
+                    OutputDebugStringA("thinkerNeca AUTO-OBS: victory history append failed\n");
+                fclose(history);
+            } else {
+                OutputDebugStringA("thinkerNeca AUTO-OBS: victory history open failed\n");
+            }
+        }
         terminal_result_recorded = true;
         if (!atomic_write(session_dir + "/status.json", status_json("terminal"))) {
             OutputDebugStringA("thinkerNeca AUTO-OBS: terminal status write failed\n");
         }
     } else {
         OutputDebugStringA("thinkerNeca AUTO-OBS: terminal result write failed\n");
+    }
+}
+
+void telemetry_resume_after_victory() {
+    if (!recording) return;
+    terminal_result_recorded = false;
+    // result.json remains as the most recent victory; victories.jsonl is the
+    // durable complete history. The active session itself is recording again.
+    if (!atomic_write(session_dir + "/status.json", status_json("recording"))) {
+        recorder_failure();
     }
 }
 
