@@ -33,7 +33,7 @@ assert 'autosim_control_active()' in dialog
 # Planet Buster strike warning is one-way; terrain mutation, orbital defense,
 # unit/base removals, atrocities and explosion stay in native source order.
 strike = combat[combat.index("void __cdecl planet_busting("):
-                combat.index("int __cdecl battle_fight(", combat.index("void __cdecl planet_busting("))]
+                combat.index("void __cdecl promote(", combat.index("void __cdecl planet_busting("))]
 assert 'autosim_notice_popp(ScriptFile, "PLANETBUSTER", img);' in strike
 assert strike.index("Console_focus(") < strike.index('autosim_notice_popp(ScriptFile, "PLANETBUSTER"')
 assert strike.index('autosim_notice_popp(ScriptFile, "PLANETBUSTER"') < strike.index("shoot_value = shoot(")
@@ -80,7 +80,7 @@ assert "game_rand() % 100 < MissileDefendChance" in odps
 # Random-event UI was already migrated; the new eruption report isn't new.
 events = turn[turn.index("void __cdecl random_events("):
               turn.index("void __cdecl alien_fauna(")]
-assert not re.search(r"(?<![a-zA-Z_])(?:popp|POP2|X_pop|NetMsg_pop)\\s*\\(", events)
+assert not re.search(r"(?<![a-zA-Z_])(?:popp|POP2|X_pop|NetMsg_pop)\s*\(", events)
 for label in ("PERIHELION", "SOLARSTORM", "ASTEROID", "FAMINE",
               "HAIL", "NEWRESOURCE", "NETCRASH", "INFLATION"):
     assert f'"{label}"' in events
