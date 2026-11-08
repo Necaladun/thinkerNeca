@@ -1,5 +1,13 @@
 # thinkerNeca — fork changelog
 
+## Unmerged AUTO-LOG — comprehensive automation launcher and campaign archive (9 November 2026)
+
+- Draft PR #11 adds explicit new-game selection of all seven native faction slots from fourteen SMAC/X stock factions; old profiles retain existing faction setup and loading a SAV cannot change its roster.
+- Adds run-profile-only timing and checkpoint cadence controls (default on and every 25 complete turns, respectively, in new launcher profiles; old profiles default off), separate UTC-ms native phase `timings.jsonl` and checkpoint `checkpoints.jsonl`, and UTC stamps on passive notices/Council events. Ironman checkpoints skip the native serializer because it can alter the RNG.
+- New full-cycle native SAV checkpoint copies live within the campaign/session archive, independent of native autosaves, with fingerprint, failure status and campaign-link metadata. Operator-named saves are additionally copied there.
+- Adds Launcher `Faction roster` and `Campaign tools & archive` tabs, packaging and opening the existing Python Campaign Analyzer and generating whole-campaign ZIP exports. HTML/CSV reports now include phase timings and SAV indices; old report/session layouts remain readable.
+- Compilation, synthetic reporting, Windows PowerShell GUI smoke and same-build SAV reload for these additions still require verification. Do not treat the earlier economic-victory Windows result as verification of these new features.
+
 ## Unmerged AUTO-OBS Stage 3 — observer-neutral all-AI simulation (9 November 2026)
 
 - Draft PR #11 source implementation adds launcher-selectable `unlimited_expansion` bypass for AI colony quotas during explicitly eligible all-AI sessions. It uses the independent Automation Launcher profile (default enabled for new profiles), not distributed `thinker.ini` or ordinary-game settings.
