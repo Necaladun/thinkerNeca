@@ -15,6 +15,12 @@ enum AutosimChildId {
     ID_SAVE_EXIT = 6005,
     ID_TAKE_CONTROL = 6006,
     ID_RESUME = 6007,
+    ID_START = 6008,
+    ID_ARM = 6009,
+    ID_CONTINUE = 6010,
+    ID_CANCEL = 6011,
+    ID_SUPPRESS = 6012,
+    ID_FAST_COMBAT = 6013,
 };
 
 struct DialogContext {
@@ -92,8 +98,10 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
     if (message == WM_INITDIALOG) {
         DialogContext* ctx = reinterpret_cast<DialogContext*>(lparam);
         SetWindowLongPtrA(dialog, DWLP_USER, (LONG_PTR)ctx);
-        SetWindowTextA(dialog, "thinkerNeca - Simulation Control");
         const AutosimDialogState& s = *ctx->state;
+        SetWindowTextA(dialog, s.mode == AUTOSIM_DIALOG_SETUP
+            ? "thinkerNeca - Simulation Setup"
+            : "thinkerNeca - Simulation Control");
         RECT bounds = {};
         GetClientRect(dialog, &bounds);
         const int width = bounds.right;
@@ -101,51 +109,92 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         const int left = 20;
         const int inner = width - 40;
 
-        add_child(dialog, "STATIC", "AI simulation completed at a full turn boundary",
-            SS_LEFT, 0, 0, left, 13, inner, 22);
+        const char* intro = s.mode == AUTOSIM_DIALOG_SETUP
+            ? "Prepare a simulation. Hand over all factions in Scenario Editor, then End Turn."
+            : s.mode == AUTOSIM_DIALOG_STARTUP
+            ? "All factions are AI-controlled. Confirm before starting unattended turns."
+            : "Simulation paused at a completed full-turn boundary.";
+        add_child(dialog, "STATIC", intro,
+            SS_LEFT, 0, 0, left, 13, inner, 23);
         char summary[384] = {};
         snprintf(summary, sizeof(summary),
-            "Turns: %d this segment / %d total.  Mission years: %d -> %d\r\n"
-            "Colonies: %d -> %d    Units: %d -> %d    Living factions: %d",
+            "Observed faction: %d    Humans mask: %02X    Living factions: %d\r\n"
+            "Turns: %d segment / %d total.  Mission years: %d -> %d\r\n"
+            "Colonies: %d -> %d    Units: %d -> %d",
+            s.viewed_faction, (unsigned)(s.human_mask & 0xFF), s.alive_factions,
             s.completed_segment, s.completed_total, s.start_year, s.end_year,
-            s.start_bases, s.end_bases, s.start_units, s.end_units, s.alive_factions);
-        add_child(dialog, "STATIC", summary, SS_LEFT, 0, 0, left, 43, inner, 45);
+            s.start_bases, s.end_bases, s.start_units, s.end_units);
+        add_child(dialog, "STATIC", summary, SS_LEFT, 0, 0, left, 43, inner, 66);
 
-        add_child(dialog, "STATIC", "Campaign name (used in telemetry reports)",
-            SS_LEFT, 0, 0, left, 99, inner, 20);
+        char session[256] = {};
+        snprintf(session, sizeof(session),
+            "Campaign ID: %.75s    Session: %.32s    Telemetry: %s",
+            s.campaign_id.empty() ? "(not recording)" : s.campaign_id.c_str(),
+            s.session_id.empty() ? "(none)" : s.session_id.c_str(),
+            s.telemetry_enabled ? "ON" : "OFF");
+        add_child(dialog, "STATIC", session, SS_LEFT, 0, 0, left, 119, inner, 25);
+
+        add_child(dialog, "STATIC", "Campaign display name (does not change campaign/session ID)",
+            SS_LEFT, 0, 0, left, 157, inner, 20);
         add_child(dialog, "EDIT", s.campaign_name.c_str(),
             WS_TABSTOP | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE, ID_CAMPAIGN_NAME,
-            left, 119, inner, 25);
+            left, 179, inner, 25);
         SendDlgItemMessageA(dialog, ID_CAMPAIGN_NAME, EM_LIMITTEXT, 88, 0);
 
-        add_child(dialog, "STATIC", "Save filename (within saves/, .sav added automatically)",
-            SS_LEFT, 0, 0, left, 157, inner, 20);
+        add_child(dialog, "STATIC", "Save filename (saves/, .sav added automatically)",
+            SS_LEFT, 0, 0, left, 215, inner, 20);
         add_child(dialog, "EDIT", s.save_name.c_str(),
             WS_TABSTOP | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE, ID_SAVE_NAME,
-            left, 177, inner, 25);
+            left, 237, inner, 25);
         SendDlgItemMessageA(dialog, ID_SAVE_NAME, EM_LIMITTEXT, 72, 0);
 
-        add_child(dialog, "STATIC", "Additional completed AI turns",
-            SS_LEFT, 0, 0, left, 217, inner, 20);
+        add_child(dialog, "STATIC", "Completed AI turns per segment (1-100000)",
+            SS_LEFT, 0, 0, left, 273, inner, 20);
         char count[24] = {};
         snprintf(count, sizeof(count), "%d", s.additional_turns);
         add_child(dialog, "EDIT", count,
             WS_TABSTOP | ES_AUTOHSCROLL | ES_NUMBER, WS_EX_CLIENTEDGE,
-            ID_MORE_TURNS, left, 237, 130, 26);
+            ID_MORE_TURNS, left, 295, 140, 26);
         SendDlgItemMessageA(dialog, ID_MORE_TURNS, EM_LIMITTEXT, 6, 0);
 
-        add_child(dialog, "STATIC",
-            "Saving uses the game serializer. Cancel/failure leaves this window open.",
-            SS_LEFT, 0, 0, left, 278, inner, 30);
+        add_child(dialog, "BUTTON", "Suppress audited, noninteractive notices",
+            WS_TABSTOP | BS_AUTOCHECKBOX, 0, ID_SUPPRESS, left, 342, inner, 23);
+        SendDlgItemMessageA(dialog, ID_SUPPRESS, BM_SETCHECK,
+            s.suppress_notices ? BST_CHECKED : BST_UNCHECKED, 0);
+        add_child(dialog, "BUTTON", "Fast AI combat/presentation",
+            WS_TABSTOP | BS_AUTOCHECKBOX, 0, ID_FAST_COMBAT, left, 370, inner, 23);
+        SendDlgItemMessageA(dialog, ID_FAST_COMBAT, BM_SETCHECK,
+            s.fast_combat ? BST_CHECKED : BST_UNCHECKED, 0);
 
-        const int buttons = s.allow_resume ? 4 : 3;
+        add_child(dialog, "STATIC",
+            "Changes here apply in memory only. Session logging is configured at game load.",
+            SS_LEFT, 0, 0, left, 402, inner, 28);
+
         const int gap = 8;
+        const int y = height - 59;
+        int ids[5] = {};
+        const char* captions[5] = {};
+        int buttons = 0;
+        if (s.mode == AUTOSIM_DIALOG_SETUP) {
+            ids[0] = ID_ARM; captions[0] = "Arm Simulation";
+            ids[1] = ID_CANCEL; captions[1] = "Close";
+            buttons = 2;
+        } else if (s.mode == AUTOSIM_DIALOG_STARTUP) {
+            ids[0] = ID_START; captions[0] = "Start Simulation";
+            ids[1] = ID_TAKE_CONTROL; captions[1] = "Take Control";
+            buttons = 2;
+        } else {
+            ids[0] = ID_SAVE_CONTINUE; captions[0] = "Save && Continue";
+            ids[1] = ID_SAVE_EXIT; captions[1] = "Save && Exit";
+            ids[2] = ID_TAKE_CONTROL; captions[2] = "Take Control";
+            ids[3] = ID_CONTINUE; captions[3] = "Continue";
+            buttons = 4;
+            if (s.allow_resume) {
+                ids[4] = ID_RESUME; captions[4] = "Resume Unchanged";
+                buttons = 5;
+            }
+        }
         const int button_width = (inner - gap * (buttons - 1)) / buttons;
-        const int y = height - 60;
-        const int ids[4] = {ID_SAVE_CONTINUE, ID_SAVE_EXIT, ID_TAKE_CONTROL, ID_RESUME};
-        const char* captions[4] = {
-            "Save && Continue", "Save && Exit", "Take Control", "Resume"
-        };
         for (int i = 0; i < buttons; ++i) {
             add_child(dialog, "BUTTON", captions[i],
                 WS_TABSTOP | (i == 0 ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON),
@@ -158,7 +207,9 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
     DialogContext* ctx = reinterpret_cast<DialogContext*>(
         GetWindowLongPtrA(dialog, DWLP_USER));
     if (message == WM_CLOSE) {
-        if (ctx && ctx->state->allow_resume) {
+        if (ctx && ctx->state->mode == AUTOSIM_DIALOG_SETUP) {
+            EndDialog(dialog, AUTOSIM_DIALOG_CANCEL);
+        } else if (ctx && ctx->state->allow_resume) {
             EndDialog(dialog, AUTOSIM_DIALOG_RESUME);
         } else {
             MessageBeep(MB_ICONINFORMATION);
@@ -181,7 +232,13 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         return FALSE;
     }
     if (id != ID_SAVE_CONTINUE && id != ID_SAVE_EXIT
-    && id != ID_TAKE_CONTROL && id != ID_RESUME) return FALSE;
+    && id != ID_TAKE_CONTROL && id != ID_RESUME
+    && id != ID_START && id != ID_ARM && id != ID_CONTINUE
+    && id != ID_CANCEL) return FALSE;
+    if (id == ID_CANCEL) {
+        EndDialog(dialog, AUTOSIM_DIALOG_CANCEL);
+        return TRUE;
+    }
     if (id == ID_RESUME) {
         EndDialog(dialog, AUTOSIM_DIALOG_RESUME);
         return TRUE;
@@ -208,7 +265,8 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         return TRUE;
     }
     int count = ctx->state->additional_turns;
-    if (id == ID_SAVE_CONTINUE) {
+    if (id == ID_SAVE_CONTINUE || id == ID_START
+    || id == ID_ARM || id == ID_CONTINUE) {
         const std::string input = read_field(dialog, ID_MORE_TURNS);
         if (input.empty() || input.size() > 6) count = 0;
         else {
@@ -227,8 +285,16 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
     ctx->state->campaign_name = campaign;
     if (id != ID_TAKE_CONTROL) ctx->state->save_name = save;
     ctx->state->additional_turns = count;
-    EndDialog(dialog, id == ID_SAVE_CONTINUE ? AUTOSIM_DIALOG_SAVE_CONTINUE
-        : id == ID_SAVE_EXIT ? AUTOSIM_DIALOG_SAVE_EXIT : AUTOSIM_DIALOG_TAKE_CONTROL);
+    ctx->state->suppress_notices =
+        SendDlgItemMessageA(dialog, ID_SUPPRESS, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    ctx->state->fast_combat =
+        SendDlgItemMessageA(dialog, ID_FAST_COMBAT, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    EndDialog(dialog,
+        id == ID_SAVE_CONTINUE ? AUTOSIM_DIALOG_SAVE_CONTINUE
+        : id == ID_SAVE_EXIT ? AUTOSIM_DIALOG_SAVE_EXIT
+        : id == ID_TAKE_CONTROL ? AUTOSIM_DIALOG_TAKE_CONTROL
+        : id == ID_START ? AUTOSIM_DIALOG_START
+        : id == ID_ARM ? AUTOSIM_DIALOG_ARM : AUTOSIM_DIALOG_CONTINUE);
     return TRUE;
 }
 
@@ -251,7 +317,7 @@ AutosimDialogChoice autosim_show_control_dialog(AutosimDialogState* state) {
     tpl->dwExtendedStyle = 0;
     tpl->cdit = 0;
     tpl->x = 0; tpl->y = 0;
-    tpl->cx = 460; tpl->cy = 345;
+    tpl->cx = 520; tpl->cy = 465;
     // The trailing six bytes are zero (no menu, default dialog class,
     // zero-length title); set caption after creation in WM_INITDIALOG.
     DialogContext ctx = {};
