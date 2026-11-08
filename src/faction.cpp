@@ -203,6 +203,12 @@ bool allow_expand(int faction_id) {
     if (is_human(faction_id)) {
         return true;
     }
+    // Explicit Automation Launcher run profile only. Normal Thinker games,
+    // saves and thinker.ini retain the configured AI colony production cap.
+    // Keep scenario no-colony and engine-wide MaxBaseNum checks above intact.
+    if (conf.autosim_unlimited_expansion && autosim_control_active()) {
+        return true;
+    }
     for (int i = 1; i < MaxPlayerNum && conf.expansion_autoscale > 0; i++) {
         if (is_human(i) && is_alive(i)) {
             bases = max(bases, Factions[i].base_count);
