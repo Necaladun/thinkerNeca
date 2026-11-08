@@ -20,6 +20,44 @@ static void autosim_trace_council_call(const char* phase, int faction_id) {
     telemetry_record_ui_notice("council_trace", "call_council", action);
 }
 
+// Targeted diagnostic for the verified native terranx.exe Council callsite
+// 0x4284CA -> CouncWin_init (0x427230). The Council window both computes
+// nonhuman ballots and invokes native resolution routines, so instrument
+// without replacing, hiding or synthesising any Council decision. Events
+// flush immediately before a native modal can block.
+void __thiscall autosim_trace_CouncWin_init(CouncWindow* win,
+    int faction_id, int faction_id_2) {
+    const bool trace = autosim_control_active() && conf.telemetry_enabled;
+    if (trace) {
+        char action[192];
+        snprintf(action, sizeof(action),
+            "enter arg1=%d arg2=%d owner=%d human_mask=%08X pending=%d governor=%d",
+            faction_id, faction_id_2, MapWin->cOwner, (unsigned)FactionStatus[0],
+            *CouncilSessionPending, *GovernorFaction);
+        telemetry_record_ui_notice("council_native", "CouncWin_init", action);
+    }
+    CouncWin_init(win, faction_id, faction_id_2);
+    if (trace) {
+        char action[512];
+        snprintf(action, sizeof(action),
+            "exit proposal=%d candidate=%d outcome=%d vote_mask=%08X "
+            "votes=%d,%d,%d,%d,%d,%d,%d,%d "
+            "weights=%d,%d,%d,%d,%d,%d,%d,%d pending=%d governor=%d",
+            win->proposal_type, win->candidate_faction_id,
+            win->proposal_outcome, (unsigned)win->vote_faction_mask,
+            win->faction_vote[0], win->faction_vote[1],
+            win->faction_vote[2], win->faction_vote[3],
+            win->faction_vote[4], win->faction_vote[5],
+            win->faction_vote[6], win->faction_vote[7],
+            win->faction_vote_count[0], win->faction_vote_count[1],
+            win->faction_vote_count[2], win->faction_vote_count[3],
+            win->faction_vote_count[4], win->faction_vote_count[5],
+            win->faction_vote_count[6], win->faction_vote_count[7],
+            *CouncilSessionPending, *GovernorFaction);
+        telemetry_record_ui_notice("council_native", "CouncWin_init", action);
+    }
+}
+
 fp_1int sub_51E530 = (fp_1int)0x51E530;
 
 int* const dword_78D7F8 = (int*)0x78D7F8;
