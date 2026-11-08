@@ -613,6 +613,17 @@ void __cdecl control_turn() {
             // a modal control window or perform a manual save mid-faction.
             telemetry_record_completed_turn();
             autosim_monitor_progress("turn_completed", 0);
+            if (autosim_take_post_victory_segment_reset()) {
+                // The operator explicitly elected to keep simulating after
+                // an actual victory. Start their new turn quota at this
+                // first fully completed cycle (no mid-upkeep counter reset).
+                auto_driver.completed_turns = 0;
+                segment_start_year = *CurrentMissionYear;
+                segment_start_bases = *BaseCount;
+                segment_start_units = *VehCount;
+                telemetry_record_ui_notice("autosim", "VICTORY",
+                    "new_ai_segment_at_full_cycle_boundary");
+            }
             const bool full_cycle = !first_cycle_partial;
             const bool eligible = autosim_ready();
             const AutoCycleAction action = auto_driver.on_cycle(
