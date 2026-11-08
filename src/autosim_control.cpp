@@ -128,12 +128,12 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
 
         char session[256] = {};
         snprintf(session, sizeof(session),
-            "Campaign ID: %.75s    Session: %.32s    Telemetry: %s    Rejoined: %s",
+            "Campaign: %.60s\r\nSession: %.32s    Telemetry: %s    Rejoined: %s",
             s.campaign_id.empty() ? "(not recording)" : s.campaign_id.c_str(),
             s.session_id.empty() ? "(none)" : s.session_id.c_str(),
             s.telemetry_enabled ? "ON" : "OFF",
             s.resumed_campaign ? "Yes" : "No");
-        add_child(dialog, "STATIC", session, SS_LEFT, 0, 0, left, 119, inner, 25);
+        add_child(dialog, "STATIC", session, SS_LEFT, 0, 0, left, 111, inner, 43);
 
         add_child(dialog, "STATIC", "Campaign display name (does not change campaign/session ID)",
             SS_LEFT, 0, 0, left, 157, inner, 20);
@@ -373,7 +373,7 @@ AutosimDialogChoice autosim_show_control_dialog(AutosimDialogState* state) {
     tpl->cdit = 0;
     tpl->x = 0; tpl->y = 0;
     // Fit an 800x600 game viewport at standard Windows dialog font metrics.
-    tpl->cx = 440; tpl->cy = 330;
+    tpl->cx = 420; tpl->cy = 310;
     // The trailing six bytes are zero (no menu, default dialog class,
     // zero-length title); set caption after creation in WM_INITDIALOG.
     DialogContext ctx = {};
