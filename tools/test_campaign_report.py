@@ -59,6 +59,36 @@ class CampaignReportTests(unittest.TestCase):
             self.assertIn("Faction 1", html_text)
             self.assertEqual(len((output / "factions.csv").read_text(encoding="utf-8").splitlines()), 15)
 
+    def test_editable_name_and_multiple_sessions_share_one_campaign(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session1 = fixture(Path(tmp))
+            (campaign / "campaign.json").write_text(json.dumps({
+                "schema": 1, "campaign_id": campaign.name,
+                "display_name": "Gaians - Long AI experiment",
+                "created_utc": "20261108T090000Z",
+            }), encoding="utf-8")
+            # A resumed game writes a new session rather than overwriting
+            # session-001 and can be selected separately by the reporter.
+            session2 = campaign / "sessions" / "session-002"
+            session2.mkdir()
+            for file in ("manifest.json", "status.json", "turns.jsonl", "bases.jsonl"):
+                (session2 / file).write_bytes((session1 / file).read_bytes())
+            output = generate(campaign, session_id="session-002")
+            content = (output / "index.html").read_text(encoding="utf-8")
+            self.assertIn("Gaians - Long AI experiment / session-002", content)
+            info = summarize_session(session1)
+            self.assertEqual(info["campaign_name"], "Gaians - Long AI experiment")
+            self.assertEqual(len(scan_campaigns(Path(tmp))), 2)
+            self.assertTrue((session1 / "turns.jsonl").is_file())
+            self.assertTrue((session2 / "turns.jsonl").is_file())
+
+    def test_old_campaign_without_label_uses_folder_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session = fixture(Path(tmp))
+            self.assertEqual(summarize_session(session)["campaign_name"], campaign.name)
+            html_text = (generate(campaign) / "index.html").read_text(encoding="utf-8")
+            self.assertIn(campaign.name, html_text)
+
     def test_duplicate_turns_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             _, session = fixture(Path(tmp), turns=(1, 1))
