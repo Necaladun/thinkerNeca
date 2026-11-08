@@ -497,7 +497,7 @@ void __cdecl mon_winning_unify(int faction_id, int winner_id) {
         event.achieved = 1;
         event.param2 = winner_id;
         Monuments[faction_id].latest_event_id = MON_WINNING_UNIFY;
-        if (faction_id == MapWin->cOwner) {
+        if (faction_id == MapWin->cOwner && !autosim_session_active()) {
             monument(1);
         }
     }
@@ -513,7 +513,7 @@ void __cdecl mon_winning_trans(int faction_id, int winner_id) {
         event.achieved = 1;
         event.param2 = winner_id;
         Monuments[faction_id].latest_event_id = MON_WINNING_TRANS;
-        if (faction_id == MapWin->cOwner) {
+        if (faction_id == MapWin->cOwner && !autosim_session_active()) {
             monument(1);
         }
     }
