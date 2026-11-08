@@ -154,6 +154,7 @@ struct Config {
     int autosim_suppress_notices = 0; // AUTO-002 opt-in, only when all factions are AI
     int autosim_fast_combat = 1; // AUTO-002: temporary fast all-AI presentation (historic option name), 0=off
     int autosim_render_mode = 0; // 0=normal, 1=fast, 2=null map rendering; launcher opt-in only
+    int autosim_unlimited_expansion = 0; // launch-profile only; bypass AI colony cap during all-AI automation
     int warn_on_former_replace = 1;
     int manage_player_bases = 0;
     int manage_player_units = 0;
