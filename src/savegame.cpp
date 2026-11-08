@@ -1218,6 +1218,11 @@ int __cdecl mod_load_daemon(const char* filename, int flag) {
     }
     *GameDrawState |= 4;
     fclose(fp);
+    // TEL-001: record the actual successfully loaded save path (also covers
+    // native Load Game via top_menu, where control_game lacks a filename).
+    // The recorder offers explicit campaign rejoin only if that save has a
+    // validated sidecar written by Simulation Control.
+    telemetry_note_loaded_save(filename);
     return SAVE_LOAD_VALID;
 }
 
