@@ -3,62 +3,30 @@
 #include "autosim.h"
 #include "autosim_control.h"
 
-// AUTO-002: read-only Council diagnostics. The pre-call record is flushed by
-// the telemetry stream before entering native call_council(), where the
-// reported vote/offer modal might otherwise suspend this thread.
-// Do not call game_random(), vote evaluators or any Council UI from here.
+// Native Council setup and resolution remain unchanged. These hooks observe
+// the existing resolved ballots only; execution diagnostics are separate
+// automation notices. No AI voting function is invoked by telemetry.
 static void autosim_trace_council_call(const char* phase, int faction_id) {
-    if (!conf.telemetry_enabled) {
-        return;
-    }
-    const int owner = MapWin->cOwner;
-    char action[192];
-    snprintf(action, sizeof(action),
-        "%s actor=%d owner=%d human_mask=%08X pending=%d governor=%d owner_proposal=%d owner_vote=%d",
-        phase, faction_id, owner, (unsigned)FactionStatus[0],
-        *CouncilSessionPending, *GovernorFaction,
-        CouncilProposal[owner], CouncilVoteState[owner]);
-    telemetry_record_council_event("call_council", faction_id, action);
+    if (!strcmp(phase, "enter")) telemetry_council_call_enter(faction_id);
+    else telemetry_council_call_leave();
 }
 
-// Targeted diagnostic for the verified native terranx.exe Council callsite
-// 0x4284CA -> CouncWin_init (0x427230). The Council window both computes
-// nonhuman ballots and invokes native resolution routines, so instrument
-// without replacing, hiding or synthesising any Council decision. Events
-// flush immediately before a native modal can block.
 void __thiscall autosim_trace_CouncWin_init(CouncWindow* win,
     int faction_id, int faction_id_2) {
-    const bool trace = conf.telemetry_enabled;
-    if (trace) {
-        char action[192];
-        snprintf(action, sizeof(action),
-            "enter arg1=%d arg2=%d owner=%d human_mask=%08X pending=%d governor=%d",
-            faction_id, faction_id_2, MapWin->cOwner, (unsigned)FactionStatus[0],
-            *CouncilSessionPending, *GovernorFaction);
-        telemetry_record_council_event("CouncWin_init", faction_id, action);
-    }
+    const int previous_governor = *GovernorFaction;
+    const unsigned previous_game_state = (unsigned)*GameState;
+    int passes_before[PROP_REINSTATE_UN_CHARTER + 1];
+    for (int i = 0; i <= PROP_REINSTATE_UN_CHARTER; ++i)
+        passes_before[i] = ProposalPassCount[i];
     CouncWin_init(win, faction_id, faction_id_2);
-    if (trace) {
-        char action[512];
-        snprintf(action, sizeof(action),
-            "exit proposal=%d candidate=%d outcome=%d vote_mask=%08X "
-            "votes=%d,%d,%d,%d,%d,%d,%d,%d "
-            "weights=%d,%d,%d,%d,%d,%d,%d,%d pending=%d governor=%d",
-            win->proposal_type, win->candidate_faction_id,
-            win->proposal_outcome, (unsigned)win->vote_faction_mask,
-            win->faction_vote[0], win->faction_vote[1],
-            win->faction_vote[2], win->faction_vote[3],
-            win->faction_vote[4], win->faction_vote[5],
-            win->faction_vote[6], win->faction_vote[7],
-            win->faction_vote_count[0], win->faction_vote_count[1],
-            win->faction_vote_count[2], win->faction_vote_count[3],
-            win->faction_vote_count[4], win->faction_vote_count[5],
-            win->faction_vote_count[6], win->faction_vote_count[7],
-            *CouncilSessionPending, *GovernorFaction);
-        telemetry_record_council_event("CouncWin_init", faction_id, action);
+    telemetry_council_initialized(win, faction_id, faction_id_2);
+    if (win->proposal_type >= PROP_ELECT_PLANETARY_GOVERNOR
+    && win->proposal_type <= PROP_REINSTATE_UN_CHARTER
+    && win->proposal_outcome != 0) {
+        telemetry_council_resolved(win, 0, passes_before[win->proposal_type],
+            previous_governor, previous_game_state);
     }
 }
-
 
 int __cdecl autosim_council_announcement(const char* filename, const char* label,
     int a3, const char* pcx, fp_none callback) {
@@ -124,80 +92,53 @@ int __thiscall autosim_council_modal_or_resolve(CouncWindow* win,
     int a2, void* a3, void* a4) {
     typedef int(__thiscall *NativeModal)(CouncWindow*, int, void*, void*);
     NativeModal original = (NativeModal)(*(void***)win)[0xE4 / sizeof(void*)];
-    if (!autosim_ui_active()) return original(win, a2, a3, a4);
     const int owner = MapWin->cOwner;
     const int proposal = win->proposal_type;
-    // Do not infer a vote for unknown or future modded proposal identifiers.
-    // All ten official Council proposals are represented by this interval.
-    if (owner <= 0 || owner >= MaxPlayerNum ||
-        proposal < PROP_ELECT_PLANETARY_GOVERNOR ||
-        proposal > PROP_REINSTATE_UN_CHARTER ||
-        FactionStatus[0] || *MultiplayerActive || *PbemActive) {
+    // Observe outcomes from the native interactive modal as well. It is
+    // always the original call; telemetry does not alter voting or rendering.
+    if (!autosim_ui_active()) {
+        const int before = proposal >= PROP_ELECT_PLANETARY_GOVERNOR
+            && proposal <= PROP_REINSTATE_UN_CHARTER ? ProposalPassCount[proposal] : -1;
+        const int governor = *GovernorFaction;
+        const unsigned game_state = (unsigned)*GameState;
+        const int result = original(win, a2, a3, a4);
+        telemetry_council_resolved(win, result, before, governor, game_state);
+        return result;
+    }
+    if (owner <= 0 || owner >= MaxPlayerNum
+    || proposal < PROP_ELECT_PLANETARY_GOVERNOR
+    || proposal > PROP_REINSTATE_UN_CHARTER
+    || FactionStatus[0] || *MultiplayerActive || *PbemActive) {
         char reason[128];
         snprintf(reason, sizeof(reason),
             "proposal=%d owner=%d human_mask=%08X multiplayer=%d pbem=%d",
             proposal, owner, (unsigned)FactionStatus[0],
             *MultiplayerActive, *PbemActive);
         telemetry_record_council_event("modal_fallback", owner, reason);
-        return original(win, a2, a3, a4);
+        const int result = original(win, a2, a3, a4);
+        return result;
     }
-    // Native CouncWin_init (0x4278E6..0x427974) precomputes ballots
-    // for all nonhuman voters, irrespective of proposal type, across up
-    // to three passes. Council_make_resolution (0x424410) implements the
-    // native Governor candidate tally, Supreme Leader supermajority,
-    // ordinary yes/no, veto and the actual Council action via its vtable.
-    // It returns zero without applying the motion if a required ballot
-    // is still uncast. Do not rerun council_get_vote or set_vote.
+    // Native CouncWin_init already computes all nonhuman ballots. Do not
+    // call council_get_vote or CouncWin_set_vote again; the existing native
+    // resolution implements elections, vetoes and actual Council effects.
     if (win->proposal_outcome != 0) {
-        telemetry_record_council_event("headless_already_resolved", owner,
-            "native_resolution_preceded_modal");
         return 0;
     }
-
     const int previous_passes = ProposalPassCount[proposal];
+    const int previous_governor = *GovernorFaction;
     const unsigned previous_game_state = (unsigned)*GameState;
-    char before[544];
-    snprintf(before, sizeof(before),
-        "proposal=%d name=%s candidate=%d outcome=%d pass_count=%d "
-        "mask=%08X votes=%d,%d,%d,%d,%d,%d,%d,%d "
-        "weights=%d,%d,%d,%d,%d,%d,%d,%d",
-        proposal, autosim_council_proposal_name(proposal),
-        win->candidate_faction_id, win->proposal_outcome, previous_passes,
-        (unsigned)win->vote_faction_mask,
-        win->faction_vote[0], win->faction_vote[1],
-        win->faction_vote[2], win->faction_vote[3],
-        win->faction_vote[4], win->faction_vote[5],
-        win->faction_vote[6], win->faction_vote[7],
-        win->faction_vote_count[0], win->faction_vote_count[1],
-        win->faction_vote_count[2], win->faction_vote_count[3],
-        win->faction_vote_count[4], win->faction_vote_count[5],
-        win->faction_vote_count[6], win->faction_vote_count[7]);
-    telemetry_record_council_event("headless_native_ballots", owner, before);
-
     const int resolved = CouncWin_make_resolution(win, 1);
-    char after[512];
-    snprintf(after, sizeof(after),
-        "proposal=%d name=%s native_make_resolution=%d outcome=%d "
-        "candidate=%d governor=%d pending=%d pass_count_before=%d "
-        "pass_count_after=%d game_state_before=%08X game_state_after=%08X "
-        "victory_type=%d mask=%08X votes=%d,%d,%d,%d,%d,%d,%d,%d",
-        proposal, autosim_council_proposal_name(proposal),
-        resolved, win->proposal_outcome, win->candidate_faction_id,
-        *GovernorFaction, *CouncilSessionPending,
-        previous_passes, ProposalPassCount[proposal],
-        previous_game_state, (unsigned)*GameState, *GameVictoryType,
-        (unsigned)win->vote_faction_mask,
-        win->faction_vote[0], win->faction_vote[1],
-        win->faction_vote[2], win->faction_vote[3],
-        win->faction_vote[4], win->faction_vote[5],
-        win->faction_vote[6], win->faction_vote[7]);
-    telemetry_record_council_event("headless_native_resolution", owner, after);
+    telemetry_council_resolved(win, resolved, previous_passes,
+        previous_governor, previous_game_state);
     if (!resolved || win->proposal_outcome == 0) {
-        // Native implementation reported an incomplete ballot or outcome.
-        // Retain the UI; do not force a passage, veto, election or victory.
+        // Native returned incomplete. Preserve real modal; never invent a
+        // ballot, election, veto or outcome.
         telemetry_record_council_event("modal_fallback", owner,
             "native_resolution_incomplete");
-        return original(win, a2, a3, a4);
+        const int result = original(win, a2, a3, a4);
+        telemetry_council_resolved(win, result, previous_passes,
+            previous_governor, previous_game_state);
+        return result;
     }
     return 0;
 }
