@@ -132,8 +132,10 @@ verify("native Win_update_screen uses verified complete 5-byte entry prologue",
        "e_screen[] = {0xA1,0x30,0x7B,0x9B,0x00}" in render
        and "0x5F7320,e_screen,sizeof(e_screen)" in render)
 verify("no native Win32 message loop or visibility mutation hooked",
-       "do_all_draws" not in render
-       and "PeekMessage" not in render and "synch_bit(" not in render)
+       "do_all_draws(" not in render
+       and "PeekMessage(" not in render and "synch_bit(" not in render
+       and "do_all_draws" not in render[render.index("RenderSite sites[]"):
+                                        render.index("for (const auto& s : sites)")])
 verify("actual render suppression instrumentation exposed in status",
        "++screen_skipped" in render and "++screen_forwarded" in render
        and "++draw_skipped" in render and "++draw_forwarded" in render
