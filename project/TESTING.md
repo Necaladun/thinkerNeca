@@ -6,6 +6,10 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 external-stop and physical-hotkey CI checkpoint (8 November 2026)
+
+[Windows x86 Develop and Release CI run 42451218764](https://github.com/Necaladun/thinkerNeca/actions/runs/42451218764) **passed** at source head `fff9fef`. Both x86 cross-compilations, the new `tools/test_autosim_operator_control.py` structural contract, the existing Council/diplomacy regression, source checks and remaining tests succeeded. The Develop artifact `thinker-develop-win32` contains `thinker.dll` and `thinker.exe`. **No actual Windows runtime test of physical key polling, `autosim-stop.txt`, save/reload, or native Council state was performed by CI.**
+
 ## AUTO-002 Council recurrence, hotkey input, and stop-file trial (8 November 2026)
 
 **User Windows finding:** the Council popup reappeared with the human-diplomacy-guard build. F9/F10 appeared unresponsive during continuous AI turns, but the user subsequently reported **F10 worked while the Council popup was open**, triggering the expected Save Game/Exit after that popup completed. Thus input can be captured and the turn-boundary action can execute, but availability is UI-state-dependent. Faster combat display is user-reported; unit-state/RNG parity remains unverified.
