@@ -11,6 +11,12 @@ std::string startup_load_path = "";
 bool autosim_launcher_active = false;
 bool autosim_auto_new_game = false;
 int autosim_new_world_size = 2;
+int autosim_new_world_source = 0;
+int autosim_new_custom_x = 40;
+int autosim_new_custom_y = 80;
+bool autosim_new_rules_override = false;
+uint32_t autosim_new_rules_mask = 0x1A0E; // DefaultRules, stock victory/rule defaults
+int autosim_new_random_leaders = 0;
 int autosim_new_world_ocean = 1;
 int autosim_new_world_erosion = 1;
 int autosim_new_world_cloud = 1;
@@ -478,6 +484,10 @@ struct AutosimRunProfile {
     int archive_interval = 0; // no archive writes in older profiles
     int timing = 0;
     int size = -1, ocean = -1, erosion = -1, cloud = -1, life = -1;
+    int world_source = 0; // old profiles use the existing generated-world route
+    int custom_x = -1, custom_y = -1;
+    int rules_mode = 0; // old profiles retain installed-game rules
+    int rules_mask = -1, rules_random = -1;
     int difficulty = -1, observer = -1, monitor = -1;
     std::string mode;
     std::string source_save;
@@ -525,7 +535,13 @@ static int autosim_profile_option(void* data, const char* section,
         ++p->faction_slot_count;
         return 1;
     }
-    if (!strcmp(name, "world_size")) return autosim_profile_int(value, 4, &p->size);
+    if (!strcmp(name, "world_size")) return autosim_profile_int(value, 6, &p->size);
+    if (!strcmp(name, "world_source")) return autosim_profile_int(value, 2, &p->world_source);
+    if (!strcmp(name, "custom_map_x")) return autosim_profile_int(value, 512, &p->custom_x);
+    if (!strcmp(name, "custom_map_y")) return autosim_profile_int(value, 512, &p->custom_y);
+    if (!strcmp(name, "rules_mode")) return autosim_profile_int(value, 1, &p->rules_mode);
+    if (!strcmp(name, "rules_mask")) return autosim_profile_int(value, 65535, &p->rules_mask);
+    if (!strcmp(name, "rules_random")) return autosim_profile_int(value, 3, &p->rules_random);
     if (!strcmp(name, "world_ocean")) return autosim_profile_int(value, 2, &p->ocean);
     if (!strcmp(name, "world_erosion")) return autosim_profile_int(value, 2, &p->erosion);
     if (!strcmp(name, "world_cloud")) return autosim_profile_int(value, 2, &p->cloud);
@@ -553,6 +569,12 @@ static bool autosim_apply_launch_profile(Config* cf) {
     for (std::string& slot : autosim_new_roster) slot.clear();
     autosim_launcher_active = false;
     autosim_auto_new_game = false;
+    autosim_new_world_source = 0;
+    autosim_new_custom_x = 40;
+    autosim_new_custom_y = 80;
+    autosim_new_rules_override = false;
+    autosim_new_rules_mask = 0x1A0E;
+    autosim_new_random_leaders = 0;
     autosim_launch_campaign_name.clear();
     autosim_launch_profile_path.clear();
 
@@ -571,6 +593,10 @@ static bool autosim_apply_launch_profile(Config* cf) {
     || (p.monitor != -1 && p.monitor < 30)
     || (p.mode == "new" && (p.size < 0 || p.ocean < 0 || p.erosion < 0
         || p.cloud < 0 || p.life < 0 || p.difficulty < 0 || p.observer < 1))
+    || (p.mode == "new" && p.world_source == 0 && p.size == 6
+        && (p.custom_x < 16 || p.custom_y < 16))
+    || (p.mode == "new" && p.rules_mode == 1
+        && (p.rules_mask < 0 || p.rules_random < 0))
     || (p.mode != "new" && p.mode != "load")
     || (p.faction_slot_count != 0 && p.faction_slot_count != 7)
     || (p.mode == "new" && !p.source_save.empty())
@@ -600,6 +626,14 @@ static bool autosim_apply_launch_profile(Config* cf) {
     autosim_auto_new_game = p.mode == "new";
     if (autosim_auto_new_game) {
         autosim_new_world_size = p.size;
+        autosim_new_world_source = p.world_source;
+        if (p.custom_x >= 16) autosim_new_custom_x = p.custom_x;
+        if (p.custom_y >= 16) autosim_new_custom_y = p.custom_y;
+        autosim_new_rules_override = p.rules_mode == 1;
+        if (autosim_new_rules_override) {
+            autosim_new_rules_mask = (uint32_t)p.rules_mask;
+            autosim_new_random_leaders = p.rules_random;
+        }
         autosim_new_world_ocean = p.ocean;
         autosim_new_world_erosion = p.erosion;
         autosim_new_world_cloud = p.cloud;
