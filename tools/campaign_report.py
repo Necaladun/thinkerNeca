@@ -264,6 +264,138 @@ def render_automation_diagnostics(timings, checkpoints):
     )
 
 
+COUNCIL_MOTIONS = {
+    0: "Elect Planetary Governor",
+    1: "Unite Supreme Leader",
+    2: "Salvage Unity Core",
+    3: "Global Trade Pact",
+    4: "Repeal Global Trade Pact",
+    5: "Launch Solar Shade",
+    6: "Increase Solar Shade",
+    7: "Melt Polar Caps",
+    8: "Repeal U.N. Charter",
+    9: "Reinstate U.N. Charter",
+}
+
+def build_gameplay_records(council, projects):
+    """Interpret ONLY typed gameplay records, not old Council execution traces.
+
+    No guessed sponsor, candidate/vote semantics or AI reasons. Older
+    phase/detail-only council.jsonl files are intentionally not promoted to
+    political history.
+    """
+    typed = [x for x in council if x.get("event") in
+             ("proposal", "ballots", "resolution")]
+    meetings = {}
+    order = []
+    ballots = []
+    for row in typed:
+        mid = str(row.get("meeting_id", ""))
+        if not mid:
+            continue
+        if mid not in meetings:
+            meetings[mid] = {"meeting_id": mid, "turn": row.get("turn"),
+                             "mission_year": row.get("mission_year"),
+                             "proposal_id": row.get("proposal_id"),
+                             "convening_faction": None, "proposer_faction": None,
+                             "candidate_faction": None, "outcome_raw": None,
+                             "governor_after": None, "pass_count_after": None}
+            order.append(mid)
+        meeting = meetings[mid]
+        for key in ("convening_faction", "proposer_faction",
+                    "candidate_faction", "outcome_raw",
+                    "governor_after", "pass_count_after"):
+            if key in row:
+                meeting[key] = row[key]
+        if row["event"] == "ballots" and isinstance(row.get("ballots"), list):
+            for vote in row["ballots"]:
+                if not isinstance(vote, dict):
+                    continue
+                ballots.append({
+                    "meeting_id": mid,
+                    "turn": row.get("turn"),
+                    "mission_year": row.get("mission_year"),
+                    "proposal_id": row.get("proposal_id"),
+                    "voter_faction": vote.get("faction"),
+                    "choice_raw": vote.get("choice_raw"),
+                    "weight_raw": vote.get("weight_raw"),
+                    "reason": vote.get("reason"),
+                    "reason_status": vote.get("reason_status", "unknown"),
+                })
+    return [meetings[mid] for mid in order], ballots, [
+        row for row in projects if row.get("event") in
+        ("started", "changed", "abandoned", "interrupted", "completed")
+    ]
+
+
+def render_gameplay_events(meetings, ballots, projects, legacy_traces):
+    """Compact human-readable histories; raw choice/outcome codes are not
+    silently translated to supported/opposed, passed/failed or abstention."""
+    council_rows = "\n".join(
+        "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>"
+        "<td>{}</td><td>{}</td></tr>".format(
+            html.escape(str(row.get("mission_year", ""))),
+            html.escape(COUNCIL_MOTIONS.get(row.get("proposal_id"), "Unknown motion")),
+            html.escape(str(row.get("convening_faction") if
+                            row.get("convening_faction") is not None else "unverified")),
+            html.escape(str(row.get("candidate_faction") if
+                            row.get("candidate_faction") is not None else "—")),
+            html.escape(str(row.get("outcome_raw") if
+                            row.get("outcome_raw") is not None else "unresolved")),
+            html.escape(str(row.get("governor_after") if
+                            row.get("governor_after") is not None else "—")))
+        for row in meetings
+    ) or '<tr><td colspan="6">No structured Council meetings in this session</td></tr>'
+    ballot_rows = "\n".join(
+        "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+            html.escape(str(row.get("meeting_id", ""))),
+            html.escape(str(row.get("voter_faction", ""))),
+            html.escape(str(row.get("choice_raw", ""))),
+            html.escape(str(row.get("weight_raw", ""))),
+            html.escape(str(row.get("reason_status", "unknown"))))
+        for row in ballots
+    ) or '<tr><td colspan="5">No native ballots recorded</td></tr>'
+    project_rows = "\n".join(
+        "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td>"
+        "<td>{}</td><td>{}</td></tr>".format(
+            html.escape(str(row.get("mission_year", ""))),
+            html.escape(str(row.get("faction", ""))),
+            html.escape(str(row.get("project_name", ""))),
+            html.escape(str(row.get("event", ""))),
+            html.escape(str(row.get("base_name", ""))),
+            html.escape(str(row.get("change_cause", ""))))
+        for row in projects
+    ) or '<tr><td colspan="6">No project transitions recorded</td></tr>'
+    legacy = (f" {legacy_traces} legacy Council diagnostic records were not "
+              "interpreted as votes." if legacy_traces else "")
+    return (
+        '<h2>Planetary Council history</h2>'
+        '<p class="muted">Native votes, voting weights and outcomes are RAW codes; '
+        'no unverified interpretation or AI motivation is invented. The '
+        'convening faction is the verified call_council argument when available; '
+        'motion sponsor remains unknown.' + legacy + '</p>'
+        '<div class="scroll"><table><thead><tr><th>MY</th><th>Motion</th>'
+        '<th>Convener</th><th>Candidate</th><th>Outcome raw</th>'
+        '<th>Governor after</th></tr></thead><tbody>' + council_rows
+        + '</tbody></table></div>'
+        '<h3>Recorded ballots</h3><div class="scroll"><table><thead><tr>'
+        '<th>Meeting</th><th>Faction</th><th>Vote raw</th><th>Weight raw</th>'
+        '<th>Reason evidence</th></tr></thead><tbody>' + ballot_rows
+        + '</tbody></table></div>'
+        '<p><a href="council_meetings.csv">Council meetings CSV</a> · '
+        '<a href="council_ballots.csv">Council ballots CSV</a></p>'
+        '<h2>Secret Project history</h2>'
+        '<p class="muted">Production starts/changes/abandonments and confirmed '
+        'native completions. A project in progress at recording start is '
+        'baseline state, not falsely dated as a new start. Queue changes '
+        'do not establish an AI motive.</p>'
+        '<div class="scroll"><table><thead><tr><th>MY</th><th>Faction</th>'
+        '<th>Project</th><th>Event</th><th>Base</th><th>Observed cause</th>'
+        '</tr></thead><tbody>' + project_rows + '</tbody></table></div>'
+        '<p><a href="projects.csv">Secret Project events CSV</a></p>'
+    )
+
+
 def campaign_display_name(campaign_dir):
     """Use an editable label when present; legacy campaigns keep folder names."""
     path = campaign_dir / "campaign.json"
@@ -295,6 +427,27 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     manifest, status, turns, bases = load_session(session_dir)
     output = output_dir or campaign_dir / "reports" / session_dir.name
     output.mkdir(parents=True, exist_ok=True)
+    council_path = session_dir / "council.jsonl"
+    projects_path = session_dir / "projects.jsonl"
+    council_events = read_jsonl(council_path) if council_path.is_file() else []
+    project_events = read_jsonl(projects_path) if projects_path.is_file() else []
+    for name, rows in (("council", council_events), ("projects", project_events)):
+        if any(row.get("schema") != SCHEMA for row in rows):
+            raise ValueError(f"{name}: unsupported event schema")
+    meetings, ballots, projects = build_gameplay_records(council_events, project_events)
+    write_csv(output / "council_meetings.csv",
+              ("meeting_id", "turn", "mission_year", "proposal_id",
+               "convening_faction", "proposer_faction", "candidate_faction",
+               "outcome_raw", "governor_after", "pass_count_after"), meetings)
+    write_csv(output / "council_ballots.csv",
+              ("meeting_id", "turn", "mission_year", "proposal_id",
+               "voter_faction", "choice_raw", "weight_raw",
+               "reason", "reason_status"), ballots)
+    write_csv(output / "projects.csv",
+              ("event_id", "turn", "mission_year", "event", "faction",
+               "project_id", "facility_id", "project_name", "base_name",
+               "base_x", "base_y", "previous_facility_id", "next_facility_id",
+               "source", "change_cause", "reason_status"), projects)
     notices_file = session_dir / "ui_notices.jsonl"
     notices = read_jsonl(notices_file) if notices_file.is_file() else []
     for notice in notices:
@@ -329,6 +482,12 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     write_csv(output / "bases.csv", BASE_FIELDS, base_rows)
     document = render_html(campaign_display_name(campaign_dir), session_dir.name,
                            manifest, status, turns, bases, notices)
+    legacy_count = sum(1 for row in council_events if
+                       "event" not in row and "phase" in row)
+    document = document.replace('<h2>AUTO-002 UI handling',
+                                render_gameplay_events(meetings, ballots, projects,
+                                                       legacy_count)
+                                + '<h2>AUTO-002 UI handling', 1)
     document = document.replace('<script id="turn-data"',
                                 render_automation_diagnostics(timings, checkpoints)
                                 + '<script id="turn-data"', 1)
