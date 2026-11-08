@@ -605,6 +605,144 @@ void telemetry_record_completed_turn() {
     }
 }
 
+// AUTO-OBS: terminal state is not a completed full faction cycle. In
+// particular, a Council or production victory may fire during one AI's
+// upkeep. No score/vote calculators, RNG or native UI are invoked here.
+void telemetry_record_terminal_result(const char* save_path, const char* save_status) {
+    if (!recording || terminal_result_recorded) return;
+
+    const int victory = *GameVictoryType;
+    const char* reason = "unknown";
+    switch (victory) {
+    case VIC_UNIFY_SOLO:
+    case VIC_UNIFY_COOP: reason = "conquest"; break;
+    case VIC_DIPLOMATIC_SOLO:
+    case VIC_DIPLOMATIC_COOP:
+    case VIC_DIPLOMATIC_LOSS: reason = "diplomatic"; break;
+    case VIC_ECONOMIC_SOLO:
+    case VIC_ECONOMIC_COOP:
+    case VIC_ECONOMIC_LOSS: reason = "economic"; break;
+    case VIC_TRANSCEND_PLR:
+    case VIC_TRANSCEND_UNK:
+    case VIC_TRANSCEND_LOSS: reason = "transcendence"; break;
+    case VIC_ALIEN_SOLO:
+    case VIC_ALIEN_COOP:
+    case VIC_ALIEN_LOSS: reason = "alien"; break;
+    case VIC_TIME_LIMIT: reason = "time_limit"; break;
+    case VIC_SUDDEN_DEATH: reason = "scenario_sudden_death"; break;
+    case VIC_LOST_CAPTURE:
+    case VIC_LOST_REMOVE: reason = "unexpected_observer_defeat"; break;
+    default: break;
+    }
+
+    int alive_count = 0;
+    int sole_survivor = 0;
+    int base_counts[MaxPlayerNum] = {};
+    int unit_counts[MaxPlayerNum] = {};
+    for (int i = 0; i < *BaseCount; ++i) {
+        const int faction = Bases[i].faction_id;
+        if (faction >= 0 && faction < MaxPlayerNum) ++base_counts[faction];
+    }
+    for (int i = 0; i < *VehCount; ++i) {
+        const int faction = Vehs[i].faction_id;
+        if (faction >= 0 && faction < MaxPlayerNum) ++unit_counts[faction];
+    }
+    for (int i = 1; i < MaxPlayerNum; ++i) {
+        if (is_alive(i)) { ++alive_count; sole_survivor = i; }
+    }
+    if (victory == VIC_NONE && alive_count == 0) reason = "extinction";
+
+    std::vector<int> winners;
+    const char* winner_basis = "unresolved";
+    if (victory == VIC_UNIFY_SOLO || victory == VIC_UNIFY_COOP) {
+        if (alive_count == 1) {
+            winners.push_back(sole_survivor);
+            winner_basis = "sole_living_faction";
+        } else {
+            // Cooperative/surrender victory can involve multiple living
+            // factions; do not guess the leader from the camera or ranking.
+            winner_basis = "coalition_unresolved";
+        }
+    } else if (victory == VIC_TRANSCEND_PLR || victory == VIC_TRANSCEND_UNK
+        || victory == VIC_TRANSCEND_LOSS) {
+        for (int i = 1; i < MaxPlayerNum; ++i) {
+            if (Monuments[i].events[MON_WINNING_TRANS].achieved) winners.push_back(i);
+        }
+        if (!winners.empty()) winner_basis = "transcendence_monument";
+    } else {
+        unsigned win_flag = 0;
+        if (victory == VIC_ECONOMIC_SOLO || victory == VIC_ECONOMIC_COOP
+            || victory == VIC_ECONOMIC_LOSS) win_flag = PFLAG_UNK_40000;
+        if (victory == VIC_ALIEN_SOLO || victory == VIC_ALIEN_COOP
+            || victory == VIC_ALIEN_LOSS) win_flag = PFLAG_UNK_100000;
+        if (victory == VIC_DIPLOMATIC_SOLO || victory == VIC_DIPLOMATIC_COOP
+            || victory == VIC_DIPLOMATIC_LOSS) win_flag = PFLAG_UNK_20000;
+        if (win_flag) {
+            for (int i = 1; i < MaxPlayerNum; ++i) {
+                if ((unsigned)Factions[i].player_flags & win_flag) winners.push_back(i);
+            }
+            if (!winners.empty()) winner_basis = "native_winner_flags";
+        }
+    }
+
+    const char* status = victory == VIC_TIME_LIMIT ? "time_limit"
+        : victory == VIC_NONE && alive_count == 0 ? "extinction"
+        : victory == VIC_LOST_CAPTURE || victory == VIC_LOST_REMOVE
+            ? "unexpected_observer_defeat"
+        : victory == VIC_NONE ? "unknown_termination" : "victory";
+
+    std::ostringstream result;
+    result << "{\"schema\":1,\"status\":" << json_string(status)
+           << ",\"reason\":" << json_string(reason)
+           << ",\"victory_type_raw\":" << victory
+           << ",\"game_state_raw\":" << (unsigned)*GameState
+           << ",\"turn\":" << *CurrentTurn
+           << ",\"mission_year\":" << *CurrentMissionYear
+           << ",\"last_committed_turn\":" << last_committed_turn
+           << ",\"partial_cycle\":" << (*CurrentTurn > last_committed_turn ? "true" : "false")
+           << ",\"initial_observer\":" << initial_observer
+           << ",\"final_observer\":" << (MapWin ? MapWin->cOwner : 0)
+           << ",\"human_mask\":" << (unsigned)FactionStatus[0]
+           << ",\"alive_mask\":" << (unsigned)FactionStatus[1]
+           << ",\"alive_count\":" << alive_count
+           << ",\"winner_basis\":" << json_string(winner_basis)
+           << ",\"primary_winner_factions\":[";
+    for (size_t j = 0; j < winners.size(); ++j) {
+        if (j) result << ',';
+        result << winners[j];
+    }
+    result << "],\"terminal_save\":{\"status\":" << json_string(save_status)
+           << ",\"path\":";
+    if (save_path && save_path[0]) result << json_string(save_path);
+    else result << "null";
+    result << "},\"factions\":[";
+    for (int i = 1; i < MaxPlayerNum; ++i) {
+        if (i > 1) result << ',';
+        const Faction& faction = Factions[i];
+        result << "{\"id\":" << i
+               << ",\"name\":" << json_string(MFactions[i].formal_name_faction)
+               << ",\"alive\":" << (is_alive(i) ? "true" : "false")
+               << ",\"bases\":" << base_counts[i]
+               << ",\"units\":" << unit_counts[i]
+               << ",\"credits\":" << faction.energy_credits
+               << ",\"ranking\":" << faction.ranking
+               << ",\"tech_ranking\":" << faction.tech_ranking
+               << ",\"player_flags\":" << (unsigned)faction.player_flags
+               << ",\"transcendence_event\":"
+               << (Monuments[i].events[MON_WINNING_TRANS].achieved ? "true" : "false")
+               << "}";
+    }
+    result << "]}";
+    if (atomic_write(session_dir + "/result.json", result.str())) {
+        terminal_result_recorded = true;
+        if (!atomic_write(session_dir + "/status.json", status_json("terminal"))) {
+            OutputDebugStringA("thinkerNeca AUTO-OBS: terminal status write failed\n");
+        }
+    } else {
+        OutputDebugStringA("thinkerNeca AUTO-OBS: terminal result write failed\n");
+    }
+}
+
 void telemetry_end_session() {
     if (recording) {
         if (!atomic_write(session_dir + "/status.json",
