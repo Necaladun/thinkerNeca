@@ -1,10 +1,10 @@
 # thinkerNeca — fork changelog
 
-## Unmerged AUTO-002/TEL-ORBIT — guarded native orbital popup and basic event ledger (9 November 2026)
+## Unmerged AUTO-002/TEL-ORBIT — active orbital popup suppression and basic event ledger (9 November 2026)
 
-- Direct `action_sat_attack` satellite hit/miss notifications bypassed the earlier `X_pop/X_pops` filters, calling native `popp` at `0x4CF70F`. Added exact five-byte post-Scient callsite preflight and opt-in suppression of the four passive result labels; default human and suppression-off `popp` calls remain native, and orbital combat/RNG code is unchanged.
+- Corrected the initial, **ineffective** hook at original EXE callsite `0x4CF70F`: `patch.cpp` already replaces the native `action_sat_attack` at `0x4CF480` with C++ `basewin.cpp::action_sat_attack`. The four passive C++ hit/miss `popp` calls now use the existing `autosim_notice_popp` wrapper in eligible all-AI suppression mode. Removed the unreachable EXE hook and its wrapper; normal human/opt-out presentation, attack RNG, satellite counts and Geosynchronous effects remain unchanged.
 - Added telemetry-only per-session `orbit.jsonl`: actual satellite launches, executed AI orbital strike decision inputs and inventory-derived outcome, solar-storm/asteroid losses, and faction orbital inventories at session start/completed turn. The stream is independent of popup suppression and uses the existing recorder's flush/error/session lifecycle.
-- Develop/Release Windows x86 CI and source checks passed at `d13c734` (run [42509596293](https://github.com/Necaladun/thinkerNeca/actions/runs/42509596293)). Actual Windows satellite-combat suppression, unchanged RNG/state parity, and save/reload remain unverified. Detailed orbital AI and missile-interception logging is deferred.
+- The initial event-stream build passed CI at `d13c734`, but a subsequent Windows report confirmed the old result-popup hook was unreachable. The corrected source route requires new PR-head CI and Windows gameplay confirmation, including state parity and save/reload. Detailed orbital AI and missile-interception logging is deferred.
 
 ## Unmerged AUTO-LOG — comprehensive automation launcher and campaign archive (9 November 2026)
 
