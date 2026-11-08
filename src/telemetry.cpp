@@ -538,6 +538,19 @@ void telemetry_end_session() {
 }
 
 
+const char* telemetry_get_campaign_id() {
+    return campaign_id.c_str();
+}
+
+const char* telemetry_get_session_id() {
+    // Keep the filesystem identity immutable across display-name edits.
+    static std::string session_id;
+    const size_t slash = session_dir.find_last_of("/\\\\");
+    session_id = session_dir.empty() ? "" :
+        session_dir.substr(slash == std::string::npos ? 0 : slash + 1);
+    return session_id.c_str();
+}
+
 const char* telemetry_get_campaign_name() {
     if (campaign_display_name.empty())
         campaign_display_name = readable_campaign_default();
