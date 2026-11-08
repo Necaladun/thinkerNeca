@@ -455,29 +455,24 @@ void __cdecl control_turn() {
             const AutosimControlRequest request = autosim_take_control_request();
             const bool operator_stop = eligible && request == AUTOSIM_CTL_STOP;
             const bool operator_pause = eligible && request == AUTOSIM_CTL_PAUSE;
+            const bool operator_menu = eligible && request == AUTOSIM_CTL_MENU;
             bool switched_to_manual = false;
-            if (eligible && (action == AUTO_CYCLE_STOP || operator_stop || operator_pause)) {
+            if (eligible && (action == AUTO_CYCLE_STOP || operator_stop
+            || operator_pause || operator_menu)) {
                 telemetry_record_ui_notice("autosim",
                     action == AUTO_CYCLE_STOP ? "TURN_LIMIT" :
-                    operator_stop ? "OPERATOR_STOP" : "PAUSE",
+                    operator_stop ? "OPERATOR_STOP" :
+                    operator_menu ? "OPERATOR_MENU" : "PAUSE",
                     "control_dialog");
                 AutosimDialogState dialog;
+                autosim_fill_dialog_state(&dialog, AUTOSIM_DIALOG_RUNNING);
                 dialog.completed_segment = auto_driver.completed_turns;
-                    dialog.completed_total = total_autosim_turns;
-                    dialog.start_year = segment_start_year;
-                    dialog.end_year = *CurrentMissionYear;
-                    dialog.start_bases = segment_start_bases;
-                    dialog.end_bases = *BaseCount;
-                    dialog.start_units = segment_start_units;
-                    dialog.end_units = *VehCount;
-                    for (int i = 1; i < MaxPlayerNum; ++i) {
-                        if (is_alive(i)) ++dialog.alive_factions;
-                    }
-                    dialog.additional_turns = conf.autosim_manual_turns;
-                    dialog.allow_resume = (operator_pause && action == AUTO_CYCLE_ADVANCE);
-                    dialog.campaign_name = telemetry_get_campaign_name();
-                    dialog.save_name = autosim_default_save_name(
-                        dialog.campaign_name.c_str(), *CurrentMissionYear);
+                dialog.completed_total = total_autosim_turns;
+                dialog.start_year = segment_start_year;
+                dialog.start_bases = segment_start_bases;
+                dialog.start_units = segment_start_units;
+                dialog.allow_resume =
+                    (operator_pause || operator_menu) && action == AUTO_CYCLE_ADVANCE;
                 for (;;) {
                     const AutosimDialogChoice selection = autosim_show_control_dialog(&dialog);
                     if (selection == AUTOSIM_DIALOG_FAILED) {
@@ -495,7 +490,7 @@ void __cdecl control_turn() {
                             "resume_without_save");
                         break;
                     }
-                    if (!telemetry_set_campaign_name(dialog.campaign_name.c_str())) {
+                    if (!autosim_apply_dialog_options(dialog)) {
                         MessageBoxA(*phWnd,
                             "Could not write the campaign name. Check campaigns/ permissions.",
                             "thinkerNeca Simulation Control", MB_OK | MB_ICONWARNING);
@@ -509,6 +504,17 @@ void __cdecl control_turn() {
                             "handover_to_human_next_turn");
                         set_human(MapWin->cOwner, true);
                         switched_to_manual = true;
+                        break;
+                    }
+                    if (selection == AUTOSIM_DIALOG_CONTINUE) {
+                        // New segment without a save, explicitly requested
+                        // from the unified operator menu at a full boundary.
+                        auto_driver.completed_turns = 0;
+                        segment_start_year = *CurrentMissionYear;
+                        segment_start_bases = *BaseCount;
+                        segment_start_units = *VehCount;
+                        telemetry_record_ui_notice("autosim", "CONTROL",
+                            "continue_without_save_new_segment");
                         break;
                     }
                     if (selection == AUTOSIM_DIALOG_SAVE_CONTINUE
