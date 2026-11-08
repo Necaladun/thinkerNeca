@@ -1,6 +1,7 @@
 
 #include "gameturn.h"
 #include "autosim.h"
+#include "autosim_control.h"
 
 // AUTO-002: read-only Council diagnostics. The pre-call record is flushed by
 // the telemetry stream before entering native call_council(), where the
@@ -79,6 +80,11 @@ void __cdecl control_turn() {
     int load_iter = 0;
     int skip_human_turn = 0;
     AutoTurnDriver auto_driver;
+    int total_autosim_turns = 0;
+    int segment_start_year = *CurrentMissionYear;
+    int segment_start_bases = *BaseCount;
+    int segment_start_units = *VehCount;
+    bool segment_started = false;
     // A game loaded mid-cycle resumes remaining factions first.
     bool first_cycle_partial = (*ControlTurnMove != 0);
     RECT rc;
@@ -107,6 +113,19 @@ void __cdecl control_turn() {
     bool run_upkeep = true;
     while (1) {
         debug("control_turn %d %d %d\n", *CurrentTurn, current_id, MapWin->cOwner);
+        // Capture a baseline as soon as the user has handed the last human
+        // faction to AI. An initially partial loaded cycle is not counted.
+        if (autosim_ready()) {
+            if (!segment_started) {
+                segment_started = true;
+                segment_start_year = *CurrentMissionYear;
+                segment_start_bases = *BaseCount;
+                segment_start_units = *VehCount;
+            }
+        } else if (segment_started) {
+            segment_started = false;
+            total_autosim_turns = 0;
+        }
         if (run_upkeep) {
             if (!*PbemActive) {
                 MessageWin_clear(MessageWin);
@@ -389,44 +408,108 @@ void __cdecl control_turn() {
             if (!first_cycle_partial) {
                 autosim_collect_stop_file();
             }
-            // All faction phases have completed for this turn.
+            // All faction phases have completed for this turn. Never open
+            // a modal control window or perform a manual save mid-faction.
             telemetry_record_completed_turn();
+            const bool full_cycle = !first_cycle_partial;
+            const bool eligible = autosim_ready();
             const AutoCycleAction action = auto_driver.on_cycle(
-                conf.autosim_manual_turns, autosim_ready(), !first_cycle_partial);
+                conf.autosim_manual_turns, eligible, full_cycle);
+            if (eligible && full_cycle) ++total_autosim_turns;
             first_cycle_partial = false;
-            const AutosimControlRequest user_request = autosim_take_control_request();
-            bool stop_requested = (action != AUTO_CYCLE_NORMAL
-                && user_request == AUTOSIM_CTL_STOP);
-            if (user_request == AUTOSIM_CTL_PAUSE && action == AUTO_CYCLE_ADVANCE) {
-                telemetry_record_ui_notice("autosim", "PAUSE", "requested_completed_turn");
-                // Explicit user-requested pause: no game phase is in progress.
-                // A native Win32 two-choice prompt avoids running the game
-                // loop or accepting AI orders while the operator decides.
-                const int choice = MessageBoxA(*phWnd,
-                    "AI simulation paused after a completed turn.\n\n"
-                    "Yes: Resume simulation\n"
-                    "No: Open Save Game, then return to main menu",
-                    "thinkerNeca AI Simulation", MB_YESNO | MB_ICONINFORMATION);
-                stop_requested = (choice != IDYES);
-                telemetry_record_ui_notice("autosim", "PAUSE",
-                    stop_requested ? "save_and_stop" : "resume");
-            }
-            if (action == AUTO_CYCLE_STOP || stop_requested) {
-                // AUTO-002: offer the same native Save Game dialog used by
-                // the normal turn controller. Save/cancel both lead to menu.
-                // We do not silently overwrite an autosave or change the
-                // selected filename. A saved all-AI game must be reloaded
-                // and advanced on Windows before treating this as verified.
-                OutputDebugStringA("thinkerNeca AUTO-002: completed turn; offering Save Game\n");
+            const AutosimControlRequest request = autosim_take_control_request();
+            const bool operator_stop = eligible && request == AUTOSIM_CTL_STOP;
+            const bool operator_pause = eligible && request == AUTOSIM_CTL_PAUSE;
+            bool switched_to_manual = false;
+            if (eligible && (action == AUTO_CYCLE_STOP || operator_stop || operator_pause)) {
                 telemetry_record_ui_notice("autosim",
-                    action == AUTO_CYCLE_STOP ? "TURN_LIMIT" : "OPERATOR_STOP",
-                    "save_dialog");
-                save_game(0);
-                *ControlTurnA = 1;
-                *ControlTurnB = 1;
-                return;
+                    action == AUTO_CYCLE_STOP ? "TURN_LIMIT" :
+                    operator_stop ? "OPERATOR_STOP" : "PAUSE",
+                    "control_dialog");
+                for (;;) {
+                    AutosimDialogState dialog;
+                    dialog.completed_segment = auto_driver.completed_turns;
+                    dialog.completed_total = total_autosim_turns;
+                    dialog.start_year = segment_start_year;
+                    dialog.end_year = *CurrentMissionYear;
+                    dialog.start_bases = segment_start_bases;
+                    dialog.end_bases = *BaseCount;
+                    dialog.start_units = segment_start_units;
+                    dialog.end_units = *VehCount;
+                    for (int i = 1; i < MaxPlayerNum; ++i) {
+                        if (is_alive(i)) ++dialog.alive_factions;
+                    }
+                    dialog.additional_turns = conf.autosim_manual_turns;
+                    dialog.allow_resume = (operator_pause && action == AUTO_CYCLE_ADVANCE);
+                    dialog.campaign_name = telemetry_get_campaign_name();
+                    dialog.save_name = autosim_default_save_name(
+                        dialog.campaign_name.c_str(), *CurrentMissionYear);
+
+                    const AutosimDialogChoice selection = autosim_show_control_dialog(&dialog);
+                    if (selection == AUTOSIM_DIALOG_FAILED) {
+                        // Unavailable standard controls: retain the prior
+                        // native Save Game -> menu path rather than auto-advance.
+                        telemetry_record_ui_notice("autosim", "CONTROL_DIALOG_ERROR",
+                            "native_save_fallback");
+                        save_game(0);
+                        *ControlTurnA = 1;
+                        *ControlTurnB = 1;
+                        return;
+                    }
+                    if (selection == AUTOSIM_DIALOG_RESUME) {
+                        telemetry_record_ui_notice("autosim", "CONTROL",
+                            "resume_without_save");
+                        break;
+                    }
+                    if (!telemetry_set_campaign_name(dialog.campaign_name.c_str())) {
+                        MessageBoxA(*phWnd,
+                            "Could not write the campaign name. Check campaigns/ permissions.",
+                            "thinkerNeca Simulation Control", MB_OK | MB_ICONWARNING);
+                        continue;
+                    }
+                    if (selection == AUTOSIM_DIALOG_TAKE_CONTROL) {
+                        // A completed full turn has just ended. Changing the
+                        // human bit here makes the NEXT turn use native upkeep
+                        // and Console_human_turn, rather than replaying upkeep.
+                        telemetry_record_ui_notice("autosim", "CONTROL",
+                            "handover_to_human_next_turn");
+                        set_human(MapWin->cOwner, true);
+                        switched_to_manual = true;
+                        break;
+                    }
+                    if (selection == AUTOSIM_DIALOG_SAVE_CONTINUE
+                    || selection == AUTOSIM_DIALOG_SAVE_EXIT) {
+                        std::string path;
+                        std::string error;
+                        if (!autosim_save_named(dialog.save_name, &path, &error)) {
+                            MessageBoxA(*phWnd, error.c_str(),
+                                "thinkerNeca Save Game", MB_OK | MB_ICONWARNING);
+                            continue;
+                        }
+                        telemetry_record_named_save(path.c_str());
+                        telemetry_record_ui_notice("autosim", "SAVED",
+                            path.c_str());
+                        if (selection == AUTOSIM_DIALOG_SAVE_EXIT) {
+                            *ControlTurnA = 1;
+                            *ControlTurnB = 1;
+                            return;
+                        }
+                        // New user-selected segment, same running game and
+                        // telemetry session. Never count the first partial
+                        // cycle on reload as a fresh completed turn.
+                        auto_driver.completed_turns = 0;
+                        conf.autosim_manual_turns = dialog.additional_turns;
+                        segment_start_year = *CurrentMissionYear;
+                        segment_start_bases = *BaseCount;
+                        segment_start_units = *VehCount;
+                        telemetry_record_ui_notice("autosim", "CONTROL",
+                            "save_and_continue_new_segment");
+                        break;
+                    }
+                }
             }
-            if (!skip_human_turn && action != AUTO_CYCLE_ADVANCE) {
+            if (!skip_human_turn && action != AUTO_CYCLE_ADVANCE
+            && !switched_to_manual) {
                 Console_human_turn(MapWin);
             }
             if (*ControlTurnA) {
