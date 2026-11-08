@@ -5,7 +5,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 ## Unmerged AUTO-002 — editable simulation control and campaign naming (8 November 2026)
 
 - Source implementation: native Win32 **Simulation Control** at complete AI turn cap and F9/F10/stop file: summary of full turns/years/colonies/units, user-entered 1–100000 additional turns, editable telemetry name and SAV basename, Save & Continue, Save & Exit, and next-turn observed-faction human takeover. The existing patched `mod_save_daemon` serializer writes to a temp SAV, then commits the requested name only after successful serialization. Failed/cancelled saves leave controls open.
-- TEL-001 naming/lineage: readable new campaign folder IDs and independently editable display names, surfaced in HTML and Tkinter analyzer; named-save `.autosim-campaign` sidecar with file fingerprint offers explicit rejoin on native reload with a new session number. Other saves create new campaigns; original SAV format unchanged. **Unmerged; native Windows simulation/save/reload/manual-control testing outstanding.**
+- TEL-001 naming/lineage: readable new campaign folder IDs and independently editable display names, surfaced in HTML and Tkinter analyzer; named-save `.autosim-campaign` sidecar with file fingerprint offers explicit rejoin on native reload with a new session number. Other saves create new campaigns; original SAV format unchanged. [Windows x86 Develop/Release CI 42454429090](https://github.com/Necaladun/thinkerNeca/actions/runs/42454429090) passed at `09cd616e` (including new source/synthetic tests); **unmerged, native Windows simulation/save/reload/manual-control testing outstanding.**
 
 ## Unmerged AUTO-002 — verified-binary native Council window diagnostics (8 November 2026)
 
