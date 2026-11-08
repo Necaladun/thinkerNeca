@@ -73,6 +73,8 @@ static void test_popup_allowlist_fails_closed() {
         assert(autosim_xpop_policy(label, true) == AUTO_UI_NATIVE);
     }
     for (const char* label : {"MIMIMI", "ESCAPE", "DIPLO", "HASTY",
+                              "BUSTERSAC", "FUNGALSAC", "TECTONICSAC",
+                              "NOKILLERS", "KILLERSDEPLOYED",
                               "UNKNOWN", "ASKSEEDESIGN2"}) {
         assert(autosim_xpop_policy(label, false) == AUTO_UI_NATIVE);
     }
