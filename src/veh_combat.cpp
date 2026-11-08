@@ -1963,8 +1963,6 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                             VEH* veh = &Vehs[iter_veh_id];
                             parse_says(0, veh->name(), -1, -1);
                             veh->faction_id = veh_atk->faction_id;
-                            telemetry_unit_owner_changed(iter_veh_id, capture_id,
-                                veh_atk->faction_id, "marine_detachment");
                             if (iter_base_id < 0
                             || Bases[iter_base_id].faction_id != veh_atk->faction_id
                             || Bases[iter_base_id].pop_size < 3) {
@@ -1972,6 +1970,9 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                             } else {
                                 veh->home_base_id = iter_base_id;
                             }
+                            // Both owner and new home-base association are settled.
+                            telemetry_unit_owner_changed(iter_veh_id, capture_id,
+                                veh_atk->faction_id, "marine_detachment");
                             debug("battle_fight detach %s -> %s\n", veh_atk->name(), veh->name());
                             veh_skip(iter_veh_id);
                             iter_veh_id = veh->next_veh_id_stack;
