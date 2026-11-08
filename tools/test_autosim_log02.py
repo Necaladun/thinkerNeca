@@ -37,10 +37,10 @@ check("no combat records from odds-only path",
     combat.index("telemetry_combat_exchange("))
 check("artillery records after actual applied damage",
     combat.index("veh_def->damage_taken += damage_value;") <
-    combat.index('telemetry_combat_exchange(veh_id_atk, veh_id_def, "artillery"'))
+    combat.index('telemetry_combat_exchange(veh_id_atk, veh_id_def, faction_id_def, "artillery"'))
 check("direct HP exchange records after fight",
     combat.index("bool def_alive = veh_def_last_hp > 0;") <
-    combat.index('telemetry_combat_exchange(veh_id_atk, veh_id_def, "direct_or_duel"'))
+    combat.index('telemetry_combat_exchange(veh_id_atk, veh_id_def, faction_id_def, "direct_or_duel"'))
 check("research grant after actual owner bit update",
     tech.index("TechOwners[tech_id] |= (1 << faction_id);") <
     tech.index("telemetry_research_acquired("))
