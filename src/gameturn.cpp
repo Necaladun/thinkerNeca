@@ -2,6 +2,24 @@
 #include "gameturn.h"
 #include "autosim.h"
 
+// AUTO-002: read-only Council diagnostics. The pre-call record is flushed by
+// the telemetry stream before entering native call_council(), where the
+// reported vote/offer modal might otherwise suspend this thread.
+// Do not call game_random(), vote evaluators or any Council UI from here.
+static void autosim_trace_council_call(const char* phase, int faction_id) {
+    if (!autosim_control_active() || !conf.telemetry_enabled) {
+        return;
+    }
+    const int owner = MapWin->cOwner;
+    char action[192];
+    snprintf(action, sizeof(action),
+        "%s actor=%d owner=%d human_mask=%08X pending=%d governor=%d owner_proposal=%d owner_vote=%d",
+        phase, faction_id, owner, (unsigned)FactionStatus[0],
+        *CouncilSessionPending, *GovernorFaction,
+        CouncilProposal[owner], CouncilVoteState[owner]);
+    telemetry_record_ui_notice("council_trace", "call_council", action);
+}
+
 fp_1int sub_51E530 = (fp_1int)0x51E530;
 
 int* const dword_78D7F8 = (int*)0x78D7F8;
@@ -2300,7 +2318,9 @@ void __cdecl faction_upkeep(int faction_id) {
             autosim_notice_popp(ScriptFile, "COUNCILOPEN", "council_sm.pcx");
         }
         if (!is_human(faction_id)) {
+            autosim_trace_council_call("enter", faction_id);
             call_council(faction_id);
+            autosim_trace_council_call("exit", faction_id);
         }
     }
     } // Restore all preference bits before the ordinary autosave call.
