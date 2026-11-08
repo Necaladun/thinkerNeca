@@ -6,6 +6,14 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 Council recurrence, hotkey input, and stop-file trial (8 November 2026)
+
+**User Windows finding:** the Council popup reappeared with the human-diplomacy-guard build. F9/F10 appeared unresponsive during continuous AI turns, but the user subsequently reported **F10 worked while the Council popup was open**, triggering the expected Save Game/Exit after that popup completed. Thus input can be captured and the turn-boundary action can execute, but availability is UI-state-dependent. Faster combat display is user-reported; unit-state/RNG parity remains unverified.
+
+**Source change (not yet Windows-tested):** `autosim_collect_queued_keys()` now also samples focus-gated `GetAsyncKeyState(VK_F9/VK_F10)` physical key-down edges during AI iteration. A new one-shot stop-file poll uses `GetModuleFileNameA(NULL)` for the executable directory, looks for `autosim-stop.txt`, attempts to delete it and queues the same `AUTOSIM_CTL_STOP` at the next **complete** all-faction boundary; it does not interrupt the native Council or force a partial-turn save. `tools/test_autosim_operator_control.py` checks guarded source routing only; the Windows behaviour is unverified.
+
+**Required Windows tests:** configure >100 AI turns, place `autosim-stop.txt` beside the executable during an unfocused run after a few complete turns and verify Save Game/menu on the next completed cycle; confirm file deletion, telemetry `EXTERNAL_STOP` event, human game ignored, partial-cycle load, saving/cancelling and reloading. Separately hold F9/F10 while game focused, verify F10 outranks F9 and a single F9 pause per press, and capture Council `council_trace`/`diplomacy_guard` events if a Council popup recurs. **Native Council session completion and diplomacy parity remain unresolved.**
+
 ## AUTO-002 offscreen visual and fungus notice CI checkpoint (8 November 2026)
 
 [GitHub Actions Windows x86 Develop and Release run 42447573120](https://github.com/Necaladun/thinkerNeca/actions/runs/42447573120) **passed** at source head `d651cff`. Both native cross-builds passed; Develop also passed C++11 host policy and combat-damage tests, `tools/test_autosim_presentation_contract.py` checking movement, artillery loop preservation, native preference scopes and ecology notices, the probe UI source test, other terrain/INI/telemetry/doc tests and artifact packaging. The `thinker-develop-win32` artifact includes `thinker.dll` and `thinker.exe`. This establishes compile/structural consistency only; **there is no Windows gameplay run of these rendering changes**. Large-stack artillery, seen-vs-unseen simulation state/RNG equivalence and fungus ecology save/reload remain high-priority verification.
