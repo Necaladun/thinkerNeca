@@ -2539,7 +2539,8 @@ int __cdecl mod_eliminate_player(int faction_id, int setup_id) {
         && (*GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES)) {
             mod_amovie_project(&m->filename[0]);
         }
-        if (!*MultiplayerActive && setup_val && setup_id == *CurrentPlayerFaction) {
+        if (!*MultiplayerActive && setup_val && setup_id == *CurrentPlayerFaction
+        && is_human(setup_id)) {
             // TRACKED event, escape location may be revealed by random chance
             bool infiltrate = Factions[setup_id].diplo_status[faction_id] & DIPLO_HAVE_INFILTRATOR;
             int veh_id;
