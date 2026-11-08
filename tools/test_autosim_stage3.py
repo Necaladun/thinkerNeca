@@ -147,6 +147,13 @@ verify("victory pause offers transactional SAV with failure retry and reload war
        and "telemetry_record_named_save(saved_path.c_str())" in ending
        and "saved_post_victory_checkpoint_reload_unverified" in ending
        and "experimental mid-cycle snapshot; reload is unverified" in control)
+verify("terminal SAV load reopens victory controls before zero-human preflight",
+       'if (autosim_session_active() && (*GameState & STATE_GAME_DONE)' in turn
+       and 'telemetry_record_ui_notice("autosim", "LOADED_VICTORY"' in turn
+       and 'if (end_of_game(0)) return;' in turn
+       and turn.index('if (autosim_session_active() && (*GameState & STATE_GAME_DONE)') <
+           turn.index('auto autosim_ready ='))
+
 verify("post-victory continuation resets quota at full-cycle boundary",
        "bool autosim_take_post_victory_segment_reset()" in game
        and "autosim_post_victory_segment_pending = true;" in ending
