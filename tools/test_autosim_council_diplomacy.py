@@ -50,9 +50,10 @@ assert "!multiplayer && !pbem && !game_done" in autosim
 # Native Council caller remains unchanged; the new Council-specific hooks are
 # separately verified and the pre-call record persists on modal stall.
 assert 'autosim_trace_council_call("enter", faction_id);\n            call_council(faction_id);\n            autosim_trace_council_call("exit", faction_id);' in turn
-assert 'telemetry_record_council_event("call_council", faction_id, action);' in turn
-assert "CouncilProposal[owner], CouncilVoteState[owner]" in turn
-assert "*CouncilSessionPending" in turn
+assert "telemetry_council_call_enter(faction_id);" in turn
+assert "telemetry_council_call_leave();" in turn
+assert "telemetry_council_initialized(win, faction_id, faction_id_2);" in turn
+assert "CouncWin_make_resolution(win, 1);" in turn
 assert "council(MapWin->cOwner, 0, 0);" in turn
 assert "buy_council_vote(faction_id, faction_id_2" in diplo
 print("AUTO-002 Council diplomacy structural contract passed (not native gameplay)")
