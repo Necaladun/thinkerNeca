@@ -435,6 +435,15 @@ void __cdecl control_game() {
                 telemetry_end_session();
             }
             desktop_close();
+            // One automation launcher invocation always runs at most one
+            // game. Save & Exit sets ControlTurnB=1 for the native menu,
+            // which previously regenerated a second world because the
+            // launcher New Game flag was still set on loop reentry.
+            // Sequential game batches will be driven outside terranx.exe.
+            if (autosim_launcher_active) {
+                *ControlTurnB = 0;
+                return cleanup_close();
+            }
             if (!*ControlTurnB) {
                 return cleanup_close();
             }

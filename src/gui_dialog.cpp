@@ -206,6 +206,21 @@ void autosim_null_render_popup(const char* label) {
     telemetry_record_ui_notice("null_render", label ? label : "(null)",
         "native_popup_restore_rendering");
 }
+// A real native modal must draw while open, then restore the suspended
+// null phase on return. The prior implementation left rendering enabled
+// until the next turn after any unsuppressed X_pop/X_pops message.
+struct AutosimNativePopupRenderScope {
+    const bool had_null;
+    explicit AutosimNativePopupRenderScope(const char* label)
+        : had_null(autosim_null_render_active()) {
+        if (had_null) autosim_null_render_popup(label);
+    }
+    ~AutosimNativePopupRenderScope() {
+        if (had_null && autosim_control_active()) {
+            autosim_null_render_suppress(true);
+        }
+    }
+};
 void autosim_monitor_commands() {
     if (!autosim_launcher_active || autosim_launch_profile_path.empty()) return;
     const std::string command = autosim_launch_profile_path + ".command";
@@ -223,6 +238,7 @@ void autosim_monitor_commands() {
         telemetry_record_ui_notice("null_render", "SHOW", "operator_restored_rendering");
     } else if (!strncmp(line, "NULL", 4)) {
         autosim_null_override = false;
+        if (autosim_control_active()) autosim_null_phase = true;
         telemetry_record_ui_notice("null_render", "NULL", "operator_restored_null");
     } else if (!strncmp(line, "STOP", 4)) {
         autosim_request_control(AUTOSIM_CTL_STOP);
@@ -239,13 +255,15 @@ void autosim_monitor_progress(const char* phase, int faction) {
     if (!file) return;
     fprintf(file,
         "version=1\npid=%lu\nphase=%s\nturn=%d\nyear=%d\nfaction=%d\n"
-        "render=%s\nhuman_mask=%u\n",
+        "render=%s\nconfigured_render=%d\nnull_phase=%d\n"
+        "null_override=%d\nhuman_mask=%u\n",
         (unsigned long)GetCurrentProcessId(), phase ? phase : "unknown",
         *CurrentTurn, *CurrentMissionYear, faction,
         autosim_null_render_active() ? "null" :
             (conf.autosim_render_mode == 2 && autosim_null_override
             ? "restored" : conf.autosim_render_mode ? "fast" : "normal"),
-        (unsigned)FactionStatus[0]);
+        conf.autosim_render_mode, autosim_null_phase ? 1 : 0,
+        autosim_null_override ? 1 : 0, (unsigned)FactionStatus[0]);
     const bool flushed = fflush(file) == 0;
     const bool closed = fclose(file) == 0;
     if (flushed && closed) {
@@ -321,10 +339,10 @@ int __cdecl X_pop(const char* label, fp_none fn)
             return 0;
         }
     }
-    autosim_null_render_popup(label);
     if (!conf.warn_on_former_replace && !strcmp(label, "MIMIMI")) {
         return 1;
     }
+    AutosimNativePopupRenderScope native_popup(label);
     return X_pop_9(ScriptFile, label, -1, 0, 0, fn);
 }
 
@@ -338,38 +356,38 @@ int __cdecl X_pop_2(const char* filename, const char* label, fp_none fn)
             return 0;
         }
     }
-    autosim_null_render_popup(label);
+    AutosimNativePopupRenderScope native_popup(label);
     return X_pop_9(filename, label, -1, 0, 0, fn);
 }
 
 int __cdecl X_pop_6(const char* label, int a2, fp_none fn)
 {
-    autosim_null_render_popup(label);
+    AutosimNativePopupRenderScope native_popup(label);
     return X_pop_9(ScriptFile, label, -1, 0, a2, fn);
 }
 
 int __cdecl X_pops(const char* label, Sprite* a2, fp_none fn)
 {
-    autosim_null_render_popup(label);
+    AutosimNativePopupRenderScope native_popup(label);
     return X_pops_18(ScriptFile, label, -1, 0, 0, a2, 1, 1, fn);
 }
 
 int __cdecl X_pops_11(const char* label, int a2, Sprite* a3, fp_none fn)
 {
-    autosim_null_render_popup(label);
+    AutosimNativePopupRenderScope native_popup(label);
     return X_pops_18(ScriptFile, label, -1, 0, a2, a3, 1, 1, fn);
 }
 
 int __cdecl X_dialog(const char* label, int faction_id)
 {
-    autosim_null_render_popup(label);
+    AutosimNativePopupRenderScope native_popup(label);
     return X_pops_18(ScriptFile, label, -1, 0, POPUP_UNK_100000,
         FactionPortraits[faction_id], 1, 1, pop_wait);
 }
 
 int __cdecl X_dialog_alt(const char* filename, const char* label, int faction_id)
 {
-    autosim_null_render_popup(label);
+    AutosimNativePopupRenderScope native_popup(label);
     return X_pops_18(filename, label, -1, 0, POPUP_UNK_100000,
         FactionPortraits[faction_id], 1, 1, pop_wait);
 }
