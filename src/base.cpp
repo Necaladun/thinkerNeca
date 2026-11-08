@@ -432,7 +432,7 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
             treaty_on(faction_id, i, DIPLO_WANT_TO_TALK);
         }
     }
-    if (faction_id_atk == player_id) {
+    if (faction_id_atk == player_id && is_human(faction_id_atk)) {
         int queue_item = base->queue_items[0];
         if (queue_item <= -SP_ID_First) {
             int item_id = abs(queue_item);
@@ -3408,7 +3408,8 @@ int __cdecl mod_base_production() {
                 }
             }
             if (unit_id == BSC_MIND_WORMS) {
-                if (faction_id == player_id && !(*GameInterludeState & 0x10)) {
+                if (faction_id == player_id && is_human(faction_id)
+                && !(*GameInterludeState & 0x10)) {
                     autosim_interlude(4, base->name, 1, 0);
                     veh->state |= VSTATE_ASSISTANT_WORM;
                 }
@@ -3437,7 +3438,7 @@ int __cdecl mod_base_production() {
             }
             veh->morale = clamp(morale_val + 1, 0, 6);
             veh->state |= VSTATE_UNK_2000;
-            if (faction_id == player_id) {
+            if (faction_id == player_id && is_human(faction_id)) {
                 veh->flags |= VFLAG_UNK_1000;
             }
             if (Units[unit_id].plan == PLAN_COLONY) {
