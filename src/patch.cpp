@@ -729,16 +729,6 @@ bool patch_setup(Config* cf) {
     write_jump(0x4CEDE0, (int)action_give);
     write_jump(0x4CF380, (int)action_gate);
     write_jump(0x4CF480, (int)action_sat_attack);
-    // Original native orbital attack result: E8 8C C9 FB FF -> popp(0x48C0A0).
-    // Scient's patch has already been applied. Fail closed on any variant
-    // executable or overlapping hook instead of rewriting unknown bytes.
-    const byte orbital_result_expected[] = {0xE8, 0x8C, 0xC9, 0xFB, 0xFF};
-    if (!memcmp((const void*)0x4CF70F, orbital_result_expected,
-        sizeof(orbital_result_expected))) {
-        write_call(0x4CF70F, (int)autosim_orbital_result_popp);
-    } else {
-        debug("AUTO-002: orbital result popp hook skipped; unexpected 0x4CF70F bytes\\n");
-    }
     write_jump(0x4CF740, (int)action);
     write_jump(0x4D8A70, (int)Console_automate);
     write_jump(0x4E13E0, (int)Console_editor_fungus);
