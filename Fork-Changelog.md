@@ -6,12 +6,18 @@
 - Added telemetry-only per-session `orbit.jsonl`: actual satellite launches, executed AI orbital strike decision inputs and inventory-derived outcome, solar-storm/asteroid losses, and faction orbital inventories at session start/completed turn. The stream is independent of popup suppression and uses the existing recorder's flush/error/session lifecycle.
 - The initial event-stream build passed CI at `d13c734`, but a subsequent Windows report confirmed the old result-popup hook was unreachable. The corrected source route requires new PR-head CI and Windows gameplay confirmation, including state parity and save/reload. Detailed orbital AI and missile-interception logging is deferred.
 
+## Unmerged AUTO-LAUNCH — single launcher with integrated campaign reports (9 November 2026)
+
+- The existing `Run Automation.bat` / PowerShell WinForms launcher now includes the former Campaign Analyzer GUI functions directly in its `Campaign tools & archive` tab: browse/refresh/filter session metadata, inspect recording details, generate/open HTML and CSV reports, open existing reports or campaign folders, export ZIP and access launcher logs. No secondary Tkinter window is launched.
+- Kept the proven `tools/campaign_report.py` standard-library report engine as a **headless** subprocess, adding read-only `--scan-json` for session metadata; generation semantics and output formats stay unchanged. The legacy `Campaign Analyzer.pyw` remains in the repository but is no longer packaged by CI.
+- Added synthetic report CLI regression and Windows PowerShell 5.1 report-bridge and GUI construction smoke checks; actual installed Windows interaction with the new integrated tab remains to be verified. Normal simulation launcher profiles, monitor and native game files are not rewritten.
+
 ## Unmerged AUTO-LOG — comprehensive automation launcher and campaign archive (9 November 2026)
 
 - Draft PR #11 adds explicit new-game selection of all seven native faction slots from fourteen SMAC/X stock factions; old profiles retain existing faction setup and loading a SAV cannot change its roster.
 - Adds run-profile-only timing and checkpoint cadence controls (default on and every 25 complete turns, respectively, in new launcher profiles; old profiles default off), separate UTC-ms native phase `timings.jsonl` and checkpoint `checkpoints.jsonl`, and UTC stamps on passive notices/Council events. Ironman checkpoints skip the native serializer because it can alter the RNG.
 - New full-cycle native SAV checkpoint copies live within the campaign/session archive, independent of native autosaves, with fingerprint, failure status and campaign-link metadata. Operator-named saves are additionally copied there.
-- Adds Launcher `Faction roster` and `Campaign tools & archive` tabs, packaging and opening the existing Python Campaign Analyzer and generating whole-campaign ZIP exports. HTML/CSV reports now include phase timings and SAV indices; old report/session layouts remain readable.
+- Adds Launcher `Faction roster` and `Campaign tools & archive` tabs, with the latter now embedding session-aware report controls and whole-campaign ZIP export rather than launching a separate Tkinter analyzer. The Python report engine remains headless; HTML/CSV exports include phase timings and SAV indices, with older sessions still readable.
 - Compilation, synthetic reporting, Windows PowerShell GUI smoke and same-build SAV reload for these additions still require verification. Do not treat the earlier economic-victory Windows result as verification of these new features.
 
 ## Unmerged AUTO-OBS Stage 3 — observer-neutral all-AI simulation (9 November 2026)
