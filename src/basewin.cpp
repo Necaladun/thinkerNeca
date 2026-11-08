@@ -61,9 +61,9 @@ void __cdecl action_sat_attack(int faction_id, int faction_id_tgt, int target_id
     if (game_rand() % 100 >= OrbitalAttackChance) {
         --Factions[faction_id].satellites_ODP;
         if (faction_id == player_id) {
-            popp(ScriptFile, "WEMUFFEDIT", 0, "satbat_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "WEMUFFEDIT", "satbat_sm.pcx");
         } else if (faction_id_tgt == player_id) {
-            popp(ScriptFile, "THEYMUFFEDIT", 0, "satbat_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "THEYMUFFEDIT", "satbat_sm.pcx");
         }
     } else {
         switch (target_id) {
@@ -75,9 +75,9 @@ void __cdecl action_sat_attack(int faction_id, int faction_id_tgt, int target_id
         }
         ++Factions[faction_id].ODP_deployed;
         if (faction_id == player_id) {
-            popp(ScriptFile, "WEKILLEDIT", 0, "satbat_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "WEKILLEDIT", "satbat_sm.pcx");
         } else if (faction_id_tgt == player_id) {
-            popp(ScriptFile, "THEYKILLEDIT", 0, "satbat_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "THEYKILLEDIT", "satbat_sm.pcx");
         }
     }
     if (ReportIf->view_mode == 6 && InfcList[*InfcUsed] == 5) {
