@@ -1,5 +1,13 @@
 # thinkerNeca — fork changelog
 
+## Unmerged AUTO-OBS Stage 3 — observer-neutral all-AI simulation (9 November 2026)
+
+- Draft PR #11 source implementation adds launcher-selectable `unlimited_expansion` bypass for AI colony quotas during explicitly eligible all-AI sessions. It uses the independent Automation Launcher profile (default enabled for new profiles), not distributed `thinker.ini` or ordinary-game settings.
+- Targeted player/observer parity changes cover alien-observer world rules, AI research timing, cargo orders, monolith, Mind Worm/story flags and project intel; an eliminated AI observer is automatically reassigned to a surviving AI without ending the world.
+- Native `pact_ends` retains treaty removal and both forced pact unit withdrawals but omits passive `ENDPACT1/2/3` modal screens for the all-AI session. 
+- World terminal states now produce a session `result.json` with raw victory, actual survivor/evidence-backed winner, observer transition, and partial-turn status before clean exit. **Terminal SAV is not attempted at unverified partial-cycle boundary**; existing ordinary autosaves remain. GUI score/replay/credits are bypassed in unattended mode.
+- Source contracts and Windows CI build checks are not gameplay acceptance. Pending same-save RNG parity, native observer handover, real victory scenarios, same-build SAV reload and performance/balance testing. Not merged.
+
 ## Unmerged AUTO-NULL / AUTO-NEW experimental simulation features (8 November 2026)
 
 - Draft PR #11 adds tabbed pre-game automation setup (approximately 1.5x previous size), optional native map/tile Null Rendering gates, lightweight PowerShell progress monitor with warning/recovery commands, and profile-driven native no-menu New Game initialization with all factions under AI control from initial setup. This changes no native save format or ordinary game setup and leaves campaign-owned SAV/ZIP, terminal victory/report and batch cycling for separate work. Source/CI only; **Windows game validation pending**.
