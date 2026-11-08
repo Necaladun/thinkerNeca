@@ -19,6 +19,8 @@ std::string campaign_display_name;
 std::string campaign_created_utc;
 std::string last_loaded_save;
 int last_committed_turn = -1;
+int initial_observer = 0;
+bool terminal_result_recorded = false;
 bool recording = false;
 bool resumed_linked_campaign = false;
 
@@ -287,6 +289,8 @@ void recorder_failure() {
 void telemetry_begin_session(const char* source_save) {
     telemetry_end_session();
     last_committed_turn = -1;
+    initial_observer = MapWin ? MapWin->cOwner : 0;
+    terminal_result_recorded = false;
     campaign_dir.clear();
     session_dir.clear();
     campaign_id.clear();
@@ -388,6 +392,8 @@ void telemetry_begin_session(const char* source_save) {
         manifest << "null";
     }
     manifest << ",\"autosim_manual_turns\":" << conf.autosim_manual_turns;
+    manifest << ",\"autosim_unlimited_expansion\":"
+             << (conf.autosim_unlimited_expansion ? "true" : "false");
     manifest << ",\"autosim_suppress_notices\":" << conf.autosim_suppress_notices;
     manifest << ",\"mod_version\":" << json_string(MOD_VERSION)
              << ",\"mod_date\":" << json_string(MOD_DATE)
@@ -601,7 +607,8 @@ void telemetry_record_completed_turn() {
 
 void telemetry_end_session() {
     if (recording) {
-        if (!atomic_write(session_dir + "/status.json", status_json("closed"))) {
+        if (!atomic_write(session_dir + "/status.json",
+            status_json(terminal_result_recorded ? "terminal" : "closed"))) {
             OutputDebugStringA("thinkerNeca TEL-001: failed to finalise status.json\n");
         }
     }
