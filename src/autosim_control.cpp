@@ -119,7 +119,7 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         char summary[384] = {};
         snprintf(summary, sizeof(summary),
             "Observed faction: %d    Humans mask: %02X    Living factions: %d\r\n"
-            "Turns: %d segment / %d total.  Mission years: %d -> %d\r\n"
+            "Turns: %d segment / %d this run.  Mission years: %d -> %d\r\n"
             "Colonies: %d -> %d    Units: %d -> %d",
             s.viewed_faction, (unsigned)(s.human_mask & 0xFF), s.alive_factions,
             s.completed_segment, s.completed_total, s.start_year, s.end_year,
@@ -128,10 +128,11 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
 
         char session[256] = {};
         snprintf(session, sizeof(session),
-            "Campaign ID: %.75s    Session: %.32s    Telemetry: %s",
+            "Campaign ID: %.75s    Session: %.32s    Telemetry: %s    Rejoined: %s",
             s.campaign_id.empty() ? "(not recording)" : s.campaign_id.c_str(),
             s.session_id.empty() ? "(none)" : s.session_id.c_str(),
-            s.telemetry_enabled ? "ON" : "OFF");
+            s.telemetry_enabled ? "ON" : "OFF",
+            s.resumed_campaign ? "Yes" : "No");
         add_child(dialog, "STATIC", session, SS_LEFT, 0, 0, left, 119, inner, 25);
 
         add_child(dialog, "STATIC", "Campaign display name (does not change campaign/session ID)",
@@ -307,6 +308,7 @@ void autosim_fill_dialog_state(AutosimDialogState* state, AutosimDialogMode mode
     state->human_mask = (unsigned)FactionStatus[0];
     state->viewed_faction = MapWin ? MapWin->cOwner : 0;
     state->telemetry_enabled = conf.telemetry_enabled != 0;
+    state->resumed_campaign = telemetry_resumed_linked_campaign();
     state->suppress_notices = conf.autosim_suppress_notices != 0;
     state->fast_combat = conf.autosim_fast_combat != 0;
     state->campaign_id = telemetry_get_campaign_id();
