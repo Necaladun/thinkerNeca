@@ -962,3 +962,16 @@ Exit does not silently launch a new game, AI state/visibility and
 same-build save/reload. If skipped counts remain zero or the display
 still animates, inspect native callers and alternative present paths
 rather than altering fog-of-war or AI view.
+
+## AUTO-OBS Stage 1 — observer-neutrality validation plan (9 November 2026)
+
+**Evidence:** source inspection only (draft PR #11); no gameplay code modifications, build, controlled runtime A/B or same-build reload test performed in this audit. See \`project/technical/telemetry-automation.md\` OBS-01–14 for source locations and risk classification. Confirmed source branches are **not** proof that each is reachable in active Windows unattended play.
+
+1. **Start invariants:** on explicit New Game, each faction slot 1–7 is AI controlled (human bitmask 0), every faction uses computer allocation and Thinker/AI turn driver, and the selected observer remains valid. On loaded saves, record and validate the preexisting mask separately; do not claim automatic AI handover if any human bit remains.
+2. **Rules at creation:** with the same fixed seed, roster, faction identities and explicit game options, vary only the observer, including alien versus non-alien. Compare \`GameRules\`, blind research, Intense Rivalry, map/world flags and RNG state **before** faction setup. OBS-01 predicts different flags in the present source; do not treat different seeds/maps as evidence.
+3. **Same-save control:** fork a single fresh same-build save with identical game world and AI state, choose two different **living** observer factions, ensure no human bits are introduced, run an identical number of complete cycles. Trace per-faction \`faction_upkeep\` and \`mod_enemy_turn\` begin/end, selected research, orders, cargo disembark/wake, base capture, first Mind Worm and monolith use. Record RNG state and phase timing for *every* event, not sampled console lines.
+4. **Compare actual simulation:** normalized per-turn world hash (units, bases, flags, tech, credits, diplomacy, Council/victory, RNG), excluding only proven presentation-only data. On first divergence, save a before/after reproduction and identify the responsible callsite. Do not mask unexpectedly divergent faction intel/story/game flags without classification.
+5. **Elimination/victory:** eliminate current observer while at least two factions remain, verify it is an ordinary faction defeat and simulation continues with another observer; separately test actual economic/diplomatic/conquest/alien/transcendence/time-limit victory. Preserve terminal outcome winner attribution rather than observer-relative \`VIC_*_LOSS\` labels.
+6. **Regression:** ordinary human (including human Progenitor), suppression off, different difficulty levels including below \`limit_project_start\`, stable same-build save/reload, and low-risk source/static tests. Native Windows x86 and loaded runtime hooks require actual in-game evidence.
+
+No measured A/B results have been obtained. A compile or source contract passing will not settle whether observer changes the simulation.
