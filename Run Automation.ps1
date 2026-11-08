@@ -194,6 +194,7 @@ public static class AutoMonitorWin32 {
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hwnd, int show);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, ref AutoMonitorRect rect);
+    [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
 }
 '@
     $statusFile = $runProfilePath + '.status'
@@ -203,11 +204,13 @@ public static class AutoMonitorWin32 {
     $gamePid = 0
     $reportedStall = $false
     $monitorStart = [DateTime]::UtcNow
+    $consoleFocusAttempted = $false
     Write-Host ''
     Write-Host 'thinkerNeca Automation Monitor'
     Write-Host ('Run profile: ' + $runProfilePath)
     Write-Host ('Game PID handoff: ' + $pidFile)
     Write-Host ('Game progress: ' + $statusFile)
+    Write-Host 'The monitor will try to take focus when AI processing begins.'
     Write-Host 'G: Show game  |  R: Restore rendering  |  N: Null rendering'
     Write-Host 'P: Screenshot  |  S: Stop at next full turn  |  Space: Pause at next full turn'
     Write-Host 'Q: Leave monitor open? No - Q closes this console WITHOUT killing the game.'
@@ -254,8 +257,26 @@ public static class AutoMonitorWin32 {
                         ' | turn ' + $record['turn'] +
                         ' | faction ' + $record['faction'] +
                         ' | ' + $record['phase'] +
-                        ' | ' + $record['render'])
+                        ' | ' + $record['render'] +
+                        ' (configured=' + $record['configured_render'] + ')')
                     $lastRecord = $signature
+                    # SMAC takes foreground focus on launch, making the
+                    # external console keyboard controls hard to reach.
+                    # Attempt foreground only ONCE on the first live AI phase.
+                    if (-not $consoleFocusAttempted -and $record['phase'] -eq 'ai_turn') {
+                        $consoleFocusAttempted = $true
+                        $consoleWindow = [AutoMonitorWin32]::GetConsoleWindow()
+                        if ($consoleWindow -ne [IntPtr]::Zero) {
+                            [AutoMonitorWin32]::ShowWindow($consoleWindow, 9) | Out-Null
+                            if ([AutoMonitorWin32]::SetForegroundWindow($consoleWindow)) {
+                                Write-Host 'Monitor console focused; R/N/S/Space/Q commands ready.'
+                            } else {
+                                Write-Host 'Windows declined console focus. Alt+Tab to use monitor keys.'
+                            }
+                        } else {
+                            Write-Host 'No console window handle available. Alt+Tab to the monitor.'
+                        }
+                    }
                     $lastProgress = [DateTime]::UtcNow
                     $reportedStall = $false
                 }
