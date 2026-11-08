@@ -1331,6 +1331,25 @@ int __cdecl commlink_attempter(int faction_id, int faction_id_2) {
 }
 
 void __cdecl communicate(int faction_id, int faction_id_2, int flag) {
+    // AUTO-002: communicate() is the *human dialogue* handler, not the
+    // AI-to-AI diplomacy engine. enemy_diplomacy() already sends pairs of
+    // nonhuman factions through enemies_trade_tech()/encounter() and treaty
+    // updates, and only enters communicate() for a human partner. A native
+    // observer-owner route may nevertheless attempt this UI after all factions
+    // have been handed to AI. Fail closed here instead of inventing answers.
+    //
+    // No proposal, relationship, resource, or RNG state has been changed yet.
+    // A hit is an anomalous call and is logged for caller tracing; it is NOT
+    // evidence that a native Council window has been fixed.
+    if (autosim_control_active()) {
+        char context[192];
+        snprintf(context, sizeof(context),
+            "blocked_human_dialog owner=%d actor=%d partner=%d flag=%d human_mask=%08X pending=%d",
+            MapWin->cOwner, faction_id, faction_id_2, flag,
+            (unsigned)FactionStatus[0], *CouncilSessionPending);
+        telemetry_record_ui_notice("diplomacy_guard", "communicate", context);
+        return;
+    }
     Faction& plr = Factions[faction_id];
     Faction& cmp = Factions[faction_id_2];
     int base_id;
