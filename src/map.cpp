@@ -375,10 +375,23 @@ void __cdecl alt_set(int x, int y, int altitude) {
                     Console_focus(MapWin, base->x, base->y, *CurrentPlayerFaction);
                     parse_says(0, &base->name[0], -1, -1);
                     if (is_player) {
-                        X_pop_2("BASESUBMERGED", "subbase_sm.pcx", 0);
+                        // The popup return is ignored. Keep native X_pop_2
+                        // for ordinary play; all-AI only records this loss
+                        // notice after population/Pressure Dome changes.
+                        if (autosim_ui_active()) {
+                            telemetry_record_ui_notice("x_pop_2",
+                                "BASESUBMERGED", "suppressed_notice");
+                        } else {
+                            X_pop_2("BASESUBMERGED", "subbase_sm.pcx", 0);
+                        }
                     } else {
                         parse_says(1, &MFactions[base->faction_id].adj_name_faction[0], -1, -1);
-                        X_pop_2("BASESUBMERGED2", "subbase_sm.pcx", 0);
+                        if (autosim_ui_active()) {
+                            telemetry_record_ui_notice("x_pop_2",
+                                "BASESUBMERGED2", "suppressed_notice");
+                        } else {
+                            X_pop_2("BASESUBMERGED2", "subbase_sm.pcx", 0);
+                        }
                     }
                 }
                 return set_alt();
@@ -387,10 +400,10 @@ void __cdecl alt_set(int x, int y, int altitude) {
                 Console_focus(MapWin, base->x, base->y, *CurrentPlayerFaction);
                 parse_says(0, &base->name[0], -1, -1);
                 if (is_player) {
-                    popp(ScriptFile, "BASESUBMERGED1", 0, "subbase_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "BASESUBMERGED1", "subbase_sm.pcx");
                 } else {
                     parse_says(1, &MFactions[base->faction_id].adj_name_faction[0], -1, -1);
-                    popp(ScriptFile, "BASESUBMERGED3", 0, "subbase_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "BASESUBMERGED3", "subbase_sm.pcx");
                 }
             }
             mod_base_kill(base_id);
