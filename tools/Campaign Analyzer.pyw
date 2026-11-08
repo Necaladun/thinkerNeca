@@ -8,6 +8,7 @@
 
 from pathlib import Path
 import os
+import sys
 import queue
 import threading
 import webbrowser
@@ -25,7 +26,13 @@ class CampaignPicker(tk.Tk):
         self.geometry("1110x680")
         self.minsize(790, 520)
         # Resolve relative to this script, never to an arbitrary PowerShell cwd.
-        self.campaigns_root = Path(__file__).resolve().parent
+        script_folder = Path(__file__).resolve().parent
+        # Also supports being shipped as tools/ beside the unified launcher.
+        # A command-line directory overrides both placements.
+        self.campaigns_root = (Path(sys.argv[1]).resolve() if len(sys.argv) > 1
+                               else script_folder.parent / "campaigns"
+                               if script_folder.name.lower() == "tools"
+                               else script_folder)
         self.all_rows = []
         self.rows_by_id = {}
         self.result_queue = queue.Queue()
