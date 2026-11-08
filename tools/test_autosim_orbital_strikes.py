@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """AUTO-002 satellite lifecycle and native orbital-strike trace source contract.
 
-A structural test, not proof that native action_sat_attack routes its popup
-through any of the covered X_pop/X_pops variants. Windows x86 validation remains required.
+A structural test. Exact native popp callsite was identified from the
+user's terranx.exe; actual Windows hook execution and state parity remain pending.
 """
 from pathlib import Path
 
@@ -46,6 +46,20 @@ for entry in ('"x_pop"', '"x_pop_2"', '"x_pops"', '"x_pops_11"'):
 assert 'return X_pops_18(ScriptFile, label, -1, 0, 0, a2, 1, 1, fn);' in ui
 assert 'return X_pops_18(ScriptFile, label, -1, 0, a2, a3, 1, 1, fn);' in ui
 assert "write_jump(0x5BF930," not in patch
+
+# Native action_sat_attack at 0x4CF480 calls popp directly at 0x4CF70F.
+# Exact post-Scient byte preflight; no broad popp hook or gameplay rewrite.
+assert 'const byte orbital_result_expected[] = {0xE8, 0x8C, 0xC9, 0xFB, 0xFF};' in patch
+assert 'if (!memcmp((const void*)0x4CF70F, orbital_result_expected,' in patch
+assert 'write_call(0x4CF70F, (int)autosim_orbital_result_popp);' in patch
+assert 'AUTO-002: orbital result popp hook skipped' in patch
+assert 'int __cdecl autosim_orbital_result_popp(const char* filename, const char* label,' in ui
+assert 'if (autosim_ui_active() && !fn && label' in ui
+assert 'return popp(filename, label, a3, image, fn);' in ui
+assert 'telemetry_record_ui_notice("native_orbital_popp", label, "suppressed_orbital_result");' in ui
+for label in ("WEKILLEDIT", "THEYKILLEDIT", "WEMUFFEDIT", "THEYMUFFEDIT"):
+    assert f'!strcmp(label, "{label}")' in ui
+
 
 # Source-owned satellite construction already preserves counts and visibility.
 for counter in ("satellites_nutrient++", "satellites_mineral++",
