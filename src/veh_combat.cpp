@@ -1088,7 +1088,7 @@ void __cdecl planet_busting(int veh_id, int tx, int ty) {
         parse_says(3, Bases[base_id].name, -1, -1);
         int dist = map_range(Bases[base_id].x, Bases[base_id].y, tx, ty);
         const char* img = (dist > reactor_range) ? "astp_sm.pcx" : "baseobl_sm.pcx";
-        popp(ScriptFile, "PLANETBUSTER", 0, img, 0);
+        autosim_notice_popp(ScriptFile, "PLANETBUSTER", img);
     }
     for (int i = 0; i < blast_range; i++) {
         int nx = wrap(tx + TableOffsetX[i]);
