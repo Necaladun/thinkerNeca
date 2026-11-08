@@ -146,3 +146,15 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
       - name: Compile Release DLL and launcher (no runtime/artwork assertion)
         run: cmake --build build/ci-release --parallel 2
+
+  launcher-windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construct actual Windows PowerShell 5.1 WinForms launcher
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -STA -File '.\Run Automation.ps1' -SelfTest
+          if ($LASTEXITCODE -ne 0) { throw 'Launcher run-profile self-test failed' }
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -STA -File '.\Run Automation.ps1' -GuiSelfTest
+          if ($LASTEXITCODE -ne 0) { throw 'WinForms GUI construction failed' }
