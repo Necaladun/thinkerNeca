@@ -1880,7 +1880,8 @@ void __cdecl setup_game(int flag) {
     }
 
     // change prefs_put_2 value to only reset preferences once when the conditions are met
-    if (!*DiffLevel && !flag && !prefs_get_2("DontResetBeginnerPrefs", 0, 0)) {
+    if (!autosim_auto_new_game && !*DiffLevel && !flag
+    && !prefs_get_2("DontResetBeginnerPrefs", 0, 0)) {
         prefs_load(1);
         AlphaIniPrefs->preferences |= PREF_BSC_TUTORIAL_MSGS;
         prefs_put_2("DontResetBeginnerPrefs", 1, 0);
