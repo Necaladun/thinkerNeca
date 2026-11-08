@@ -23,6 +23,9 @@ void __cdecl alien_fauna();
 void __cdecl do_fungal_towers();
 void __cdecl turn_upkeep();
 void __cdecl faction_upkeep(int faction_id);
+// Read-only native Council window diagnostic. Patches only a verified callsite
+// and forwards to the original CouncWin_init with the same __thiscall ABI.
+void __thiscall autosim_trace_CouncWin_init(CouncWindow* win, int faction_id, int faction_id_2);
 void __cdecl repair_phase(int faction_id);
 void __cdecl production_phase(int faction_id);
 void __cdecl allocate_energy(int faction_id);
