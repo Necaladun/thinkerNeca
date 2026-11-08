@@ -1,5 +1,6 @@
 #include "autosim_control.h"
 #include "main.h"
+#include "telemetry.h"
 
 #include <cctype>
 #include <cerrno>
@@ -122,21 +123,31 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         add_child(dialog, "STATIC", intro,
             SS_LEFT, 0, 0, left, 13, inner, 23);
         char summary[384] = {};
+        char runtime_text[100] = "AI runtime: not started";
+        if (telemetry_run_clock_started()) {
+            const unsigned long long seconds = telemetry_run_elapsed_ms() / 1000;
+            snprintf(runtime_text, sizeof(runtime_text),
+                "AI runtime: %u:%02u:%02u (operator pauses excluded)",
+                (unsigned)(seconds / 3600),
+                (unsigned)((seconds / 60) % 60),
+                (unsigned)(seconds % 60));
+        }
         if (s.mode == AUTOSIM_DIALOG_VICTORY) {
             snprintf(summary, sizeof(summary),
                 "MY%d. Observed faction: %d    Humans mask: %02X    Living factions: %d\r\n"
                 "Colonies: %d    Units: %d\r\n"
-                "Post-victory continuation creates an experimental extra segment.",
+                "%s",
                 s.end_year, s.viewed_faction, (unsigned)(s.human_mask & 0xFF),
-                s.alive_factions, s.end_bases, s.end_units);
+                s.alive_factions, s.end_bases, s.end_units, runtime_text);
         } else {
             snprintf(summary, sizeof(summary),
                 "Observed faction: %d    Humans mask: %02X    Living factions: %d\r\n"
                 "Turns: %d segment / %d this run.  Mission years: %d -> %d\r\n"
-                "Colonies: %d -> %d    Units: %d -> %d",
+                "Colonies: %d -> %d    Units: %d -> %d\r\n%s",
                 s.viewed_faction, (unsigned)(s.human_mask & 0xFF), s.alive_factions,
                 s.completed_segment, s.completed_total, s.start_year, s.end_year,
-                s.start_bases, s.end_bases, s.start_units, s.end_units);
+                s.start_bases, s.end_bases, s.start_units, s.end_units,
+                runtime_text);
         }
         add_child(dialog, "STATIC", summary, SS_LEFT, 0, 0, left, 43, inner, 66);
 
@@ -182,7 +193,7 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
             s.fast_combat ? BST_CHECKED : BST_UNCHECKED, 0);
 
         const std::string lower_note = s.mode == AUTOSIM_DIALOG_VICTORY
-            ? s.victory_summary
+            ? s.victory_summary + " Post-victory continuation is experimental."
                 + (s.partial_turn
                     ? "\r\nTerminal save is an experimental mid-cycle snapshot; reload is unverified."
                     : "\r\nVictory reached at a turn boundary; verify saved game reload.")
