@@ -1,6 +1,20 @@
 # Campaign telemetry and automated AI games — design and implementation status
 
 
+## TEL-LOG-02 source-owned gameplay events (9 November 2026; unmerged draft PR #11)
+
+Four optional session JSONL streams (`production`, `units`, `combat`, `research`) use globally ordered session event IDs, schema 1, UTC, turn/year and processing faction; they are distinct from UI diagnostics. The offline Analyzer exports one CSV for each and a bounded most-recent-60 HTML table. Older sessions with missing streams still work.
+
+**Production:** `mod_base_change` direct queue changes after mineral retool penalty; successful unit completion after native `veh_init`, before producing base can disappear; facility/satellite/project completion after native state change, with item/cost/minerals and base coordinates. Direct native queue writes outside these routes may be missed. `projects.jsonl` and `orbit.jsonl` remain their specialist ledgers.
+
+**Vehicles:** baseline existing slots and new `veh_init` births get per-session instance IDs tracked in a parallel vector; IDs shift with `veh_kill` array compaction. Native removal is marked cause unknown. Marine Detachment changes are logged after owner mutation. No native VEH/save layout change; IDs do not continue across separate sessions; unhooked ownership changes or native array mutations are not claimed covered.
+
+**Combat:** only executed `mod_battle_fight_2` HP exchanges, including per-defender applied artillery damage, with raw effective strengths, reactor, before/after HP, flags, retreat and Marine status. Excludes odds-only `option=0` calls. Captured before postcombat cleanup; HP exchanges are not definitive base-capture/winner reports. Planet Busters remain separate specialised work.
+
+**Research:** technology grants after `TechOwners` bit mutation with raw source faction, prior owner and share flag; source 0 remains `research_or_free`, not necessarily paid research. Map/commlink/prototype branches excluded. Target changes observed only at completed-cycle boundary, without AI decision explanations.
+
+Read-only collection never evaluates RNG/AI decision functions or changes gameplay state. I/O faults disable recording, not the game. CI, real Windows gameplay and save/reload evidence remain separate.
+
 ## TEL-LOG-01 Council political events and Secret Project lifecycle (9 November 2026; draft PR #11)
 
 **Scope / evidence:** implemented in the still-unmerged PR #11 source, with host/synthetic tests and CI; no native Windows verification of the new streams yet. This section supersedes the *older Council UI-trace design* below. It does **not** change the existing Council native hook preflight, AI ballot selection, make-resolution invocation, modal fallback, vote-bribery policy, popup suppression or project production choices.
