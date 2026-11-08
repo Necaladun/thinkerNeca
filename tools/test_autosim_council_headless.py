@@ -18,7 +18,7 @@ pairs = [
      "write_call(0x4282F2" not in patch and "write_byte(0x4282F7" not in patch),
     ("all-or-nothing hook install", "if (council_known)" in patch),
     ("all-AI suppression guard", "autosim_ui_active()" in turn),
-    ("native modal preserved for unsupported cases", "return original(win, a2, a3, a4);" in turn),
+    ("native modal preserved for unsupported cases", "const int result = original(win, a2, a3, a4);" in turn),
     ("all ten standard Council proposals supported",
      all(token in turn for token in (
          "PROP_ELECT_PLANETARY_GOVERNOR", "PROP_UNITE_SUPREME_LEADER",
@@ -34,23 +34,24 @@ pairs = [
      and "GameState |= STATE_GAME_DONE" not in turn[:turn.index("fp_1int sub_51E530")]
      and "council_action(" not in turn[:turn.index("fp_1int sub_51E530")]),
     ("proposal-specific before/after counters recorded",
-     'pass_count_before=%d' in turn
+     "telemetry_council_resolved(win, resolved" in turn
      and "ProposalPassCount[proposal]" in turn
-     and 'game_state_after=%08X' in turn
-     and 'headless_native_ballots' in turn
-     and 'headless_native_resolution' in turn),
+     and '"pass_count_before"' not in turn
+     and ',"pass_count_before"' in tele
+     and ',"game_state_after"' in tele
+     and 'council_record("ballots")' in tele),
     ("does not recompute already-populated AI votes",
      "council_get_vote(owner, win->proposal_type," not in turn
      and "CouncWin_set_vote(win, owner," not in turn
      and 'win->faction_vote[owner] != 0' not in turn),
     ("prevents duplicate native resolution",
      "win->proposal_outcome != 0" in turn
-     and "headless_already_resolved" in turn),
+     and "if (win->proposal_outcome != 0)" in turn),
     ("incomplete native ballots use ordinary window",
      '"native_resolution_incomplete"' in turn
      and "if (!resolved || win->proposal_outcome == 0)" in turn
-     and "return original(win, a2, a3, a4);" in turn),
-    ("independent flushed Council file", "council.jsonl" in tele and "append_line(council_file, event.str())" in tele),
+     and "const int result = original(win, a2, a3, a4);" in turn),
+    ("independent flushed Council file", "council.jsonl" in tele and "append_line(council_file, value)" in tele),
     ("all proposal names included", all(x in turn for x in (
         '"planetary_governor"', '"supreme_leader"', '"unity_core"',
         '"global_trade_pact"', '"repeal_global_trade_pact"',
