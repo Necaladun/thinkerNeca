@@ -144,4 +144,6 @@ verify("actual render suppression instrumentation exposed in status",
        and 'draw_skipped=%lu' in dialog and 'screen_skipped=%lu' in dialog)
 verify("monitor shows actual skip counters without disabling idle warning",
        "draws skipped=" in launcher and "presents skipped=" in launcher
-       and "if ($elapsed -ge $warningSeconds -and -not $reportedStall)" in launcher)
+       and "if ($elapsed -ge $warningSeconds -and -not $reportedStall -and" in launcher
+       and "$record['phase'] -ne 'victory_paused'" in launcher
+       and "$record['phase'] -ne 'operator_dialog'" in launcher)
