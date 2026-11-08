@@ -2848,10 +2848,21 @@ MOV_NAVAL:
                 MapWin->field_23BF0 = 1;
                 if (veh_fc_id == MapWin->cOwner) {
                     MapWin->field_23BF0 = 2;
-                    Console_cursor_next(MapWin, tgt_x, tgt_y);
+                    if (!autosim_fast_combat_active()) {
+                        Console_cursor_next(MapWin, tgt_x, tgt_y);
+                    }
                 }
             }
         }
+    }
+    // AUTO-002: visibility was already computed and the legal movement
+    // decision was made. No human controls any faction in this mode.
+    // Follow the existing offscreen movement path: retain stack_put,
+    // rotation and all state updates without focusing/animating every step.
+    // The normal per-turn map redraw remains unchanged.
+    if (autosim_fast_combat_active()) {
+        move_delay = 0;
+        visual_tgl = false;
     }
     if (visual_tgl && !ctrl_key_down()
     && (move_delay || !(*GamePreferences & PREF_ADV_NO_CENTER_VEH_ORDERS))) {
