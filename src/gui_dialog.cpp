@@ -114,12 +114,15 @@ static void autosim_poll_physical_shortcuts() {
         && (GetAsyncKeyState(VK_MENU) & 0x8000) == 0;
     if (f9_down && !f9_was_down) {
         autosim_request_control(AUTOSIM_CTL_PAUSE);
+        telemetry_record_ui_notice("autosim_input", "F9", "physical_latched");
     }
     if (f10_down && !f10_was_down) {
         autosim_request_control(AUTOSIM_CTL_STOP);
+        telemetry_record_ui_notice("autosim_input", "F10", "physical_latched");
     }
     if (menu_down && !menu_was_down) {
         autosim_request_control(AUTOSIM_CTL_MENU);
+        telemetry_record_ui_notice("autosim_input", "CTRL_SHIFT_F12", "physical_latched");
     }
     f9_was_down = f9_down;
     f10_was_down = f10_down;
@@ -137,17 +140,24 @@ void autosim_collect_queued_keys() {
     autosim_poll_physical_shortcuts();
     MSG msg = {};
     while (PeekMessageA(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE)) {
-        if (msg.message != WM_KEYDOWN || (msg.lParam & (1u << 30)))
+        // Windows treats F10 as a system key: its queued message may be
+        // WM_SYSKEYDOWN rather than WM_KEYDOWN. Capture both, but keep
+        // ordinary keys out of gameplay during unattended AI turns.
+        if ((msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN)
+        || (msg.lParam & (1u << 30)))
             continue;
         if (msg.wParam == VK_F10) {
             autosim_request_control(AUTOSIM_CTL_STOP);
+            telemetry_record_ui_notice("autosim_input", "F10", "queued_latched");
         } else if (msg.wParam == VK_F9) {
             autosim_request_control(AUTOSIM_CTL_PAUSE);
+            telemetry_record_ui_notice("autosim_input", "F9", "queued_latched");
         } else if (msg.wParam == VK_F12
         && (GetAsyncKeyState(VK_CONTROL) & 0x8000)
         && (GetAsyncKeyState(VK_SHIFT) & 0x8000)
         && !(GetAsyncKeyState(VK_MENU) & 0x8000)) {
             autosim_request_control(AUTOSIM_CTL_MENU);
+            telemetry_record_ui_notice("autosim_input", "CTRL_SHIFT_F12", "queued_latched");
         }
     }
 }

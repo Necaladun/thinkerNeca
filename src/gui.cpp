@@ -646,11 +646,16 @@ LRESULT WINAPI ModWinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     // AUTO-002: controls only queue a request, never interrupt a live AI
     // action. The turn driver handles it after the current full turn.
     // Repeated keydown events must not re-arm the request.
-    if (msg == WM_KEYDOWN && !*GameHalted && autosim_control_active()
+    if ((msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
+    && !*GameHalted && autosim_control_active()
     && (wParam == VK_F9 || wParam == VK_F10)) {
+        // F10 often arrives via WM_SYSKEYDOWN; previously it could be
+        // missed by the WM_KEYDOWN-only native window-procedure path.
         if (!(lParam & (1u << 30))) {
             autosim_request_control(wParam == VK_F10
                 ? AUTOSIM_CTL_STOP : AUTOSIM_CTL_PAUSE);
+            telemetry_record_ui_notice("autosim_input",
+                wParam == VK_F10 ? "F10" : "F9", "winproc_latched");
         }
         return 0;
     }

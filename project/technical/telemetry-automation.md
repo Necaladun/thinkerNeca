@@ -307,3 +307,16 @@ once, with already-populated ballots and no `council_get_vote` reroll or
 `CouncWin_set_vote` resubmission. A zero return or zero outcome logs
 `native_resolution_incomplete` and uses the original window.
 Non-Governor motions remain native. Actual game verification is pending.
+
+
+**Operator input traces and F10 WM_SYSKEYDOWN (8 Nov):**
+`autosim_input` records `F9`, `F10`, and `CTRL_SHIFT_F12`
+with latch source `physical_latched`, `queued_latched` or
+`winproc_latched`, plus one `BOUNDARY_REQUEST` with request ID,
+eligibility and full-cycle state when the turn driver consumes any
+queued request. Both keyboard paths now accept `WM_SYSKEYDOWN` for
+F10 in addition to `WM_KEYDOWN`. Physical polling requires game
+foreground; while another application has focus use
+`autosim-stop.txt` in the executable directory to trigger the next
+safe-boundary Save/Exit UI. This only adds input telemetry; native
+Council vote logic is unchanged. Test Windows behaviour separately.

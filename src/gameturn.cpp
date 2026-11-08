@@ -569,6 +569,12 @@ void __cdecl control_turn() {
             if (eligible && full_cycle) ++total_autosim_turns;
             first_cycle_partial = false;
             const AutosimControlRequest request = autosim_take_control_request();
+            if (request != AUTOSIM_CTL_NONE) {
+                char action[96];
+                snprintf(action, sizeof(action), "request=%d eligible=%d full_cycle=%d",
+                    (int)request, eligible ? 1 : 0, full_cycle ? 1 : 0);
+                telemetry_record_ui_notice("autosim_input", "BOUNDARY_REQUEST", action);
+            }
             const bool operator_stop = eligible && request == AUTOSIM_CTL_STOP;
             const bool operator_pause = eligible && request == AUTOSIM_CTL_PAUSE;
             const bool operator_menu = eligible && request == AUTOSIM_CTL_MENU;

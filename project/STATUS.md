@@ -135,3 +135,19 @@ The revised test path invokes native `CouncWin_make_resolution(win,1)`
 directly (rather than recasting any vote); its native early return on a
 missing ballot triggers a logged modal fallback. **Windows runtime validation
 of the revised path remains pending.**
+
+
+**AUTO-002 operator input regression (8 Nov, MY2195–2212 live test):**
+The revised Governor Council headless election completed on Windows with
+`native_make_resolution=1`, nonzero outcome, Governor faction 1 and
+pending=0; the native window flashed briefly but needed no clicks.
+Game advanced through at least MY2212. The user reports F9/F10 ineffective
+and manually terminated the process. `ui_notices.jsonl` shows no
+`OPERATOR_STOP`, `PAUSE` or other consumed operator command, despite
+completed faction cycles. Source audit: keyboard polling/WinProc previously
+only processed `WM_KEYDOWN`; F10 may arrive as `WM_SYSKEYDOWN`.
+The follow-up patch accepts both types, logs keyboard latch sources and
+turn-boundary consumption, and preserves the external `autosim-stop.txt`
+fallback. Foreground focus and timing remain possible causes; awaiting
+Windows testing. First Council Governor success does not verify other
+proposals or vote purchases.

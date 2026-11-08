@@ -28,6 +28,17 @@ for key, action in (("VK_F9", "AUTOSIM_CTL_PAUSE"), ("VK_F10", "AUTOSIM_CTL_STOP
             f"{key} physical request does not latch")
 require("PeekMessageA(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE)" in keys,
         "Existing queued keyboard route disappeared")
+require("msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN" in keys,
+        "F10 WM_SYSKEYDOWN needs to be handled alongside WM_KEYDOWN")
+require('"F10", "queued_latched"' in keys and '"F10", "physical_latched"' in keys,
+        "F10 must emit queued and physical diagnostic records")
+gui = (ROOT / "src/gui.cpp").read_text(encoding="utf-8")
+require("(msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)" in gui,
+        "WinProc must accept F10 system keydown messages")
+require('"winproc_latched"' in gui,
+        "WinProc must record captured operator shortcuts")
+require('"BOUNDARY_REQUEST"' in turn,
+        "Completed-cycle request consumption must be logged")
 require("autosim_poll_physical_shortcuts();" in keys,
         "Physical key polling not part of periodic AI collection")
 require("if (!autosim_control_active()) return;" in keys,

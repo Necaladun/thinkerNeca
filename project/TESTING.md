@@ -700,3 +700,32 @@ Test startup, no-click MY2195 resolution, ballot totals, final Governor,
 subsequent AI turns, same-build reload, ordinary human Councils, repeat
 elections, vote-buying offers and other Council proposals. CI success is
 not gameplay acceptance.
+
+
+### AUTO-002 user smoke: Council succeeded; operator keys not observed — 8 Nov 2026
+
+**Actual Windows test of `ba5c6d82`:** `council(1).jsonl`
+(first records MY2194, last MY2212) records MY2195 Governor election:
+`notice_suppressed CALLSCOUNCIL`, native
+`headless_native_ballots` `votes=-3,1,-3,-3,-3,1,-3,7`,
+`headless_native_resolution native_make_resolution=1 outcome=1
+governor=1 pending=0`, `CouncWin_init exit`, and
+`notice_suppressed GOVERNOR`. Native Council UI flashed and closed
+automatically. Governor remained 1 through subsequent recorded turns.
+This validates the first Governor election *for this save* only.
+
+**Separate regression / open cause:** user attempted F9/F10 during the
+continued all-AI session, but it advanced more than 10 years; user
+terminated process externally. In `ui_notices(9).jsonl`, only
+`autosim STARTUP`/`SETTINGS`/`confirmed` appear; neither
+`OPERATOR_STOP`, `PAUSE`, `TURN_LIMIT` nor `SAVED` was emitted.
+Code samples physical keys only while the game process owns foreground,
+and keyboard polling/ModWinProc previously recognised only
+`WM_KEYDOWN`, not `WM_SYSKEYDOWN` (used by Windows for F10).
+Follow-up source now recognises both message classes and logs
+`autosim_input` physical/queued/winproc latches and
+`BOUNDARY_REQUEST` consumption. Need Windows evidence distinguishing
+F9 focus, quick tap timing, F10 system-message handling and game-native
+modal capture. Verify `autosim-stop.txt` (game EXE directory) triggers
+Save Game -> menu after a completed faction cycle with the game
+out of foreground. Do not treat source structural tests as runtime proof.
