@@ -597,92 +597,213 @@ try {
     [void](Add-Label $monitorTab 'A warning means no observed progress, not proof of a deadlock. No automatic termination.' 30 455 860 55)
     [void](Add-Label $monitorTab 'Restoring rendering cannot make an already-blocked game thread draw a fresh frame.' 30 520 860 55)
 
-    [void](Add-Label $reportTab 'Reports, campaign archives and diagnostic files from one launcher.' 28 20 910 34)
-    [void](Add-Label $reportTab 'Selected recorded campaign' 28 77 850 25)
-    $campaignList = New-Object System.Windows.Forms.ComboBox
-    $campaignList.DropDownStyle = 'DropDownList'
-    $campaignList.SetBounds(28,107,700,32)
-    $reportTab.Controls.Add($campaignList)
+    # Campaign browsing and report actions are embedded in this launcher tab.
+    # campaign_report.py is a headless data/rendering backend, not another GUI.
+    [void](Add-Label $reportTab 'Campaign reports, session browser, saves and archive' 28 12 875 28)
+    [void](Add-Label $reportTab 'Campaigns folder' 28 43 150 24)
+    $rootBox = Add-Text $reportTab (Join-Path $gameRoot 'campaigns') 180 40 548
+    $rootBox.ReadOnly = $true
+    $rootBrowse = New-Object System.Windows.Forms.Button
+    $rootBrowse.Text = 'Choose folder...'
+    $rootBrowse.SetBounds(745,39,157,32)
+    $reportTab.Controls.Add($rootBrowse)
+
+    [void](Add-Label $reportTab 'Filter sessions' 28 85 120 24)
+    $sessionFilter = Add-Text $reportTab '' 145 82 580
     $refreshCampaigns = New-Object System.Windows.Forms.Button
     $refreshCampaigns.Text = 'Refresh'
-    $refreshCampaigns.SetBounds(749,107,150,34)
+    $refreshCampaigns.SetBounds(745,79,157,34)
     $reportTab.Controls.Add($refreshCampaigns)
-    $campaignRoot = Join-Path $gameRoot 'campaigns'
-    $archiveRoot = Join-Path $gameRoot 'automation\archives'
-    $refreshAction = {
-        $current = [string]$campaignList.SelectedItem
-        $campaignList.Items.Clear()
-        if ([System.IO.Directory]::Exists($campaignRoot)) {
-            Get-ChildItem -LiteralPath $campaignRoot -Directory |
-                Sort-Object LastWriteTime -Descending | ForEach-Object {
-                    [void]$campaignList.Items.Add($_.Name)
-                }
-        }
-        if ($campaignList.Items.Count -gt 0) {
-            $index = $campaignList.Items.IndexOf($current)
-            $campaignList.SelectedIndex = if ($index -ge 0) {$index} else {0}
-        }
-    }
-    $refreshCampaigns.Add_Click($refreshAction)
-    & $refreshAction
-    $reportAnalyzer = New-Object System.Windows.Forms.Button
-    $reportAnalyzer.Text = 'Open Python Campaign Analyzer'
-    $reportAnalyzer.SetBounds(28,180,300,49)
-    $reportTab.Controls.Add($reportAnalyzer)
-    $reportAnalyzer.Add_Click({
-        try {
-            $scriptPath = Join-Path $gameRoot 'tools\Campaign Analyzer.pyw'
-            if (-not [System.IO.File]::Exists($scriptPath)) {
-                throw 'Campaign Analyzer.pyw not installed. Install the tools/ folder from the automation build.'
-            }
-            $python = $null
-            $extra = @()
-            foreach ($candidate in @('pythonw.exe','pyw.exe','python.exe','py.exe')) {
-                $cmd = Get-Command $candidate -ErrorAction SilentlyContinue |
-                    Select-Object -First 1
-                if ($cmd) {
-                    $python = $cmd.Source
-                    if ($candidate -like 'py*' -and $candidate -ne 'pythonw.exe' -and $candidate -ne 'python.exe') {
-                        $extra = @('-3')
-                    }
-                    break
-                }
-            }
-            if (-not $python) { throw 'Install Python 3 (including Tkinter) to open Campaign Analyzer.' }
-            $argsList = @($extra) + @('"' + $scriptPath + '"', '"' + $campaignRoot + '"')
-            [void](Start-Process -FilePath $python -WorkingDirectory (Join-Path $gameRoot 'tools') -ArgumentList $argsList -PassThru)
-        } catch {
-            [void][System.Windows.Forms.MessageBox]::Show(
-                $_.Exception.Message, 'Campaign Analyzer',
-                [System.Windows.Forms.MessageBoxButtons]::OK,
-                [System.Windows.Forms.MessageBoxIcon]::Warning)
-        }
-    })
+
+    $sessionList = New-Object System.Windows.Forms.ListView
+    $sessionList.View = [System.Windows.Forms.View]::Details
+    $sessionList.FullRowSelect = $true
+    $sessionList.MultiSelect = $false
+    $sessionList.HideSelection = $false
+    $sessionList.GridLines = $true
+    $sessionList.SetBounds(28,129,874,266)
+    [void]$sessionList.Columns.Add('Campaign',200)
+    [void]$sessionList.Columns.Add('Session',90)
+    [void]$sessionList.Columns.Add('Faction / observer',147)
+    [void]$sessionList.Columns.Add('Years',110)
+    [void]$sessionList.Columns.Add('Turns',64)
+    [void]$sessionList.Columns.Add('Bases',55)
+    [void]$sessionList.Columns.Add('Status',93)
+    [void]$sessionList.Columns.Add('Updated',138)
+    $sessionList.Tag = [object[]]@()
+    $reportTab.Controls.Add($sessionList)
+
+    [void](Add-Label $reportTab 'Selected recording' 28 405 870 24)
+    $sessionDetails = New-Object System.Windows.Forms.TextBox
+    $sessionDetails.Multiline = $true
+    $sessionDetails.ReadOnly = $true
+    $sessionDetails.ScrollBars = 'Vertical'
+    $sessionDetails.SetBounds(28,431,874,102)
+    $reportTab.Controls.Add($sessionDetails)
+
+    $generateReport = New-Object System.Windows.Forms.Button
+    $generateReport.Text = 'Generate + open report'
+    $generateReport.SetBounds(28,548,208,42)
+    $reportTab.Controls.Add($generateReport)
+    $openExisting = New-Object System.Windows.Forms.Button
+    $openExisting.Text = 'Open existing report'
+    $openExisting.SetBounds(248,548,199,42)
+    $reportTab.Controls.Add($openExisting)
     $openCampaign = New-Object System.Windows.Forms.Button
     $openCampaign.Text = 'Open campaign folder'
-    $openCampaign.SetBounds(343,180,245,49)
+    $openCampaign.SetBounds(459,548,202,42)
     $reportTab.Controls.Add($openCampaign)
-    $openCampaign.Add_Click({
-        if ($campaignList.SelectedIndex -ge 0) {
-            $directory = Join-Path $campaignRoot ([string]$campaignList.SelectedItem)
-            if ([System.IO.Directory]::Exists($directory)) { Invoke-Item -LiteralPath $directory }
+    $zipCampaign = New-Object System.Windows.Forms.Button
+    $zipCampaign.Text = 'Export ZIP'
+    $zipCampaign.SetBounds(673,548,229,42)
+    $reportTab.Controls.Add($zipCampaign)
+
+    $openAutomationLogs = New-Object System.Windows.Forms.Button
+    $openAutomationLogs.Text = 'Open launcher logs'
+    $openAutomationLogs.SetBounds(28,608,206,36)
+    $reportTab.Controls.Add($openAutomationLogs)
+    $reportStatus = Add-Label $reportTab 'Select a recorded session. Reports use Python 3; launching the game does not.' 249 605 650 58
+    [void](Add-Label $reportTab 'Archives include SAV checkpoints, raw JSONL, metadata and generated reports. Prefer cleanly closed sessions for exports.' 28 675 875 38)
+
+    $archiveRoot = Join-Path $gameRoot 'automation\archives'
+    $getSelectedRow = {
+        if ($sessionList.SelectedItems.Count -eq 0) { return $null }
+        return $sessionList.SelectedItems[0].Tag
+    }
+    $updateReportDetails = {
+        $row = & $getSelectedRow
+        $hasRow = $null -ne $row
+        $generateReport.Enabled = $hasRow -and -not [bool]$row.error
+        $openExisting.Enabled = $hasRow
+        $openCampaign.Enabled = $hasRow
+        $zipCampaign.Enabled = $hasRow
+        if (-not $hasRow) {
+            $sessionDetails.Text = 'No session selected. Record a game with telemetry enabled, or choose a different campaigns folder.'
+        } elseif ($row.error) {
+            $sessionDetails.Text = "Campaign: $($row.campaign_name) / $($row.session_id)" +
+                [Environment]::NewLine + "Unreadable recording: $($row.error)"
+        } else {
+            $sessionDetails.Text = "Campaign: $($row.campaign_name)  /  Session: $($row.session_id)" +
+                [Environment]::NewLine + "Folder: $($row.campaign_dir)" +
+                [Environment]::NewLine + "Started: $($row.started)  |  State: $($row.status)  |  Source save: $($row.source_save)" +
+                [Environment]::NewLine + "Living factions: $($row.factions)"
+        }
+    }
+    $displayCampaignRows = {
+        $priorPath = ''
+        $prior = & $getSelectedRow
+        if ($prior) { $priorPath = [string]$prior.campaign_dir + '\' + [string]$prior.session_id }
+        $term = $sessionFilter.Text.Trim().ToLowerInvariant()
+        $sessionList.BeginUpdate()
+        try {
+            $sessionList.Items.Clear()
+            foreach ($row in @($sessionList.Tag)) {
+                if ($null -eq $row) { continue }
+                $haystack = @($row.folder, $row.campaign_name, $row.player,
+                    $row.years, $row.status, $row.started, $row.updated,
+                    $row.source_save, $row.factions, $row.session_id) -join ' '
+                if ($term -and -not $haystack.ToLowerInvariant().Contains($term)) { continue }
+                $item = New-Object System.Windows.Forms.ListViewItem([string]$row.campaign_name)
+                foreach ($value in @($row.session_id, $row.player, $row.years,
+                    $row.turns, $row.bases, $row.status, $row.updated)) {
+                    [void]$item.SubItems.Add([string]$value)
+                }
+                $item.Tag = $row
+                [void]$sessionList.Items.Add($item)
+                if ($priorPath -eq ([string]$row.campaign_dir + '\' + [string]$row.session_id)) {
+                    $item.Selected = $true
+                }
+            }
+            if ($sessionList.SelectedItems.Count -eq 0 -and $sessionList.Items.Count -gt 0) {
+                $sessionList.Items[0].Selected = $true
+            }
+        } finally {
+            $sessionList.EndUpdate()
+        }
+        & $updateReportDetails
+    }
+    $refreshAction = {
+        try {
+            $root = [System.IO.Path]::GetFullPath($rootBox.Text)
+            $json = Invoke-CampaignReporter -arguments @('--scan-json', $root)
+            $sessionList.Tag = [object[]]@($json | ConvertFrom-Json)
+            & $displayCampaignRows
+            $reportStatus.Text = "$(@($sessionList.Tag).Count) session(s) found. Select, filter, generate or export."
+        } catch {
+            $sessionList.Tag = [object[]]@()
+            & $displayCampaignRows
+            $reportStatus.Text = 'Campaign scan failed: ' + $_.Exception.Message
+        }
+    }
+    $refreshCampaigns.Add_Click({ & $refreshAction })
+    $sessionFilter.Add_TextChanged({ & $displayCampaignRows })
+    $sessionList.Add_SelectedIndexChanged({ & $updateReportDetails })
+    $rootBrowse.Add_Click({
+        $picker = New-Object System.Windows.Forms.FolderBrowserDialog
+        try {
+            $picker.Description = 'Select the folder containing your campaign directories'
+            $picker.SelectedPath = $rootBox.Text
+            if ($picker.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
+                $rootBox.Text = [System.IO.Path]::GetFullPath($picker.SelectedPath)
+                & $refreshAction
+            }
+        } finally { $picker.Dispose() }
+    })
+    $generateReportAction = {
+        $row = & $getSelectedRow
+        if (-not $row -or $row.error) { return }
+        try {
+            $form.UseWaitCursor = $true
+            $reportStatus.Text = 'Generating offline report for ' + $row.session_id + '...'
+            $reportStatus.Refresh()
+            [void](Invoke-CampaignReporter -arguments @([string]$row.campaign_dir,
+                '--session', [string]$row.session_id))
+            $reportPath = Join-Path (Join-Path (Join-Path ([string]$row.campaign_dir) 'reports') ([string]$row.session_id)) 'index.html'
+            if (-not [System.IO.File]::Exists($reportPath)) {
+                throw 'Reporter completed without creating index.html.'
+            }
+            $reportStatus.Text = 'Report created: ' + $reportPath
+            Invoke-Item -LiteralPath $reportPath
+        } catch {
+            $reportStatus.Text = 'Report generation failed.'
+            [void][System.Windows.Forms.MessageBox]::Show(
+                $_.Exception.Message, 'Campaign report',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error)
+        } finally { $form.UseWaitCursor = $false }
+    }
+    $generateReport.Add_Click({ & $generateReportAction })
+    $sessionList.Add_DoubleClick({ & $generateReportAction })
+    $openExisting.Add_Click({
+        $row = & $getSelectedRow
+        if (-not $row) { return }
+        $reportPath = Join-Path (Join-Path (Join-Path ([string]$row.campaign_dir) 'reports') ([string]$row.session_id)) 'index.html'
+        if ([System.IO.File]::Exists($reportPath)) {
+            Invoke-Item -LiteralPath $reportPath
+        } else {
+            [void][System.Windows.Forms.MessageBox]::Show(
+                'No report has been generated for this session yet. Choose Generate + open report.',
+                'Campaign report',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information)
         }
     })
-    $zipCampaign = New-Object System.Windows.Forms.Button
-    $zipCampaign.Text = 'Export selected campaign ZIP'
-    $zipCampaign.SetBounds(28,271,350,49)
-    $reportTab.Controls.Add($zipCampaign)
+    $openCampaign.Add_Click({
+        $row = & $getSelectedRow
+        if ($row -and [System.IO.Directory]::Exists([string]$row.campaign_dir)) {
+            Invoke-Item -LiteralPath ([string]$row.campaign_dir)
+        }
+    })
     $zipCampaign.Add_Click({
         try {
-            if ($campaignList.SelectedIndex -lt 0) {
-                throw 'Select an existing recorded campaign first.'
-            }
-            $campaignFolder = Join-Path $campaignRoot ([string]$campaignList.SelectedItem)
+            $row = & $getSelectedRow
+            if (-not $row) { throw 'Select a recorded session before exporting its campaign.' }
+            $campaignFolder = [System.IO.Path]::GetFullPath([string]$row.campaign_dir)
             if (-not [System.IO.Directory]::Exists($campaignFolder)) {
                 throw 'Selected campaign folder no longer exists. Refresh the list.'
             }
             [void][System.IO.Directory]::CreateDirectory($archiveRoot)
-            $suggested = [string]$campaignList.SelectedItem + '-' +
+            $suggested = [string]$row.folder + '-' +
                 (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip'
             $picker = New-Object System.Windows.Forms.SaveFileDialog
             try {
@@ -696,7 +817,7 @@ try {
                 $picker.Dispose()
             }
             if ($destination.StartsWith(
-                [System.IO.Path]::GetFullPath($campaignFolder).TrimEnd('\') + '\',
+                $campaignFolder.TrimEnd('\') + '\',
                 [StringComparison]::OrdinalIgnoreCase)) {
                 throw 'ZIP destination must be outside the campaign being archived.'
             }
@@ -707,8 +828,6 @@ try {
                     $campaignFolder, $temporary,
                     [System.IO.Compression.CompressionLevel]::Optimal, $true)
                 if ([System.IO.File]::Exists($destination)) {
-                    # Atomic replacement keeps the previous archive intact if
-                    # final commit fails. Temporary and target share a volume.
                     [System.IO.File]::Replace($temporary, $destination, $null)
                 } else {
                     [System.IO.File]::Move($temporary, $destination)
@@ -718,11 +837,7 @@ try {
                     [System.IO.File]::Delete($temporary)
                 }
             }
-            [void][System.Windows.Forms.MessageBox]::Show(
-                ('Campaign ZIP created: ' + $destination),
-                'Campaign archive',
-                [System.Windows.Forms.MessageBoxButtons]::OK,
-                [System.Windows.Forms.MessageBoxIcon]::Information)
+            $reportStatus.Text = 'Campaign ZIP created: ' + $destination
         } catch {
             [void][System.Windows.Forms.MessageBox]::Show(
                 $_.Exception.Message, 'Campaign archive error',
@@ -730,16 +845,12 @@ try {
                 [System.Windows.Forms.MessageBoxIcon]::Error)
         }
     })
-    [void](Add-Label $reportTab 'A campaign ZIP includes its completed-cycle SAV checkpoints, reports, manifest, result, phase timings and all JSONL streams.' 28 355 890 62)
-    [void](Add-Label $reportTab 'If a session is still running, logs may be changing during ZIP creation. Prefer archiving after a clean pause or exit.' 28 430 890 58)
-    $openAutomationLogs = New-Object System.Windows.Forms.Button
-    $openAutomationLogs.Text = 'Open launcher logs'
-    $openAutomationLogs.SetBounds(28,535,290,45)
-    $reportTab.Controls.Add($openAutomationLogs)
     $openAutomationLogs.Add_Click({
         $folder = Join-Path $gameRoot 'automation\logs'
         if ([System.IO.Directory]::Exists($folder)) { Invoke-Item -LiteralPath $folder }
     })
+    if (-not $GuiSelfTest) { & $refreshAction }
+    else { & $updateReportDetails }
 
     $start = New-Object System.Windows.Forms.Button
     $start.Text = 'Launch Simulation'
@@ -845,7 +956,10 @@ try {
     })
     if ($GuiSelfTest) {
         if ($tabs.TabPages.Count -ne 6 -or $factionCombos.Count -ne 7 -or
-            $reportAnalyzer.Text -ne 'Open Python Campaign Analyzer' -or
+            $generateReport.Text -ne 'Generate + open report' -or
+            $openExisting.Text -ne 'Open existing report' -or
+            $sessionList.Columns.Count -ne 8 -or
+            $rootBrowse.Text -ne 'Choose folder...' -or
             $presentation.Items.Count -ne 3 -or
             $worldSize.Items.Count -ne 5 -or $factionCombos.Count -ne 7 -or
             $archiveCadence.Items.Count -ne 6 -or $turns.Maximum -ne 100000) {
