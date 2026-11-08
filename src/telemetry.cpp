@@ -45,6 +45,12 @@ int initial_observer = 0;
 bool terminal_result_recorded = false;
 bool recording = false;
 bool resumed_linked_campaign = false;
+// Monotonic process-local duration for THIS execution session. DWORD tick
+// subtraction is wrap-safe for any single active interval under 49 days.
+unsigned long long simulation_elapsed_completed_ms = 0;
+DWORD simulation_active_start_tick = 0;
+bool simulation_clock_active = false;
+bool simulation_clock_started = false;
 
 std::string utc_stamp_ms() {
     SYSTEMTIME time = {};
@@ -274,6 +280,10 @@ std::string status_json(const char* state) {
     std::ostringstream out;
     out << "{\"schema\":1,\"state\":" << json_string(state)
         << ",\"last_committed_turn\":" << last_committed_turn
+        << ",\"simulation_elapsed_ms\":";
+    if (simulation_clock_started) out << telemetry_run_elapsed_ms();
+    else out << "null";
+    out << ",\"simulation_time_basis\":\"active_ai_wall_time_excludes_operator_pauses\""
         << ",\"updated_utc\":" << json_string(utc_stamp().c_str()) << "}\n";
     return out.str();
 }
@@ -335,10 +345,38 @@ void recorder_failure() {
 
 } // namespace
 
+void telemetry_run_clock_set_active(bool active) {
+    if (simulation_clock_active == active) return;
+    const DWORD now = GetTickCount();
+    if (active) {
+        simulation_clock_started = true;
+        simulation_active_start_tick = now;
+    } else {
+        simulation_elapsed_completed_ms +=
+            (unsigned long long)(DWORD)(now - simulation_active_start_tick);
+    }
+    simulation_clock_active = active;
+}
+
+bool telemetry_run_clock_started() {
+    return simulation_clock_started;
+}
+
+unsigned long long telemetry_run_elapsed_ms() {
+    return simulation_elapsed_completed_ms +
+        (simulation_clock_active
+            ? (unsigned long long)(DWORD)(GetTickCount() - simulation_active_start_tick)
+            : 0);
+}
+
 static bool telemetry_orbit_snapshot(const char* phase);
 
 void telemetry_begin_session(const char* source_save) {
     telemetry_end_session();
+    simulation_elapsed_completed_ms = 0;
+    simulation_active_start_tick = 0;
+    simulation_clock_active = false;
+    simulation_clock_started = false;
     last_committed_turn = -1;
     last_checkpoint_turn = -1;
     orbit_event_seq = 0;
@@ -402,12 +440,16 @@ void telemetry_begin_session(const char* source_save) {
     if (!joined) {
         SYSTEMTIME local = {};
         GetLocalTime(&local);
-        char day[16] = {};
-        snprintf(day, sizeof(day), "%04u%02u%02u", (unsigned)local.wYear,
-            (unsigned)local.wMonth, (unsigned)local.wDay);
+        char date_time[32] = {};
+        snprintf(date_time, sizeof(date_time),
+            "%04u%02u%02u-%02u%02u%02u",
+            (unsigned)local.wYear, (unsigned)local.wMonth,
+            (unsigned)local.wDay, (unsigned)local.wHour,
+            (unsigned)local.wMinute, (unsigned)local.wSecond);
+        // Name is the operator's selected campaign display label, not
+        // the initial camera faction. Stable ID is never renamed later.
         std::ostringstream prefix;
-        prefix << "AI-Sim-" << folder_slug(MFactions[MapWin->cOwner].formal_name_faction)
-               << "-MY" << *CurrentMissionYear << "-" << day;
+        prefix << folder_slug(campaign_display_name.c_str()) << "-" << date_time;
         for (int attempt = 0; attempt < 1000; ++attempt) {
             campaign_id = prefix.str() + (attempt ? "-" + std::to_string(attempt + 1) : "");
             campaign_dir = "campaigns/" + campaign_id;
@@ -1267,6 +1309,9 @@ void telemetry_record_completed_turn() {
 // particular, a Council or production victory may fire during one AI's
 // upkeep. No score/vote calculators, RNG or native UI are invoked here.
 void telemetry_record_terminal_result(const char* save_path, const char* save_status) {
+    // Freeze BEFORE the post-victory control window, screenshots, saves
+    // and operator deliberation. Later re-writes of result.json reuse it.
+    telemetry_run_clock_set_active(false);
     if (!recording) return;
     // A later operator-requested save updates result.json for the SAME win,
     // but only the initial win emits an append-only history entry.
@@ -1360,6 +1405,10 @@ void telemetry_record_terminal_result(const char* save_path, const char* save_st
            << ",\"turn\":" << *CurrentTurn
            << ",\"mission_year\":" << *CurrentMissionYear
            << ",\"last_committed_turn\":" << last_committed_turn
+           << ",\"simulation_elapsed_ms\":";
+    if (simulation_clock_started) result << telemetry_run_elapsed_ms();
+    else result << "null";
+    result << ",\"simulation_time_basis\":\"active_ai_wall_time_excludes_operator_pauses\""
            << ",\"partial_cycle\":" << (*CurrentTurn > last_committed_turn ? "true" : "false")
            << ",\"initial_observer\":" << initial_observer
            << ",\"final_observer\":" << (MapWin ? MapWin->cOwner : 0)
@@ -1417,6 +1466,9 @@ void telemetry_record_terminal_result(const char* save_path, const char* save_st
 }
 
 void telemetry_resume_after_victory() {
+    // An explicit continuation resumes only from the operator's choice;
+    // the preceding victory-control pause never enters the duration.
+    telemetry_run_clock_set_active(true);
     if (!recording) return;
     terminal_result_recorded = false;
     // result.json remains as the most recent victory; victories.jsonl is the
@@ -1427,6 +1479,7 @@ void telemetry_resume_after_victory() {
 }
 
 void telemetry_end_session() {
+    telemetry_run_clock_set_active(false);
     if (recording) {
         if (!atomic_write(session_dir + "/status.json",
             status_json(terminal_result_recorded ? "terminal" : "closed"))) {
