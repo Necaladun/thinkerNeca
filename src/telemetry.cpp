@@ -11,6 +11,7 @@ namespace {
 FILE* turns_file = NULL;
 FILE* bases_file = NULL;
 FILE* ui_notices_file = NULL;
+FILE* council_file = NULL;
 std::string campaign_dir;
 std::string session_dir;
 std::string campaign_id;
@@ -266,6 +267,10 @@ void close_files() {
         fclose(ui_notices_file);
         ui_notices_file = NULL;
     }
+    if (council_file) {
+        fclose(council_file);
+        council_file = NULL;
+    }
 }
 
 void recorder_failure() {
@@ -414,7 +419,8 @@ void telemetry_begin_session(const char* source_save) {
     turns_file = fopen((session_dir + "/turns.jsonl").c_str(), "wb");
     bases_file = fopen((session_dir + "/bases.jsonl").c_str(), "wb");
     ui_notices_file = fopen((session_dir + "/ui_notices.jsonl").c_str(), "wb");
-    if (!turns_file || !bases_file || !ui_notices_file) {
+    council_file = fopen((session_dir + "/council.jsonl").c_str(), "wb");
+    if (!turns_file || !bases_file || !ui_notices_file || !council_file) {
         recorder_failure();
         return;
     }
@@ -439,6 +445,34 @@ void telemetry_record_ui_notice(const char* source, const char* label, const cha
     if (!append_line(ui_notices_file, event.str())) {
         recorder_failure();
     }
+}
+
+// Dedicated flushed Council trace for diagnosing stalls and election parity.
+// This only reads existing game state; it never evaluates votes or RNG.
+void telemetry_record_council_event(const char* phase, int actor, const char* detail) {
+    if (!recording || !council_file) return;
+    const int owner = MapWin ? MapWin->cOwner : 0;
+    std::ostringstream event;
+    event << "{\"schema\":1,\"turn\":" << *CurrentTurn
+          << ",\"mission_year\":" << *CurrentMissionYear
+          << ",\"processing_faction\":" << *CurrentFaction
+          << ",\"actor\":" << actor
+          << ",\"observer\":" << owner
+          << ",\"human_mask\":" << (unsigned)FactionStatus[0]
+          << ",\"alive_mask\":" << (unsigned)FactionStatus[1]
+          << ",\"pending\":" << *CouncilSessionPending
+          << ",\"governor\":" << *GovernorFaction
+          << ",\"phase\":" << json_string(phase)
+          << ",\"detail\":" << json_string(detail)
+          << ",\"observer_proposal\":" << ((owner > 0 && owner < MaxPlayerNum) ? CouncilProposal[owner] : -1)
+          << ",\"observer_vote_state\":" << ((owner > 0 && owner < MaxPlayerNum) ? CouncilVoteState[owner] : -1)
+          << ",\"energy\":[";
+    for (int i = 0; i < MaxPlayerNum; ++i) {
+        if (i) event << ',';
+        event << Factions[i].energy_credits;
+    }
+    event << "]}";
+    if (!append_line(council_file, event.str())) recorder_failure();
 }
 
 void telemetry_record_completed_turn() {

@@ -5,6 +5,8 @@
 void telemetry_begin_session(const char* source_save);
 void telemetry_record_completed_turn();
 void telemetry_record_ui_notice(const char* source, const char* label, const char* action);
+// Dedicated session Council trace, flushed before native modal processing.
+void telemetry_record_council_event(const char* phase, int actor, const char* detail);
 void telemetry_end_session();
 
 // Human-friendly campaign labels are separate from stable folder IDs. A save

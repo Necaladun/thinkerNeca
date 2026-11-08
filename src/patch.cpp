@@ -1227,20 +1227,38 @@ bool patch_setup(Config* cf) {
     write_call(0x5BCC70, (int)mod_wants_to_attack); // tech_val
     write_call(0x5BCC85, (int)mod_wants_to_attack); // tech_val
     write_call(0x427F4A, (int)diplomacy_check); // CouncWin::init
-    // AUTO-002: extra read-only tracing on the verified patched terranx.exe
-    // call from council() to CouncWin::init. Verify the original target
-    // before writing, since other executables/patches may differ.
-    // Do not hook normal human games or sessions without active telemetry.
-    if (cf->telemetry_enabled && cf->autosim_manual_turns > 0) {
-        const uintptr_t callsite = 0x4284CA;
-        const uint8_t opcode = *(const uint8_t*)callsite;
-        const int32_t displacement = *(const int32_t*)(callsite + 1);
-        if (opcode == 0xE8
-            && (uintptr_t)(callsite + 5 + displacement) == 0x427230) {
-            write_call((int)callsite, (int)autosim_trace_CouncWin_init);
-        } else {
-            OutputDebugStringA("thinkerNeca AUTO-002: native Council trace hook skipped (unknown executable)\n");
-        }
+    // Native Council-only hooks: exact x86 post-Scient callsite preflight
+    // before any write. Unknown executables retain native Council behaviour.
+    // Runtime eligibility is checked in each wrapper, including setup-armed
+    // sessions where autosim_manual_turns was initially zero in the INI.
+    auto council_native_call = [](uintptr_t site, uintptr_t target) {
+        if (*(const uint8_t*)site != 0xE8) return false;
+        const int32_t displacement = *(const int32_t*)(site + 1);
+        return (uintptr_t)(site + 5 + displacement) == target;
+    };
+    const uint8_t* council_modal = (const uint8_t*)0x4282F2;
+    const bool council_known =
+        council_native_call(0x4284CA, 0x427230)
+        && council_native_call(0x4284A9, 0x48C0A0)
+        && council_native_call(0x428542, 0x48C0A0)
+        && council_native_call(0x428115, 0x5BF7D0)
+        && council_native_call(0x42828A, 0x5BF7D0)
+        && council_modal[0] == 0xFF
+        && council_modal[1] == 0x90
+        && council_modal[2] == 0xE4
+        && council_modal[3] == 0x00
+        && council_modal[4] == 0x00
+        && council_modal[5] == 0x00;
+    if (council_known) {
+        write_call(0x4284CA, (int)autosim_trace_CouncWin_init);
+        write_call(0x4284A9, (int)autosim_council_announcement);
+        write_call(0x428542, (int)autosim_council_announcement);
+        write_call(0x428115, (int)autosim_council_human_vote_offer);
+        write_call(0x42828A, (int)autosim_council_human_vote_offer);
+        write_call(0x4282F2, (int)autosim_council_modal_or_resolve);
+        write_byte(0x4282F7, 0x00, 0x90);
+    } else {
+        OutputDebugStringA("thinkerNeca AUTO-002: Council hooks skipped (native preflight mismatch)\n");
     }
     write_call(0x43F2F4, (int)diplomacy_check); // DiploPop::start
     write_call(0x4A2589, (int)diplomacy_check); // ReportWin::draw_intel

@@ -18,7 +18,7 @@ static void autosim_trace_council_call(const char* phase, int faction_id) {
         phase, faction_id, owner, (unsigned)FactionStatus[0],
         *CouncilSessionPending, *GovernorFaction,
         CouncilProposal[owner], CouncilVoteState[owner]);
-    telemetry_record_ui_notice("council_trace", "call_council", action);
+    telemetry_record_council_event("call_council", faction_id, action);
 }
 
 // Targeted diagnostic for the verified native terranx.exe Council callsite
@@ -35,7 +35,7 @@ void __thiscall autosim_trace_CouncWin_init(CouncWindow* win,
             "enter arg1=%d arg2=%d owner=%d human_mask=%08X pending=%d governor=%d",
             faction_id, faction_id_2, MapWin->cOwner, (unsigned)FactionStatus[0],
             *CouncilSessionPending, *GovernorFaction);
-        telemetry_record_ui_notice("council_native", "CouncWin_init", action);
+        telemetry_record_council_event("CouncWin_init", faction_id, action);
     }
     CouncWin_init(win, faction_id, faction_id_2);
     if (trace) {
@@ -55,8 +55,81 @@ void __thiscall autosim_trace_CouncWin_init(CouncWindow* win,
             win->faction_vote_count[4], win->faction_vote_count[5],
             win->faction_vote_count[6], win->faction_vote_count[7],
             *CouncilSessionPending, *GovernorFaction);
-        telemetry_record_ui_notice("council_native", "CouncWin_init", action);
+        telemetry_record_council_event("CouncWin_init", faction_id, action);
     }
+}
+
+
+int __cdecl autosim_council_announcement(const char* filename, const char* label,
+    int a3, const char* pcx, fp_none callback) {
+    // These two exact native popp() sites discard the return value.
+    if (autosim_ui_active() && label &&
+        (!strcmp(label, "CALLSCOUNCIL") || !strcmp(label, "GOVERNOR"))) {
+        telemetry_record_council_event("notice_suppressed", MapWin->cOwner, label);
+        return 0;
+    }
+    return popp(filename, label, a3, pcx, callback);
+}
+
+int __cdecl autosim_council_human_vote_offer(const char* label, int flags,
+    Sprite* portrait, fp_none callback) {
+    // The native Council screen offers to buy the observed HUMAN's ballot.
+    // In an all-AI game there is no player to sell their vote. Omit that
+    // human-specific proposal; do not grant tech or transfer credits.
+    if (autosim_ui_active() && label &&
+        (!strcmp(label, "VOTEFORME") || !strcmp(label, "VOTEFORMETECH"))) {
+        telemetry_record_council_event("human_only_offer_omitted",
+            MapWin->cOwner, label);
+        return 0;
+    }
+    return X_pops_11(label, flags, portrait, callback);
+}
+
+// Replace only the exact native six-byte CouncWindow virtual modal execution
+// call. The constructor, AI ballots and native Council resolution stay native.
+// Any unknown voting state must fall back to the original interactive window.
+int __thiscall autosim_council_modal_or_resolve(CouncWindow* win,
+    int a2, void* a3, void* a4) {
+    typedef int(__thiscall *NativeModal)(CouncWindow*, int, void*, void*);
+    NativeModal original = (NativeModal)(*(void***)win)[0xE4 / sizeof(void*)];
+    if (!autosim_ui_active()) return original(win, a2, a3, a4);
+    const int owner = MapWin->cOwner;
+    if (owner <= 0 || owner >= MaxPlayerNum ||
+        win->proposal_type != PROP_ELECT_PLANETARY_GOVERNOR ||
+        FactionStatus[0] || *MultiplayerActive || *PbemActive) {
+        telemetry_record_council_event("modal_fallback", owner,
+            "proposal_or_mode_not_eligible");
+        return original(win, a2, a3, a4);
+    }
+    const unsigned alive = (unsigned)FactionStatus[1];
+    bool complete = (alive & (1u << owner)) != 0;
+    for (int i = 1; i < MaxPlayerNum; ++i) {
+        if ((alive & (1u << i)) && win->faction_vote[i] == 0)
+            complete = false;
+    }
+    if (!complete) {
+        telemetry_record_council_event("modal_fallback", owner,
+            "native_ballots_incomplete");
+        return original(win, a2, a3, a4);
+    }
+    char before[256];
+    snprintf(before, sizeof(before),
+        "proposal=%d candidate=%d observed_vote=%d mask=%08X votes=%d,%d,%d,%d,%d,%d,%d,%d",
+        win->proposal_type, win->candidate_faction_id,
+        win->faction_vote[owner], (unsigned)win->vote_faction_mask,
+        win->faction_vote[0], win->faction_vote[1],
+        win->faction_vote[2], win->faction_vote[3],
+        win->faction_vote[4], win->faction_vote[5],
+        win->faction_vote[6], win->faction_vote[7]);
+    telemetry_record_council_event("headless_native_ballots", owner, before);
+    CouncWin_set_vote(win, owner, win->faction_vote[owner]);
+    char after[128];
+    snprintf(after, sizeof(after),
+        "set_vote_returned outcome=%d governor=%d pending=%d mask=%08X",
+        win->proposal_outcome, *GovernorFaction, *CouncilSessionPending,
+        (unsigned)win->vote_faction_mask);
+    telemetry_record_council_event("headless_native_resolution", owner, after);
+    return 0;
 }
 
 fp_1int sub_51E530 = (fp_1int)0x51E530;
