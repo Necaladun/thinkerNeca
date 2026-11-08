@@ -38,6 +38,7 @@ function New-Defaults {
         telemetry_enabled = '1'
         suppress_notices = '1'
         fast_combat = '1'
+        unlimited_expansion = '1'
         render_mode = '2'
         world_size = '3'
         world_ocean = '1'
@@ -76,7 +77,7 @@ function New-OptionLines($options, [bool]$includeSchema) {
     if ($includeSchema) { $lines.Add('schema=1') }
     foreach ($key in @('mode', 'source_save', 'campaign_name',
                       'turns', 'telemetry_enabled', 'suppress_notices', 'fast_combat',
-                      'render_mode', 'world_size', 'world_ocean', 'world_erosion',
+                      'unlimited_expansion', 'render_mode', 'world_size', 'world_ocean', 'world_erosion',
                       'world_cloud', 'world_life', 'difficulty', 'observer',
                       'monitor_seconds')) {
         $lines.Add($key + '=' + [string]$options[$key])
@@ -125,6 +126,7 @@ if ($SelfTest) {
             -not $lines.Contains('mode=load') -or
             -not $lines.Contains('turns=100') -or
             -not $lines.Contains('render_mode=2') -or
+            -not $lines.Contains('unlimited_expansion=1') -or
             -not $lines.Contains('world_size=3') -or
             -not $lines.Contains('monitor_seconds=45')) {
             throw 'run-profile snapshot mismatch'
@@ -460,7 +462,8 @@ try {
         'Null Rendering - suppress routine map/tile drawing') (Get-Selected 'render_mode' 2)
     $telemetry = Add-Check $presentationTab 'Record campaign telemetry, including Council events' 181 ([string]$options['telemetry_enabled'] -eq '1')
     $notices = Add-Check $presentationTab 'Suppress audited noninteractive popups' 223 ([string]$options['suppress_notices'] -eq '1')
-    [void](Add-Label $presentationTab 'Null Rendering only operates during eligible AI turns. AI visibility and fog-of-war state are unchanged.' 30 300 870 60)
+    $unlimitedExpansion = Add-Check $presentationTab 'Ignore the AI colony expansion cap while simulating (automation only)' 265 ([string]$options['unlimited_expansion'] -eq '1')
+    [void](Add-Label $presentationTab 'Null Rendering only operates during eligible AI turns. AI visibility and fog-of-war state are unchanged.' 30 330 870 60)
     [void](Add-Label $presentationTab 'An unknown modal can still stop the engine. The external monitor warns but does not click it.' 30 360 870 60)
 
     [void](Add-Label $monitorTab 'Monitor runs in this batch console after launching the game.' 30 35 880 35)
@@ -542,6 +545,7 @@ try {
                 turns=[string][int]$turns.Value
                 telemetry_enabled=if ($telemetry.Checked) {'1'} else {'0'}
                 suppress_notices=if ($notices.Checked) {'1'} else {'0'}
+                unlimited_expansion=if ($unlimitedExpansion.Checked) {'1'} else {'0'}
                 fast_combat=if ($render -ge 1) {'1'} else {'0'}
                 render_mode=[string]$render
                 world_size=[string][int]$worldSize.SelectedIndex
