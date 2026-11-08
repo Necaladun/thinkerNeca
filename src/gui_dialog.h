@@ -32,6 +32,9 @@ enum DiploCounter {
 
 int __thiscall Popup_load_icon(Popup* This, Sprite* a2, int a3, char* a4);
 // AUTO-002 classified, opt-in source-side presentation wrappers.
+// True for an explicitly launched all-AI session even if the current observer
+// has died or the world has reached a terminal state.
+bool autosim_session_active();
 bool autosim_control_active();
 bool autosim_ui_active();
 int autosim_notice_netmsg(NetMessage* msg, const char* label, int delay,
