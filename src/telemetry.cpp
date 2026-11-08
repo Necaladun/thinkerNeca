@@ -12,6 +12,8 @@ FILE* turns_file = NULL;
 FILE* bases_file = NULL;
 FILE* ui_notices_file = NULL;
 FILE* council_file = NULL;
+FILE* timings_file = NULL;
+FILE* checkpoints_file = NULL;
 std::string campaign_dir;
 std::string session_dir;
 std::string campaign_id;
@@ -19,10 +21,22 @@ std::string campaign_display_name;
 std::string campaign_created_utc;
 std::string last_loaded_save;
 int last_committed_turn = -1;
+int last_checkpoint_turn = -1;
 int initial_observer = 0;
 bool terminal_result_recorded = false;
 bool recording = false;
 bool resumed_linked_campaign = false;
+
+std::string utc_stamp_ms() {
+    SYSTEMTIME time = {};
+    GetSystemTime(&time);
+    char buffer[40] = {};
+    snprintf(buffer, sizeof(buffer), "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ",
+        (unsigned)time.wYear, (unsigned)time.wMonth, (unsigned)time.wDay,
+        (unsigned)time.wHour, (unsigned)time.wMinute,
+        (unsigned)time.wSecond, (unsigned)time.wMilliseconds);
+    return buffer;
+}
 
 std::string utc_stamp() {
     SYSTEMTIME time;
@@ -273,6 +287,14 @@ void close_files() {
         fclose(council_file);
         council_file = NULL;
     }
+    if (timings_file) {
+        fclose(timings_file);
+        timings_file = NULL;
+    }
+    if (checkpoints_file) {
+        fclose(checkpoints_file);
+        checkpoints_file = NULL;
+    }
 }
 
 void recorder_failure() {
@@ -289,6 +311,7 @@ void recorder_failure() {
 void telemetry_begin_session(const char* source_save) {
     telemetry_end_session();
     last_committed_turn = -1;
+    last_checkpoint_turn = -1;
     initial_observer = MapWin ? MapWin->cOwner : 0;
     terminal_result_recorded = false;
     campaign_dir.clear();
@@ -392,6 +415,7 @@ void telemetry_begin_session(const char* source_save) {
         manifest << "null";
     }
     manifest << ",\"autosim_manual_turns\":" << conf.autosim_manual_turns;
+    manifest << ",\"archive_interval\":" << conf.autosim_archive_interval;
     manifest << ",\"autosim_unlimited_expansion\":"
              << (conf.autosim_unlimited_expansion ? "true" : "false");
     manifest << ",\"autosim_suppress_notices\":" << conf.autosim_suppress_notices;
@@ -425,7 +449,9 @@ void telemetry_begin_session(const char* source_save) {
     for (int fc = 1; fc < MaxPlayerNum; ++fc) {
         if (fc > 1) manifest << ',';
         manifest << "{\"id\":" << fc << ",\"name\":"
-                 << json_string(MFactions[fc].formal_name_faction) << "}";
+                 << json_string(MFactions[fc].formal_name_faction)
+                 << ",\"filename\":" << json_string(MFactions[fc].filename)
+                 << ",\"search_key\":" << json_string(MFactions[fc].search_key) << "}";
     }
     manifest << "]}\n";
     if (!atomic_write(session_dir + "/manifest.json", manifest.str())) {
@@ -436,7 +462,10 @@ void telemetry_begin_session(const char* source_save) {
     bases_file = fopen((session_dir + "/bases.jsonl").c_str(), "wb");
     ui_notices_file = fopen((session_dir + "/ui_notices.jsonl").c_str(), "wb");
     council_file = fopen((session_dir + "/council.jsonl").c_str(), "wb");
-    if (!turns_file || !bases_file || !ui_notices_file || !council_file) {
+    timings_file = fopen((session_dir + "/timings.jsonl").c_str(), "wb");
+    checkpoints_file = fopen((session_dir + "/checkpoints.jsonl").c_str(), "wb");
+    if (!turns_file || !bases_file || !ui_notices_file || !council_file
+    || !timings_file || !checkpoints_file) {
         recorder_failure();
         return;
     }
