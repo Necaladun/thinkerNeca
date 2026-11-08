@@ -2,6 +2,10 @@
 
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
+## Unmerged AUTO-002 — verified-binary native Council window diagnostics (8 November 2026)
+
+- Verified user's patched `terranx.exe` hash against earlier installed binary and disassembled native Council chain, ballot and Governor-resolution handling. Added optional telemetry-only `CouncWin_init` entry/exit logging, including proposal, vote mask, ballot selections and weights, with exact-original-callsite check and matching `__thiscall` forwarding. Does **not** suppress Council UI or make any decision, and has no runtime verification. Pre-Council save still required to isolate modal safely.
+
 ## Unmerged AUTO-002 — physical F9/F10 fallback and external stop file (8 November 2026)
 
 - Adds focus-gated `GetAsyncKeyState` edge sampling alongside queued keyboard polling during all-AI simulations. Supports a one-shot `autosim-stop.txt` file beside the game executable that requests the existing Save Game → menu action at the next completed full turn, then attempts to delete the file. Native Council modals and normal human games are not changed. User reports F10 was accepted during Council popup in a prior build, and combat visuals are faster. [Develop/Release Win32 CI 42451218764 passed at `fff9fef`](https://github.com/Necaladun/thinkerNeca/actions/runs/42451218764); neither new control is Windows-tested yet.
