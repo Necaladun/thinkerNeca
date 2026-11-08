@@ -28,6 +28,7 @@ struct AutosimDialogState {
     int human_mask = 0;
     int viewed_faction = 0;
     bool telemetry_enabled = false;
+    bool resumed_campaign = false;
     bool suppress_notices = false;
     bool fast_combat = false;
     std::string campaign_id;
