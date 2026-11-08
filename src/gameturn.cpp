@@ -234,7 +234,11 @@ void __cdecl control_turn() {
     RECT rc;
     Popup cur_popup;
     Popup_ctor(&cur_popup);
-    auto guard = cleanup_handler([&] { Popup_dtor(&cur_popup); });
+    auto guard = cleanup_handler([&] {
+        autosim_null_render_suppress(false);
+        autosim_monitor_progress("turn_driver_exit", 0);
+        Popup_dtor(&cur_popup);
+    });
     if (!*CurrentTurn && !*ControlTurnMove && is_human(MapWin->cOwner) && !*PbemActive) {
         crash_landing(MapWin->cOwner);
     }
@@ -304,6 +308,8 @@ void __cdecl control_turn() {
             }
         }
         if (!autosim_ready()) startup_confirmed = false;
+        autosim_null_render_suppress(autosim_ready());
+        autosim_monitor_progress("cycle_start", 0);
         // Capture a baseline as soon as the user has handed the last human
         // faction to AI. An initially partial loaded cycle is not counted.
         if (autosim_ready()) {
@@ -327,6 +333,7 @@ void __cdecl control_turn() {
                 *ControlTurnC = 1;
                 {
                     AutoScopedAutosimFastPrefs fast_presentation;
+                    autosim_monitor_progress("turn_upkeep", 0);
                     turn_upkeep();
                 }
                 if (end_of_game(1)) {
@@ -560,6 +567,7 @@ void __cdecl control_turn() {
             }
             if (!*ControlTurnMove || (*PbemActive && (*GameMoreRules & MRULES_UNK_40))) {
                 *ControlTurnC = 1;
+                autosim_monitor_progress("faction_upkeep", current_id);
                 faction_upkeep(current_id);
                 if (end_of_game(0)) {
                     return;
@@ -580,7 +588,9 @@ void __cdecl control_turn() {
                 }
             } else {
                 AutoScopedAutosimFastPrefs fast_presentation;
+                autosim_monitor_progress("ai_turn", current_id);
                 mod_enemy_turn(current_id);
+                autosim_monitor_progress("ai_turn_complete", current_id);
             }
             if (!restart) {
                 *ControlTurnMove = 0;
@@ -602,6 +612,7 @@ void __cdecl control_turn() {
             // All faction phases have completed for this turn. Never open
             // a modal control window or perform a manual save mid-faction.
             telemetry_record_completed_turn();
+            autosim_monitor_progress("turn_completed", 0);
             const bool full_cycle = !first_cycle_partial;
             const bool eligible = autosim_ready();
             const AutoCycleAction action = auto_driver.on_cycle(
@@ -626,6 +637,9 @@ void __cdecl control_turn() {
                     operator_stop ? "OPERATOR_STOP" :
                     operator_menu ? "OPERATOR_MENU" : "PAUSE",
                     "control_dialog");
+                autosim_null_render_suppress(false);
+                autosim_monitor_progress("operator_dialog", 0);
+                draw_map(1);
                 AutosimDialogState dialog;
                 autosim_fill_dialog_state(&dialog, AUTOSIM_DIALOG_RUNNING);
                 dialog.completed_segment = auto_driver.completed_turns;

@@ -46,6 +46,14 @@ void autosim_request_control(AutosimControlRequest request);
 void autosim_collect_queued_keys();
 void autosim_collect_stop_file();
 bool autosim_fast_combat_active();
+// Null rendering suppresses native map and tile drawing only while the
+// all-AI driver is processing; all other gameplay and map-visibility state
+// remains in native code. The external launcher may request an override.
+bool autosim_null_render_active();
+void autosim_null_render_suppress(bool active);
+void autosim_null_render_popup(const char* label);
+void autosim_monitor_progress(const char* phase, int faction);
+void autosim_monitor_commands();
 
 // AUTO-002: fast native presentation throughout all-AI turn phases, not
 // solely during combat. All normal human/opt-out preferences are unchanged.

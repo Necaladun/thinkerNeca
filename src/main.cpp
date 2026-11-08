@@ -464,6 +464,7 @@ struct AutosimRunProfile {
     int telemetry = -1;
     int notices = -1;
     int fast = -1;
+    int render = -1;
     std::string mode;
     std::string source_save;
     std::string name;
@@ -487,6 +488,7 @@ static int autosim_profile_option(void* data, const char* section,
     if (!strcmp(name, "telemetry_enabled")) return autosim_profile_int(value, 1, &p->telemetry);
     if (!strcmp(name, "suppress_notices")) return autosim_profile_int(value, 1, &p->notices);
     if (!strcmp(name, "fast_combat")) return autosim_profile_int(value, 1, &p->fast);
+    if (!strcmp(name, "render_mode")) return autosim_profile_int(value, 2, &p->render);
     if (!strcmp(name, "mode")) { p->mode = value; return 1; }
     if (!strcmp(name, "source_save")) { p->source_save = value; return 1; }
     if (!strcmp(name, "campaign_name")) { p->name = value; return 1; }
@@ -500,6 +502,7 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_manual_turns = 0;
     cf->autosim_suppress_notices = 0;
     cf->autosim_fast_combat = 0;
+    cf->autosim_render_mode = 0;
     autosim_launcher_active = false;
     autosim_launch_campaign_name.clear();
     autosim_launch_profile_path.clear();
@@ -527,6 +530,7 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_manual_turns = p.turns;
     cf->autosim_suppress_notices = p.notices;
     cf->autosim_fast_combat = p.fast;
+    cf->autosim_render_mode = p.render >= 0 ? p.render : (p.fast ? 1 : 0);
     autosim_launch_campaign_name = p.name;
     autosim_launch_profile_path = path;
     if (p.mode == "load") startup_load_path = p.source_save;

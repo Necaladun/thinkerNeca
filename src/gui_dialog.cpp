@@ -187,6 +187,73 @@ void autosim_collect_stop_file() {
         removed ? "queued_file_consumed" : "queued_file_could_not_be_removed");
 }
 
+static bool autosim_null_phase = false;
+static bool autosim_null_override = false;
+bool autosim_null_render_active() {
+    return autosim_null_phase && !autosim_null_override
+        && conf.autosim_render_mode == 2 && autosim_control_active();
+}
+void autosim_null_render_suppress(bool active) {
+    autosim_null_phase = active;
+}
+void autosim_null_render_popup(const char* label) {
+    if (!autosim_null_render_active()) return;
+    // Unexpected decision dialogs must remain inspectable. Do not auto-click.
+    autosim_null_phase = false;
+    telemetry_record_ui_notice("null_render", label ? label : "(null)",
+        "native_popup_restore_rendering");
+    draw_map(1);
+}
+void autosim_monitor_commands() {
+    if (!autosim_launcher_active || autosim_launch_profile_path.empty()) return;
+    const std::string command = autosim_launch_profile_path + ".command";
+    FILE* file = fopen(command.c_str(), "rb");
+    if (!file) return;
+    char line[64] = {};
+    const bool read = fgets(line, sizeof(line), file) != NULL;
+    fclose(file);
+    DeleteFileA(command.c_str());
+    if (!read) return;
+    if (!strncmp(line, "SHOW", 4)) {
+        autosim_null_override = true;
+        autosim_null_phase = false;
+        draw_map(1);
+        telemetry_record_ui_notice("null_render", "SHOW", "operator_restored_rendering");
+    } else if (!strncmp(line, "NULL", 4)) {
+        autosim_null_override = false;
+        telemetry_record_ui_notice("null_render", "NULL", "operator_restored_null");
+    } else if (!strncmp(line, "STOP", 4)) {
+        autosim_request_control(AUTOSIM_CTL_STOP);
+    } else if (!strncmp(line, "PAUSE", 5)) {
+        autosim_request_control(AUTOSIM_CTL_PAUSE);
+    }
+}
+void autosim_monitor_progress(const char* phase, int faction) {
+    if (!autosim_launcher_active || autosim_launch_profile_path.empty()) return;
+    autosim_monitor_commands();
+    const std::string destination = autosim_launch_profile_path + ".status";
+    const std::string temporary = destination + ".tmp";
+    FILE* file = fopen(temporary.c_str(), "wb");
+    if (!file) return;
+    fprintf(file,
+        "version=1\npid=%lu\nphase=%s\nturn=%d\nyear=%d\nfaction=%d\n"
+        "render=%s\nhuman_mask=%u\n",
+        (unsigned long)GetCurrentProcessId(), phase ? phase : "unknown",
+        *CurrentTurn, *CurrentMissionYear, faction,
+        autosim_null_render_active() ? "null" :
+            (conf.autosim_render_mode == 2 && autosim_null_override
+            ? "restored" : conf.autosim_render_mode ? "fast" : "normal"),
+        (unsigned)FactionStatus[0]);
+    const bool flushed = fflush(file) == 0;
+    const bool closed = fclose(file) == 0;
+    if (flushed && closed) {
+        MoveFileExA(temporary.c_str(), destination.c_str(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    } else {
+        DeleteFileA(temporary.c_str());
+    }
+}
+
 bool autosim_fast_combat_active() {
     return conf.autosim_fast_combat != 0 && autosim_control_active();
 }
@@ -252,6 +319,7 @@ int __cdecl X_pop(const char* label, fp_none fn)
             return 0;
         }
     }
+    autosim_null_render_popup(label);
     if (!conf.warn_on_former_replace && !strcmp(label, "MIMIMI")) {
         return 1;
     }
@@ -268,6 +336,7 @@ int __cdecl X_pop_2(const char* filename, const char* label, fp_none fn)
             return 0;
         }
     }
+    autosim_null_render_popup(label);
     return X_pop_9(filename, label, -1, 0, 0, fn);
 }
 

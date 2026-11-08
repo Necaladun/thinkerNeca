@@ -4,6 +4,7 @@
 #include "patchveh.h"
 #include "savegame.h"
 #include "jungle_hook_preflight.h"
+#include "autosim_render.h"
 
 
 // From the user's supported terranx.exe inspection:
@@ -2158,6 +2159,12 @@ bool patch_setup(Config* cf) {
 
     if (!VirtualProtect(AC_IMAGE_BASE, AC_IMAGE_LEN, PAGE_EXECUTE_READ, &attrs)) {
         return false;
+    }
+    if (cf->autosim_render_mode == 2 && autosim_launcher_active) {
+        if (!autosim_install_null_render_hooks()) {
+            cf->autosim_render_mode = 1; // fail safe: fast, not half-patched
+            OutputDebugStringA("thinkerNeca: Null Rendering unavailable; fast presentation active\n");
+        }
     }
     return true;
 }
