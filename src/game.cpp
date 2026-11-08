@@ -365,6 +365,36 @@ void __cdecl control_game() {
                 if (multiplayer_init(1)) {
                     break;
                 }
+            } else if (autosim_auto_new_game) {
+                // Explicit run profile replaces TOPMENU/DIFFICULTY/WORLDSIZE
+                // dialogs. Validate native all-AI initialization before
+                // entering the ordinary control_turn driver.
+                prefs_load(0);
+                prefs_use();
+                DefaultPrefs->map_type = 1; // use saved-custom-planet quick path
+                DefaultPrefs->difficulty = autosim_new_difficulty;
+                DefaultPrefs->faction_id = autosim_new_observer;
+                AlphaIniPrefs->custom_world[0] = autosim_new_world_size;
+                AlphaIniPrefs->custom_world[1] = autosim_new_world_ocean;
+                AlphaIniPrefs->custom_world[2] = 2 - autosim_new_world_ocean;
+                AlphaIniPrefs->custom_world[3] = autosim_new_world_erosion;
+                AlphaIniPrefs->custom_world[4] = 1;
+                AlphaIniPrefs->custom_world[5] = autosim_new_world_cloud;
+                AlphaIniPrefs->custom_world[6] = autosim_new_world_life;
+                *ControlTurnMove = 0;
+                if (map_menu(1)
+                || (FactionStatus[0] & 0xFEu)
+                || MapWin->cOwner < 1 || MapWin->cOwner >= MaxPlayerNum
+                || !is_alive(MapWin->cOwner)
+                || (*GameState & (STATE_SCENARIO_EDITOR | STATE_OMNISCIENT_VIEW
+                    | STATE_SCENARIO_CHEATED_FLAG))) {
+                    MessageBoxA(*phWnd,
+                        "Automatic new-game setup failed its all-AI invariants.\n"
+                        "No turn will be simulated.",
+                        "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                    break;
+                }
+                telemetry_source_save.clear();
             } else if (startup_load_path.size()) {
                 if (!mod_load_daemon(startup_load_path.c_str(), 0)) {
                     telemetry_source_save = startup_load_path;
@@ -522,7 +552,7 @@ int __cdecl custom_planet(int use_images, int use_defaults) {
         cur_setup.preview_buffers[2] = nullptr;
     }
     *MapLandCoverage = 2 - *MapOceanCoverage;
-    prefs_save(0);
+    if (!autosim_auto_new_game) prefs_save(0);
     return 0;
 }
 
@@ -608,7 +638,7 @@ int __cdecl size_of_planet(int setup_mode) {
         *MapAreaY = 80;
     }
     *MapAreaX = 2 * width;
-    prefs_save(0);
+    if (!autosim_auto_new_game) prefs_save(0);
     if (setup_mode < 2) {
         map_init();
         Path_init(Paths);
@@ -641,7 +671,7 @@ int __cdecl map_menu(int flag) {
             return 1;
         }
         DefaultPrefs->map_type = choice;
-        prefs_save(0);
+        if (!autosim_auto_new_game) prefs_save(0);
         bool restart_outer = false;
         bool reset_climate = false;
         bool retry;
@@ -1552,7 +1582,10 @@ CONF_SEAT:
                 }
             }
         } else {
-            FactionStatus[0] = 1 << plr_id;
+            // The unattended observer is a camera anchor, not a human.
+            // Initialise every starting faction through the normal AI
+            // allocation/placement branch, including the observed one.
+            FactionStatus[0] = autosim_auto_new_game ? 0 : 1 << plr_id;
         }
         MapWin->cOwner = plr_id;
 CONF_FINAL:
@@ -1572,7 +1605,7 @@ CONF_FINAL:
             AlphaIniPrefs->time_controls = value;
             GameTimeControl[0] = value;
         }
-        prefs_save(0);
+        if (!autosim_auto_new_game) prefs_save(0);
         log_set_state(0);
         if (!(flag & 2)) {
             *VehCount = 0;
@@ -1596,7 +1629,7 @@ CONF_FINAL:
             *dword_93A9B4 = 0;
             return 0;
         }
-        if (!*MultiplayerActive && !(flag & 2)) {
+        if (!*MultiplayerActive && !(flag & 2) && !autosim_auto_new_game) {
             planetfall(MapWin->cOwner);
         }
         return 0;
@@ -1841,8 +1874,10 @@ CONF_LOOP:
 void __cdecl setup_game(int flag) {
     debug("setup_game %d\n", flag);
     LastSavePath[0] = 0;
-    prefs_put("Latest Save", unk_945E78);
-    prefs_put("Latest Scenario", unk_945E7C);
+    if (!autosim_auto_new_game) {
+        prefs_put("Latest Save", unk_945E78);
+        prefs_put("Latest Scenario", unk_945E7C);
+    }
 
     // change prefs_put_2 value to only reset preferences once when the conditions are met
     if (!*DiffLevel && !flag && !prefs_get_2("DontResetBeginnerPrefs", 0, 0)) {

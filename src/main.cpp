@@ -9,6 +9,14 @@ set_str_t movedlabels;
 map_str_t musiclabels;
 std::string startup_load_path = "";
 bool autosim_launcher_active = false;
+bool autosim_auto_new_game = false;
+int autosim_new_world_size = 2;
+int autosim_new_world_ocean = 1;
+int autosim_new_world_erosion = 1;
+int autosim_new_world_cloud = 1;
+int autosim_new_world_life = 1;
+int autosim_new_difficulty = 3;
+int autosim_new_observer = 1;
 std::string autosim_launch_campaign_name;
 std::string autosim_launch_profile_path;
 std::vector<std::pair<std::string,std::string>> faction_pool;
@@ -465,6 +473,8 @@ struct AutosimRunProfile {
     int notices = -1;
     int fast = -1;
     int render = -1;
+    int size = -1, ocean = -1, erosion = -1, cloud = -1, life = -1;
+    int difficulty = -1, observer = -1, monitor = -1;
     std::string mode;
     std::string source_save;
     std::string name;
@@ -489,6 +499,14 @@ static int autosim_profile_option(void* data, const char* section,
     if (!strcmp(name, "suppress_notices")) return autosim_profile_int(value, 1, &p->notices);
     if (!strcmp(name, "fast_combat")) return autosim_profile_int(value, 1, &p->fast);
     if (!strcmp(name, "render_mode")) return autosim_profile_int(value, 2, &p->render);
+    if (!strcmp(name, "world_size")) return autosim_profile_int(value, 4, &p->size);
+    if (!strcmp(name, "world_ocean")) return autosim_profile_int(value, 2, &p->ocean);
+    if (!strcmp(name, "world_erosion")) return autosim_profile_int(value, 2, &p->erosion);
+    if (!strcmp(name, "world_cloud")) return autosim_profile_int(value, 2, &p->cloud);
+    if (!strcmp(name, "world_life")) return autosim_profile_int(value, 2, &p->life);
+    if (!strcmp(name, "difficulty")) return autosim_profile_int(value, 5, &p->difficulty);
+    if (!strcmp(name, "observer")) return autosim_profile_int(value, 7, &p->observer);
+    if (!strcmp(name, "monitor_seconds")) return autosim_profile_int(value, 60, &p->monitor);
     if (!strcmp(name, "mode")) { p->mode = value; return 1; }
     if (!strcmp(name, "source_save")) { p->source_save = value; return 1; }
     if (!strcmp(name, "campaign_name")) { p->name = value; return 1; }
@@ -504,6 +522,7 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_fast_combat = 0;
     cf->autosim_render_mode = 0;
     autosim_launcher_active = false;
+    autosim_auto_new_game = false;
     autosim_launch_campaign_name.clear();
     autosim_launch_profile_path.clear();
 
@@ -518,6 +537,9 @@ static bool autosim_apply_launch_profile(Config* cf) {
     || p.schema != 1 || p.turns < 1 || p.turns > 100000
     || p.telemetry < 0 || p.notices < 0 || p.fast < 0
     || p.name.empty() || p.name.size() > 88
+    || (p.monitor != -1 && p.monitor < 30)
+    || (p.mode == "new" && (p.size < 0 || p.ocean < 0 || p.erosion < 0
+        || p.cloud < 0 || p.life < 0 || p.difficulty < 0 || p.observer < 1))
     || (p.mode != "new" && p.mode != "load")
     || (p.mode == "new" && !p.source_save.empty())
     || (p.mode == "load" && (p.source_save.size() < 4
@@ -533,6 +555,16 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_render_mode = p.render >= 0 ? p.render : (p.fast ? 1 : 0);
     autosim_launch_campaign_name = p.name;
     autosim_launch_profile_path = path;
+    autosim_auto_new_game = p.mode == "new";
+    if (autosim_auto_new_game) {
+        autosim_new_world_size = p.size;
+        autosim_new_world_ocean = p.ocean;
+        autosim_new_world_erosion = p.erosion;
+        autosim_new_world_cloud = p.cloud;
+        autosim_new_world_life = p.life;
+        autosim_new_difficulty = p.difficulty;
+        autosim_new_observer = p.observer;
+    }
     if (p.mode == "load") startup_load_path = p.source_save;
     autosim_launcher_active = true;
     return true;

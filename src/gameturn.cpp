@@ -228,7 +228,7 @@ void __cdecl control_turn() {
     int segment_start_bases = *BaseCount;
     int segment_start_units = *VehCount;
     bool segment_started = false;
-    bool startup_confirmed = false;
+    bool startup_confirmed = autosim_auto_new_game; // validated launcher click replaces redundant in-game Start
     // A game loaded mid-cycle resumes remaining factions first.
     bool first_cycle_partial = (*ControlTurnMove != 0);
     RECT rc;

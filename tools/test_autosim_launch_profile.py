@@ -19,13 +19,13 @@ checks = {
     "pre-game WinForms GUI, existing SAV selection and turn cap":
         all(s in ps for s in ("System.Windows.Forms.Form",
         "System.Windows.Forms.OpenFileDialog", "System.Windows.Forms.NumericUpDown",
-        "New game (native setup; manual AI handover)", "Load existing .sav")),
+        "New game - setup from automation profile", "Load an existing SAV")),
     "persistent defaults separate from immutable run-profile snapshots":
         all(s in ps for s in ("automation.ini", "automation\\profiles",
         "New-RunProfile", "Save-Options", "Read-Options", "schema=1")),
     "profile passed only in child process environment":
         "EnvironmentVariables['THINKERNECA_AUTOSIM_PROFILE']" in ps and
-        "UseShellExecute = $false" in ps,
+        "UseShellExecute=$false" in ps,
     "DLL profile read at startup, in separate automation section":
         'GetEnvironmentVariableA(' in cpp and
         'ini_parse(path, autosim_profile_option, &p)' in cpp and

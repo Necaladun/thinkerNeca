@@ -33,8 +33,8 @@ for key, val in required.items():
 assert "AutoScopedCombatPrefs(autosim_fast_combat_active()" in header
 assert "AutoScopedAutosimFastPrefs fast_presentation;" in combat
 assert turn.count("AutoScopedAutosimFastPrefs fast_presentation;") == 3
-assert turn.index("AutoScopedAutosimFastPrefs fast_presentation;\n                    turn_upkeep();") > 0
-assert "AutoScopedAutosimFastPrefs fast_presentation;\n                mod_enemy_turn(current_id);" in turn
+assert turn.index("AutoScopedAutosimFastPrefs fast_presentation;\n                    autosim_monitor_progress(\"turn_upkeep\", 0);\n                    turn_upkeep();") > 0
+assert "AutoScopedAutosimFastPrefs fast_presentation;\n                autosim_monitor_progress(\"ai_turn\", current_id);\n                mod_enemy_turn(current_id);" in turn
 
 upkeep_start = turn.index("void __cdecl faction_upkeep(")
 upkeep_end = turn.index("void __cdecl repair_phase(", upkeep_start)
