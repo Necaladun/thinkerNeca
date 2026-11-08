@@ -1819,21 +1819,22 @@ void __cdecl alien_fauna() {
                             || (*BaseFindDist > 3 && whose_territory(player_id, tx, ty, 0, 0) != player_id)) {
                                 draw_tiles(tx, ty, 2);
                             } else {
-                                if (!mod_MapWin_focus(MapWinPtr[0], tx, ty)) {
+                                if (autosim_fast_combat_active()
+                                    || !mod_MapWin_focus(MapWinPtr[0], tx, ty)) {
                                     draw_tiles(tx, ty, 2);
                                 }
                                 parse_says(0, Bases[base_id].name, -1, -1);
                                 if (conf.game_event_popup) {
                                     if (is_sea) {
-                                        POP2("KELPGROWS", "kelp_sm.pcx", -1);
+                                        autosim_notice_pop2("KELPGROWS", "kelp_sm.pcx", -1);
                                     } else {
-                                        POP2("FORESTGROWS", "forgr_sm.pcx", -1);
+                                        autosim_notice_pop2("FORESTGROWS", "forgr_sm.pcx", -1);
                                     }
                                 } else {
                                     if (is_sea) {
-                                        NetMsg_pop(NetMsg, "KELPGROWS", 5000, 0, "kelp_sm.pcx");
+                                        autosim_notice_netmsg(NetMsg, "KELPGROWS", 5000, 0, "kelp_sm.pcx");
                                     } else {
-                                        NetMsg_pop(NetMsg, "FORESTGROWS", 5000, 0, "forgr_sm.pcx");
+                                        autosim_notice_netmsg(NetMsg, "FORESTGROWS", 5000, 0, "forgr_sm.pcx");
                                     }
                                 }
                             }
