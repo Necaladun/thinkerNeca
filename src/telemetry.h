@@ -66,6 +66,11 @@ void telemetry_project_completed(int base_id, int facility_id);
 void telemetry_unit_baseline();
 void telemetry_unit_created(int veh_id);
 void telemetry_unit_destroyed(int veh_id);
+void telemetry_unit_upgraded(int veh_id, int old_unit_id, int new_unit_id, int credits_paid);
+void telemetry_production_stockpile(int base_id, int credits_gained);
+void telemetry_production_hurry(int base_id, int energy_before, int minerals_before);
+void telemetry_combat_base_captured(int base_id, int original_x, int original_y,
+    int former_faction, int new_faction, int is_probe);
 void telemetry_unit_owner_changed(int veh_id, int from_faction, int to_faction, const char* cause);
 void telemetry_production_queue_changed(int base_id, int old_item, int new_item, int minerals_after);
 void telemetry_production_unit(int base_id, int unit_id, int veh_id, int cost);
