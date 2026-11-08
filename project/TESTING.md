@@ -6,6 +6,19 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 sea-level colony losses and atrocity notifications (8 November 2026)
+
+**User Windows report on prior installed DLL:** University orbital-insertion popup; sea-level rise followed by tidal flooding and colony loss; Miriam declared Vendetta over Zakharov's major atrocity despite her earlier Planet Buster use. These observations are not runtime tests of the current unmerged patch.
+
+**Already covered in AUTO-002 source:** orbital `MADEORBITAL`/`MADEAIRDROP` in `src/veh_action.cpp::action_airdrop` and sea-level `SEARISING`/`SEAFALLING` in `src/gameturn.cpp::turn_upkeep`. The installed DLL may predate these.
+
+**New source fix:** `src/map.cpp::alt_set` now suppresses four notification-only `BASESUBMERGED*` sites during explicitly eligible all-AI simulation. For the two `X_pop_2` labels, the original call is still executed unchanged in ordinary human mode; the two return-unused `popp` sites use the standard wrapper. Nothing in coast/improvement conversion, population casualty RNG, emergency Pressure Domes, submerged colony count, last/objective colony survival, genuine `mod_base_kill`, or incompatible vehicle losses is bypassed.
+
+**New source fix:** `src/faction.cpp::major_atrocity` retains victim flags, atrocity counts, blemishes, pact cancellation, AI Vendetta and diplomatic state, then now suppresses the dynamic return-unused `MAJORATROCITY%d` popup. `atrocity()` also guards return-unused `ATROCITYSPOTS`/`ATROCITY`/`ATROCITY1`/`ATROCITY2` NetMsg reports without altering sanctions or escalation. The current AI Vendetta rule does not compare the condemning faction's own past major atrocities, so Miriam's reported behaviour is consistent with source but not yet checked against this run's state.
+
+**Source test:** `tools/test_autosim_sealevel_atrocity.py`, wired into Develop CI; it checks the two already-covered routes, four submersion messages, state ordering, retained human UI, treaty/major-atrocity logic and sanctions. Passing static assertions cannot establish Windows gameplay parity.
+
+**Windows acceptance:** from a pre-flood save compare suppression on/off for sea level, Pressure Domes, population, terrain/improvements, actual surviving/destroyed colony and unit counts; test final-colony safeguard and save/reload. From a pre-nuke save compare AI Vendetta, pacts, sanctions, atrocity count and diplomacy state with notices enabled/disabled. Verify no modal for orbital insertion, sea rise, submerged colony or major atrocity under all-AI suppression, and unchanged normal-human behavior. Council/vote decisions remain separate.
 ## AUTO-002 random events, strategic missiles and observed-AI movement (8 November 2026)
 
 **Windows user reports (existing installed Develop build, 200+ turns):** volcano-eruption popup; Miriam fired a Planet Buster, causing an announcement and noticeable but acceptable explosion animation; repeated `KEEPMOVING` (Shard Rover Artillery V2, Formers, another unit) appeared despite all-faction AI handover, several times within a few turns. User separately reports the current F9/F10 and simulation throughput generally improved. No before/after Windows run of the new changes has been provided.
