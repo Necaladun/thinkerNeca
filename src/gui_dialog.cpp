@@ -19,7 +19,7 @@ int __thiscall Popup_load_icon(Popup* This, Sprite* a2, int a3, char* a4) {
 // or native game-mode flags are changed.
 bool autosim_control_active() {
     const int owner = MapWin->cOwner;
-    return auto_turn_eligible(conf.autosim_manual_turns,
+    return autosim_launcher_active && auto_turn_eligible(conf.autosim_manual_turns,
         (unsigned)FactionStatus[0], *MultiplayerActive != 0,
         *PbemActive != 0, (*GameState & STATE_GAME_DONE) != 0,
         owner, owner >= 1 && owner < MaxPlayerNum && is_alive(owner));

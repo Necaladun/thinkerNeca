@@ -356,7 +356,8 @@ bool autosim_apply_dialog_options(const AutosimDialogState& state) {
 }
 
 void autosim_show_manual_setup() {
-    if (*GameHalted || *MultiplayerActive || *PbemActive || !MapWin)
+    if (!autosim_launcher_active || *GameHalted
+    || *MultiplayerActive || *PbemActive || !MapWin)
         return;
     AutosimDialogState state;
     autosim_fill_dialog_state(&state, AUTOSIM_DIALOG_SETUP);

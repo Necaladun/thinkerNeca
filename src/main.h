@@ -418,6 +418,9 @@ extern AIPlans plans[MaxPlayerNum];
 extern set_str_t movedlabels;
 extern map_str_t musiclabels;
 extern std::string startup_load_path;
+extern bool autosim_launcher_active;
+extern std::string autosim_launch_campaign_name;
+extern std::string autosim_launch_profile_path;
 extern std::vector<std::pair<std::string,std::string>> faction_pool;
 extern std::vector<std::pair<size_t,size_t>> faction_pair;
 

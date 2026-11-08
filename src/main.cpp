@@ -8,6 +8,9 @@ AIPlans plans[MaxPlayerNum];
 set_str_t movedlabels;
 map_str_t musiclabels;
 std::string startup_load_path = "";
+bool autosim_launcher_active = false;
+std::string autosim_launch_campaign_name;
+std::string autosim_launch_profile_path;
 std::vector<std::pair<std::string,std::string>> faction_pool;
 std::vector<std::pair<size_t,size_t>> faction_pair;
 
@@ -452,6 +455,85 @@ int opt_list_parse(int32_t* dst, char* src, int num, int min_val, int max_val) {
     return 0;
 }
 
+
+// Stage A: run-specific [automation] INI. Supplied only by the separate
+// launcher via an inherited environment variable; never read in normal mode.
+struct AutosimRunProfile {
+    int schema = -1;
+    int turns = -1;
+    int telemetry = -1;
+    int notices = -1;
+    int fast = -1;
+    std::string mode;
+    std::string source_save;
+    std::string name;
+};
+
+static int autosim_profile_int(const char* s, int maxval, int* result) {
+    if (!s || !s[0]) return 0;
+    char* end = NULL;
+    const long value = strtol(s, &end, 10);
+    if (!end || *end || value < 0 || value > maxval) return 0;
+    *result = (int)value;
+    return 1;
+}
+
+static int autosim_profile_option(void* data, const char* section,
+    const char* name, const char* value) {
+    AutosimRunProfile* p = (AutosimRunProfile*)data;
+    if (strcmp(section, "automation")) return 0;
+    if (!strcmp(name, "schema")) return autosim_profile_int(value, 1, &p->schema);
+    if (!strcmp(name, "turns")) return autosim_profile_int(value, 100000, &p->turns);
+    if (!strcmp(name, "telemetry_enabled")) return autosim_profile_int(value, 1, &p->telemetry);
+    if (!strcmp(name, "suppress_notices")) return autosim_profile_int(value, 1, &p->notices);
+    if (!strcmp(name, "fast_combat")) return autosim_profile_int(value, 1, &p->fast);
+    if (!strcmp(name, "mode")) { p->mode = value; return 1; }
+    if (!strcmp(name, "source_save")) { p->source_save = value; return 1; }
+    if (!strcmp(name, "campaign_name")) { p->name = value; return 1; }
+    return 0;
+}
+
+static bool autosim_apply_launch_profile(Config* cf) {
+    // Legacy automation keys in thinker.ini and thinker_user.ini cannot
+    // activate simulation/logging outside the explicit automation launcher.
+    cf->telemetry_enabled = 0;
+    cf->autosim_manual_turns = 0;
+    cf->autosim_suppress_notices = 0;
+    cf->autosim_fast_combat = 0;
+    autosim_launcher_active = false;
+    autosim_launch_campaign_name.clear();
+    autosim_launch_profile_path.clear();
+
+    char path[4096] = {};
+    const DWORD n = GetEnvironmentVariableA(
+        "THINKERNECA_AUTOSIM_PROFILE", path, sizeof(path));
+    if (!n) return true; // ordinary thinker.exe launch
+    if (n >= sizeof(path)) return false;
+
+    AutosimRunProfile p;
+    if (ini_parse(path, autosim_profile_option, &p) != 0
+    || p.schema != 1 || p.turns < 1 || p.turns > 100000
+    || p.telemetry < 0 || p.notices < 0 || p.fast < 0
+    || p.name.empty() || p.name.size() > 88
+    || (p.mode != "new" && p.mode != "load")
+    || (p.mode == "new" && !p.source_save.empty())
+    || (p.mode == "load" && (p.source_save.size() < 4
+        || _stricmp(p.source_save.c_str() + p.source_save.size() - 4, ".sav") != 0
+        || !FileExists(p.source_save.c_str())))) return false;
+    for (unsigned char ch : p.name)
+        if (ch < 32 || ch == 127) return false;
+
+    cf->telemetry_enabled = p.telemetry;
+    cf->autosim_manual_turns = p.turns;
+    cf->autosim_suppress_notices = p.notices;
+    cf->autosim_fast_combat = p.fast;
+    autosim_launch_campaign_name = p.name;
+    autosim_launch_profile_path = path;
+    if (p.mode == "load") startup_load_path = p.source_save;
+    autosim_launcher_active = true;
+    return true;
+}
+
 static bool is_save_file(const std::string& path) {
     if (path.length() < 4) {
         return false;
@@ -537,6 +619,12 @@ DLL_EXPORT BOOL APIENTRY DllMain(HINSTANCE UNUSED(hinstDLL), DWORD fdwReason, LP
             if (FileExists("thinker_user.ini")
             && ini_parse("thinker_user.ini", option_handler, &conf) < 0) {
                 MessageBoxA(0, "Error while opening thinker_user.ini file.",
+                    MOD_VERSION, MB_OK | MB_ICONSTOP);
+                exit_fail();
+            }
+            if (!autosim_apply_launch_profile(&conf)) {
+                MessageBoxA(0, "Automation run profile invalid or inaccessible.\n"
+                    "Use Run Automation.bat or clear THINKERNECA_AUTOSIM_PROFILE.",
                     MOD_VERSION, MB_OK | MB_ICONSTOP);
                 exit_fail();
             }

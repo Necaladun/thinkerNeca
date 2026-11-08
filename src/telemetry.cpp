@@ -291,7 +291,9 @@ void telemetry_begin_session(const char* source_save) {
     session_dir.clear();
     campaign_id.clear();
     campaign_created_utc.clear();
-    campaign_display_name = readable_campaign_default();
+    campaign_display_name = autosim_launcher_active
+        && !autosim_launch_campaign_name.empty()
+        ? autosim_launch_campaign_name : readable_campaign_default();
     resumed_linked_campaign = false;
     if (!conf.telemetry_enabled || *MultiplayerActive || *PbemActive) {
         return;

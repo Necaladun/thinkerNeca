@@ -246,7 +246,7 @@ void __cdecl control_turn() {
     // the native human console if all factions have already been handed off.
     auto autosim_ready = [&]() {
         const int owner = MapWin->cOwner;
-        return auto_turn_eligible(conf.autosim_manual_turns,
+        return autosim_launcher_active && auto_turn_eligible(conf.autosim_manual_turns,
             (unsigned)FactionStatus[0], *MultiplayerActive != 0,
             *PbemActive != 0, (*GameState & STATE_GAME_DONE) != 0,
             owner, owner >= 1 && owner < MaxPlayerNum && is_alive(owner));
@@ -257,7 +257,8 @@ void __cdecl control_turn() {
     // Never fall into a native human console with nobody human-controlled.
     auto autosim_preflight_ready = [&]() {
         const int owner = MapWin->cOwner;
-        return ((unsigned)FactionStatus[0] & 0xFEu) == 0
+        return autosim_launcher_active
+            && ((unsigned)FactionStatus[0] & 0xFEu) == 0
             && !*MultiplayerActive && !*PbemActive
             && !(*GameState & STATE_GAME_DONE)
             && owner >= 1 && owner < MaxPlayerNum && is_alive(owner);

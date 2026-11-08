@@ -371,6 +371,13 @@ void __cdecl control_game() {
                     for (int i = 1; i < MaxPlayerNum; ++i) {
                         load_faction_art(i);
                     }
+                } else if (autosim_launcher_active) {
+                    MessageBoxA(*phWnd,
+                        "Could not load the selected automation save.\n"
+                        "The simulation will not start.",
+                        "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                    startup_load_path.clear();
+                    break;
                 }
                 startup_load_path = "";
             } else if (top_menu(0)) {
