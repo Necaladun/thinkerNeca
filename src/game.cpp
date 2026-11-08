@@ -2202,6 +2202,48 @@ int __cdecl end_of_game(int flag) {
     if (!(*GameState & STATE_GAME_DONE) || (*GameState & STATE_FINAL_SCORE_DONE)) {
         return 0;
     }
+    if (autosim_session_active()) {
+        // The game state already contains native victory flags. Never show the
+        // observer-relative win/loss screens, credits or GAMEOVERMAN prompt.
+        // Preserve known victory-history markers using the actual faction,
+        // not CurrentPlayerFaction (which is only the camera in this mode).
+        int winner = 0;
+        if (*GameVictoryType == VIC_UNIFY_SOLO || *GameVictoryType == VIC_UNIFY_COOP) {
+            int alive_count = 0;
+            for (int fc = 1; fc < MaxPlayerNum; ++fc) {
+                if (is_alive(fc)) { winner = fc; ++alive_count; }
+            }
+            if (alive_count != 1) winner = 0; // do not invent coalition leader
+        } else {
+            unsigned flag_value = 0;
+            if (*GameVictoryType == VIC_DIPLOMATIC_SOLO
+            || *GameVictoryType == VIC_DIPLOMATIC_COOP
+            || *GameVictoryType == VIC_DIPLOMATIC_LOSS) {
+                flag_value = PFLAG_UNK_20000;
+            } else if (*GameVictoryType == VIC_ECONOMIC_SOLO
+            || *GameVictoryType == VIC_ECONOMIC_COOP
+            || *GameVictoryType == VIC_ECONOMIC_LOSS) {
+                flag_value = PFLAG_UNK_40000;
+            }
+            if (flag_value) {
+                for (int fc = 1; fc < MaxPlayerNum; ++fc) {
+                    if ((unsigned)Factions[fc].player_flags & flag_value) {
+                        if (winner) { winner = 0; break; } // ambiguous results
+                        winner = fc;
+                    }
+                }
+            }
+        }
+        if (winner) mon_winning_unify(winner, -1);
+        // A victory can occur during upkeep or one faction's action. Never
+        // serialize an unverified partial-turn save as a finished checkpoint.
+        // Existing normal autosaves remain intact for recovery.
+        telemetry_record_terminal_result(NULL, "not_attempted_partial_cycle");
+        *GameState |= STATE_FINAL_SCORE_DONE;
+        *ControlTurnB = 0;
+        *ControlTurnA = 1;
+        return 1;
+    }
     int victor_id = 0;
     for (int i = 1; i < MaxPlayerNum; i++) {
         if (Factions[i].player_flags & PFLAG_UNK_20000) {
