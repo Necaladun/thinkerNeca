@@ -674,6 +674,14 @@ int __cdecl size_of_planet(int setup_mode) {
             }
         }
         if (selection != 99) {
+            // The installed alpha(x).txt can differ from the distributed
+            // six-entry list. Fail closed rather than read a missing preset.
+            if (autosim_auto_new_game && (selection < 0 || selection >= entry_count)) {
+                MessageBoxA(*phWnd,
+                    "Selected world size is missing from the installed #WORLDSIZE list.",
+                    "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                return 1;
+            }
             width = widths[selection];
             *MapAreaY = heights[selection];
         } else {
@@ -777,6 +785,11 @@ int __cdecl map_menu(int flag) {
 
             case 2:
                 if (mod_load_map_daemon("maps\\xplanet.mp")) {
+                    if (autosim_auto_new_game) {
+                        MessageBoxA(*phWnd, "Could not load maps\\xplanet.mp.",
+                            "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                        return 1;
+                    }
                     restart_outer = true;
                 } else {
                     reset_climate = true;
@@ -785,6 +798,11 @@ int __cdecl map_menu(int flag) {
 
             case 3:
                 if (mod_load_map_daemon("maps\\xplanetx.mp")) {
+                    if (autosim_auto_new_game) {
+                        MessageBoxA(*phWnd, "Could not load maps\\xplanetx.mp.",
+                            "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                        return 1;
+                    }
                     restart_outer = true;
                 } else {
                     reset_climate = true;
