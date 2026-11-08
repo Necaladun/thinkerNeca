@@ -1711,6 +1711,14 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
     } else if (*GamePreferences & PREF_BSC_DONT_QUICK_MOVE_ENEMY_VEH) {
         render_battle |= render_tile;
     }
+    // AUTO-002: this AI-only mode follows the already-existing non-observed
+    // combat presentation path. The full combat/damage/state code still runs.
+    // Visibility updates were historically embedded inside render_battle;
+    // preserve those separately at their original per-defender timing below.
+    const bool suppress_combat_presentation = fast_autosim_combat && render_battle;
+    if (suppress_combat_presentation) {
+        render_battle = 0;
+    }
     assert(veh_atk->x != veh_def->x || veh_atk->y != veh_def->y);
     assert(veh_atk->faction_id != veh_def->faction_id);
     assert(veh_atk->is_probe() || veh_def->is_artifact() || at_war(faction_id_atk, faction_id_def));
@@ -1753,6 +1761,11 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                 const int damage_limit = artillery_damage_floor(
                     veh_def->max_hitpoints(), reactor_scale, max_damage_percent);
                 damage_value = max(0, min(damage_value, veh_def->cur_hitpoints() - damage_limit));
+                if (suppress_combat_presentation) {
+                    // Original per-defender render path exposed the attacker
+                    // to the target faction before damage was applied.
+                    veh_atk->visibility |= (1 << faction_id_def);
+                }
                 if (render_battle) {
                     combat_type = 0;
                     *VehDrawAttackID = veh_id_atk;
@@ -1824,6 +1837,10 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
     assert(map_range(veh_atk, veh_def) == 1 || can_arty(veh_atk->unit_id, true));
     if (combat_type) {
         add_goal(faction_id_def, AI_GOAL_PREV_DEFEND, 2, tx, ty, -1);
+    }
+    if (suppress_combat_presentation) {
+        // The normal render path updates defender knowledge here.
+        veh_atk->visibility |= (1 << faction_id_def);
     }
     if (render_battle) {
         if (*MultiplayerActive && BaseWin->zoom_active) {
