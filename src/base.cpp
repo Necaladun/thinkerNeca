@@ -75,7 +75,7 @@ static void find_relocate_base(int faction_id) {
             draw_tile(b->x, b->y, 2);
             parse_says(1, Bases[best_id].name, -1, -1);
             parse_says(2, get_noun(faction_id), -1, -1);
-            NetMsg_pop(NetMsg, "ESCAPED", 5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "ESCAPED", 5000, 0, 0);
         }
     }
 }
@@ -525,11 +525,11 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
                     set_fac(FAC_HEADQUARTERS, base_id, 0);
                     if (faction_id == player_id) {
                         if (*MultiplayerActive) {
-                            NetMsg_pop(NetMsg, "ESCAPED2", 5000, 0, 0);
+                            autosim_notice_netmsg(NetMsg, "ESCAPED2", 5000, 0, 0);
                         }
                     } else {
                         parse_says(2, get_noun(faction_id), -1, -1);
-                        NetMsg_pop(NetMsg, "ESCAPED", 5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ESCAPED", 5000, 0, 0);
                     }
                     if (!is_human(faction_id)) {
                         mod_base_reset(best_base_id, 0);
