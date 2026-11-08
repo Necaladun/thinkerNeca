@@ -21,6 +21,25 @@ void telemetry_archive_named_save(const char* saved_game_path);
 // without pretending an incomplete turn was a completed cycle.
 void telemetry_record_terminal_result(const char* save_path, const char* save_status);
 void telemetry_resume_after_victory();
+// TEL-ORBIT basic event stream. Keep capture read-only; future AI decision
+// traces can extend the schema without changing the native combat sequence.
+struct OrbitAttackTrace {
+    int id = -1;
+    int attacker_odp = 0;
+    int attacker_deployed = 0;
+    int target_nutrient = 0;
+    int target_mineral = 0;
+    int target_energy = 0;
+    int target_odp = 0;
+    int target_geosync = 0;
+};
+void telemetry_orbit_launch(int faction_id, int base_id, int facility_id, int before_count);
+OrbitAttackTrace telemetry_orbit_begin_attack(int attacker, int defender,
+    int target_type, int base_id, int reserved_odp);
+void telemetry_orbit_end_attack(const OrbitAttackTrace& trace, int attacker,
+    int defender, int target_type, int base_id);
+void telemetry_orbit_environment_loss(int faction_id, const char* cause,
+    int lost_mineral, int lost_energy, int lost_odp);
 void telemetry_record_ui_notice(const char* source, const char* label, const char* action);
 // Dedicated session Council trace, flushed before native modal processing.
 void telemetry_record_council_event(const char* phase, int actor, const char* detail);
