@@ -608,7 +608,7 @@ void telemetry_archive_completed_turn() {
     event << "{\"schema\":1,\"utc\":" << json_string(utc_stamp_ms().c_str())
           << ",\"turn\":" << *CurrentTurn
           << ",\"mission_year\":" << *CurrentMissionYear
-          << ",\"kind\":\"completed_cycle\"
+          << ",\"kind\":\"completed_cycle\""
           << ",\"status\":" << json_string(outcome)
           << ",\"path\":" << (saved ? json_string(target.c_str()) : "null")
           << ",\"fingerprint\":"
