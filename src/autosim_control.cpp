@@ -219,6 +219,20 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
     }
     if (message != WM_COMMAND || !ctx) return FALSE;
     const int id = LOWORD(wparam);
+    // Win32 can synthesize IDOK/IDCANCEL for Enter/Escape even without
+    // corresponding buttons. Never map numeric IDOK=1 to RESUME or
+    // IDCANCEL=2 to SAVE_CONTINUE, especially at mandatory startup.
+    if (id == IDCANCEL) {
+        if (ctx->state->mode == AUTOSIM_DIALOG_SETUP) {
+            EndDialog(dialog, AUTOSIM_DIALOG_CANCEL);
+        } else if (ctx->state->allow_resume) {
+            EndDialog(dialog, AUTOSIM_DIALOG_RESUME);
+        } else {
+            MessageBeep(MB_ICONINFORMATION);
+        }
+        return TRUE;
+    }
+    if (id == IDOK) return TRUE;
     if (ctx->ready && HIWORD(wparam) == EN_CHANGE) {
         if (id == ID_SAVE_NAME && !ctx->refreshing) {
             ctx->save_name_dirty = true;
