@@ -87,5 +87,7 @@ assert 'autosim_notice_netmsg(NetMsg, "KELPGROWS"' in turn
 
 # Native operator/save calls remain outside all temporary profile scopes.
 end_turn = turn[:turn.index("int __cdecl net_upkeep_phase(")]
-assert end_turn.index("save_game(0);", end_turn.index("if (action == AUTO_CYCLE_STOP")) > end_turn.index("mod_enemy_turn(current_id);")
+assert end_turn.index("autosim_save_named(", end_turn.index("if (++current_id >= 8)")) > end_turn.index("mod_enemy_turn(current_id);")
+assert end_turn.index("save_game(0);", end_turn.index("AUTOSIM_DIALOG_FAILED")) > end_turn.index("mod_enemy_turn(current_id);")
+assert end_turn.index("autosim_show_control_dialog(&dialog);") > end_turn.index("telemetry_record_completed_turn();")
 print("AUTO-002 full-turn fast profile structural contract passed (not native gameplay)")
