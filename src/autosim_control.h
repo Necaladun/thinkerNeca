@@ -2,18 +2,36 @@
 
 #include <string>
 
-// AUTO-002 operator controls. This is a modal Win32 dialog opened ONLY at a
-// completed single-player all-AI faction boundary. It never runs inside a
-// native combat, diplomacy, upkeep or save callback.
+// Operator menu: running mode opens only at complete AI boundaries;
+// startup mode runs before the first eligible AI phase, and manual setup
+// opens in the ordinary interactive world view without changing control.
+enum AutosimDialogMode {
+    AUTOSIM_DIALOG_RUNNING,
+    AUTOSIM_DIALOG_STARTUP,
+    AUTOSIM_DIALOG_SETUP,
+};
+
 enum AutosimDialogChoice {
     AUTOSIM_DIALOG_FAILED = -1,
     AUTOSIM_DIALOG_RESUME = 1,
     AUTOSIM_DIALOG_SAVE_CONTINUE = 2,
     AUTOSIM_DIALOG_SAVE_EXIT = 3,
     AUTOSIM_DIALOG_TAKE_CONTROL = 4,
+    AUTOSIM_DIALOG_START = 5,
+    AUTOSIM_DIALOG_ARM = 6,
+    AUTOSIM_DIALOG_CONTINUE = 7,
+    AUTOSIM_DIALOG_CANCEL = 8,
 };
 
 struct AutosimDialogState {
+    AutosimDialogMode mode = AUTOSIM_DIALOG_RUNNING;
+    int human_mask = 0;
+    int viewed_faction = 0;
+    bool telemetry_enabled = false;
+    bool suppress_notices = false;
+    bool fast_combat = false;
+    std::string campaign_id;
+    std::string session_id;
     int completed_segment = 0;
     int completed_total = 0;
     int start_year = 0;
