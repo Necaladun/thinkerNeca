@@ -213,8 +213,8 @@ public static class AutoMonitorWin32 {
     Write-Host ('Game PID handoff: ' + $pidFile)
     Write-Host ('Game progress: ' + $statusFile)
     Write-Host 'The monitor will try to take focus when AI processing begins.'
-    Write-Host 'G: Show game  |  R: Restore rendering  |  N: Null rendering'
-    Write-Host 'P: Screenshot  |  S: Stop at next full turn  |  Space: Pause at next full turn'
+    Write-Host 'G: Show game  |  R: Restore rendering  |  N: Re-enable Null Rendering (NOT AI pause)'
+    Write-Host 'P: Screenshot  |  S: Stop at next full turn  |  Space: Pause AI at next full turn'
     Write-Host 'Q: Leave monitor open? No - Q closes this console WITHOUT killing the game.'
     Write-Host ('No-progress warning: ' + $warningSeconds + ' seconds. Never auto-kills the game.')
     while ($true) {
@@ -284,6 +284,11 @@ public static class AutoMonitorWin32 {
                     $lastProgress = [DateTime]::UtcNow
                     $reportedStall = $false
                 }
+                if ($record['phase'] -eq 'victory_paused') {
+                    if ($signature -ne $lastRecord) {
+                        Write-Host 'Victory reached: choose Save, Continue, Take Control or Exit in the game window.'
+                    }
+                }
                 if ($record['phase'] -eq 'turn_driver_exit') {
                     Write-Host 'Simulation driver exited. Check game and campaign logs.'
                     return
@@ -306,7 +311,9 @@ public static class AutoMonitorWin32 {
         }
         $now = [DateTime]::UtcNow
         $elapsed = ($now - $lastProgress).TotalSeconds
-        if ($elapsed -ge $warningSeconds -and -not $reportedStall) {
+        if ($elapsed -ge $warningSeconds -and -not $reportedStall -and
+            $record['phase'] -ne 'victory_paused' -and
+            $record['phase'] -ne 'operator_dialog') {
             Write-Warning ('No phase/turn progress for ' + [int]$elapsed +
                 ' seconds. Possible lengthy AI turn, modal, or hang; game not terminated.')
             try { [Console]::Beep(900,200) } catch {}
@@ -323,7 +330,7 @@ public static class AutoMonitorWin32 {
                 }
                 'N' {
                     Write-RunCommand $runProfilePath 'NULL'
-                    Write-Host 'Null Rendering queued for next live phase.'
+                    Write-Host 'Null Rendering queued for next live phase; N does not pause AI. Use Space.'
                 }
                 'P' { if ($gamePid -gt 0) { Save-GameScreenshot $gamePid $gameRoot } }
                 'S' {
