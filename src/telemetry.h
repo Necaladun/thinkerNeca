@@ -13,6 +13,8 @@ void telemetry_end_session();
 const char* telemetry_get_campaign_name();
 const char* telemetry_get_campaign_id();
 const char* telemetry_get_session_id();
+// True only after the operator explicitly rejoined a fingerprint-linked save.
+bool telemetry_resumed_linked_campaign();
 bool telemetry_set_campaign_name(const char* name);
 bool telemetry_record_named_save(const char* save_path);
 void telemetry_note_loaded_save(const char* source_path);
