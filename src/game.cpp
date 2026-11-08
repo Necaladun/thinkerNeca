@@ -1,5 +1,6 @@
 
 #include "game.h"
+#include "autosim_control.h"
 #include <direct.h>
 
 int* const dword_945818 = (int*)0x945818;
