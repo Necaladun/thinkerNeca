@@ -319,6 +319,8 @@ def build_gameplay_records(council, projects):
                     "voter_faction": vote.get("faction"),
                     "choice_raw": vote.get("choice_raw"),
                     "weight_raw": vote.get("weight_raw"),
+                    "voter_alive": vote.get("alive"),
+                    "voter_human": vote.get("human"),
                     "reason": vote.get("reason"),
                     "reason_status": vote.get("reason_status", "unknown"),
                 })
@@ -444,7 +446,7 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     write_csv(output / "council_ballots.csv",
               ("meeting_id", "turn", "mission_year", "proposal_id",
                "voter_faction", "choice_raw", "weight_raw",
-               "reason", "reason_status"), ballots)
+               "voter_alive", "voter_human", "reason", "reason_status"), ballots)
     write_csv(output / "projects.csv",
               ("event_id", "turn", "mission_year", "event", "faction",
                "project_id", "facility_id", "project_name", "base_name",
