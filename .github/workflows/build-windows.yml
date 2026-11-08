@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - master
+      # Temporary CI access while AUTO-002 remains an unmerged feature branch.
+      - feature/auto-002-noninteractive-ui
 
 # One build per live PR revision; cancel superseded CI jobs.
 concurrency:
@@ -75,6 +77,8 @@ jobs:
         run: python tools/test_autosim_session_control.py
       - name: Check AUTO-002 full-turn presentation and autosave source contract
         run: python tools/test_autosim_presentation_contract.py
+      - name: Check AUTO-002 satellite, wipeout and late-game notices
+        run: python tools/test_autosim_lategame_notices.py
       - name: Validate distributed thinker.ini options
         run: python tools/test_thinker_ini_contract.py
       - name: Test offline TEL-001 campaign report
