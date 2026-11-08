@@ -30,6 +30,14 @@ check("native Planet files use distinct stock map loading routes",
       and "DefaultPrefs->map_type = autosim_new_world_source" in game
       and "autosim_new_world_source + 1 : 1;" in game
       and 'FileExists(builtin)' in game)
+check("missing or invalid installed world/map data fails closed in launcher mode",
+      "selection < 0 || selection >= entry_count" in game
+      and "Selected world size is missing" in game
+      and "no #WORLDSIZE list" in game
+      and 'if (mod_load_map_daemon("maps\\\\xplanet.mp")) {' in game
+      and 'if (mod_load_map_daemon("maps\\\\xplanetx.mp")) {' in game
+      and "Could not load maps\\\\xplanet.mp." in game
+      and "Could not load maps\\\\xplanetx.mp." in game)
 check("generated custom dimensions bypass the interactive native edit dialog",
       "autosim_new_world_source == 0 && autosim_new_world_size == 6" in game
       and "*MapSizePlanet = 99;" in game
