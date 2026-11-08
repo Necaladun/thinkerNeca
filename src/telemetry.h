@@ -41,8 +41,20 @@ void telemetry_orbit_end_attack(const OrbitAttackTrace& trace, int attacker,
 void telemetry_orbit_environment_loss(int faction_id, const char* cause,
     int lost_mineral, int lost_energy, int lost_odp);
 void telemetry_record_ui_notice(const char* source, const char* label, const char* action);
-// Dedicated session Council trace, flushed before native modal processing.
+// The legacy Council execution trace is an automation diagnostic, not
+// a gameplay vote. Only unexpected/meaningful UI guards are recorded.
 void telemetry_record_council_event(const char* phase, int actor, const char* detail);
+struct CouncWindow;
+// These read existing native ballots/resolution only; never rerun AI voting.
+void telemetry_council_call_enter(int faction_id);
+void telemetry_council_call_leave();
+void telemetry_council_initialized(const CouncWindow* window, int native_arg1, int native_arg2);
+void telemetry_council_resolved(const CouncWindow* window, int native_result,
+    int previous_passes, int previous_governor, unsigned previous_game_state);
+// Secret Project lifecycle: explicit production switches and true completion,
+// with a turn-boundary reconciliation for paths that write queues directly.
+void telemetry_project_queue_changed(int base_id, int previous_item, int next_item);
+void telemetry_project_completed(int base_id, int facility_id);
 void telemetry_end_session();
 
 // Human-friendly campaign labels are separate from stable folder IDs. A save
