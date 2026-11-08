@@ -802,6 +802,10 @@ bool patch_setup(Config* cf) {
     write_jump(0x55BB30, (int)set_treaty);
     write_jump(0x55BBA0, (int)set_agenda);
     write_jump(0x55BC00, (int)spying);
+    // Native third-party pact dissolution otherwise bypasses the existing
+    // ENEMYPACTENDS all-AI notice guard in faction_event.cpp. Use that
+    // source-equivalent routine; retain both factions' treaty-bit updates.
+    write_jump(0x55CE20, (int)enemies_unpact);
     write_jump(0x55D430, (int)enemies_trade_tech);
     write_jump(0x55D760, (int)enemies_treaty);
     write_jump(0x55E370, (int)encounter);
