@@ -1696,8 +1696,8 @@ void telemetry_research_reconcile() {
         tel02_research_targets[faction] = current;
     }
 }
-void telemetry_combat_exchange(int attacker, int defender, const char* mode,
-    int type_flags, int attack_strength, int defend_strength,
+void telemetry_combat_exchange(int attacker, int defender, int original_defender_faction,
+    const char* mode, int type_flags, int attack_strength, int defend_strength,
     int attacker_hp_before, int defender_hp_before,
     int attacker_hp_after, int defender_hp_after,
     bool retreated, bool marine_detached) {
@@ -1709,7 +1709,8 @@ void telemetry_combat_exchange(int attacker, int defender, const char* mode,
     out << ",\"mode\":" << json_string(mode)
         << ",\"combat_type_flags\":" << type_flags
         << ",\"attacker_faction\":" << atk.faction_id
-        << ",\"defender_faction\":" << def.faction_id
+        << ",\"defender_faction\":" << original_defender_faction
+        << ",\"defender_faction_at_log\":" << def.faction_id
         << ",\"attacker_unit_id\":" << atk.unit_id
         << ",\"defender_unit_id\":" << def.unit_id
         << ",\"attacker_reactor\":" << atk.reactor_type()
