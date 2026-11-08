@@ -6,6 +6,14 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## TEL-LOG-02: production/unit/combat/research (9 November 2026, draft PR #11)
+
+**Source-only; Windows acceptance pending:** New telemetry streams `production.jsonl`, `units.jsonl`, `combat.jsonl` and `research.jsonl` record actual C++ source mutation events independent of UI suppression: `mod_base_change` explicit queue changes after retool, `mod_base_production` completed builds after game state mutation, `veh_init` placement and `veh_kill` pre-compaction removal, Marine Detachment owner changes, `mod_battle_fight_2` actual HP exchanges (never option=0 odds queries), and `tech_achieved` real tech owner-bit gains (excluding maps, commlinks and prototypes). Research target observation is at completed-cycle granularity, not AI choice reasoning. Common event IDs are session-global. HTML/CSV Analyzer supports legacy sessions with absent streams.
+
+**Checks:** `tools/test_autosim_log02.py` verifies source ordering, optional reporting, HTML escaping and stream isolation. Green compilation/static CI is not native runtime proof.
+
+**Required Windows tests:** Run 10+ completed turns with telemetry, compare paid unit/facility/satellite/project completion and unit creation to snapshot totals, kill several units and verify IDs after array compaction, exercise artillery/direct/duel/retreat/Marine and reconcile HP+loss events, distinguish researched/traded/shared tech, ensure no odds-only log entries, test report CSV/HTML/ZIP, normal human and telemetry-disabled runs, same-build save/reload into another session, and telemetry-on/off game progression. Unknown causes, postcombat cleanup, native-only routes, upgrades and cross-session unit identity remain limits.
+
 ## AUTO-LAUNCH campaign-name folder IDs and active-run timing (9 November 2026; PR #11 draft)
 
 **Implemented source, native Windows trial pending.** New unlinked campaigns use the chosen launcher campaign display name (ASCII-safe slug, max 40 characters) plus local creation timestamp `YYYYMMDD-HHMMSS`, with collision suffix where necessary. Existing linked saves always reuse their existing immutable campaign ID. `telemetry_begin_session` resets a per-session active AI timer; `src/gameturn.cpp` activates it after all-AI startup confirmation and pauses it before any turn-limit/operator control; `src/game.cpp::end_of_game` freezes at the initial terminal-result write (before victory UI), preserves that value during post-victory saving, and resumes it only for an explicit continuation. Human takeover stops timing. `status.json` and `result.json` record `simulation_elapsed_ms`; victory/turn-control dialogs and integrated reports display the figure, without treating missing old-session data as zero.
