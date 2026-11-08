@@ -245,7 +245,7 @@ void __cdecl pact_ends(int faction_id, int faction_id_2) {
     // dissolution and both factions' forced unit withdrawals above.
     // Suppress these screens even if the operator enabled other notices:
     // they use a separate native modal path and require user input.
-    if (autosim_control_active()) {
+    if (autosim_session_active()) {
         telemetry_record_ui_notice("diplomacy", "ENDPACT1/2/3",
             "pact_and_withdrawal_completed_no_modal");
         return;
