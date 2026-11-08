@@ -1073,9 +1073,9 @@ int __cdecl action_airdrop(int veh_id, int tx, int ty, int flags) {
         parse_says(0, base_id >= 0 ? Bases[base_id].name : "", -1, -1);
         parse_says(1, get_noun(faction_id), -1, -1);
         if (drop_range(faction_id) >= Rules->max_airdrop_rng_wo_orbital_insert) {
-            popp(ScriptFile, "MADEORBITAL", 0, image_drop, 0);
+            autosim_notice_popp(ScriptFile, "MADEORBITAL", image_drop);
         } else {
-            popp(ScriptFile, "MADEAIRDROP", 0, image_drop, 0);
+            autosim_notice_popp(ScriptFile, "MADEAIRDROP", image_drop);
         }
     }
     veh->state |= VSTATE_MADE_AIRDROP;
@@ -1227,9 +1227,9 @@ void __cdecl action_oblit(int veh_id, int base_id) {
     parse_says(4, get_name(faction_id), -1, -1);
 
     if (faction_id == player_id) {
-        popp(ScriptFile, "OBLITTED", 0, "baseobl_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "OBLITTED", "baseobl_sm.pcx");
     } else if (faction_id_fmr == player_id || is_visible) {
-        popp(ScriptFile, "OBLITTED2", 0, "baseobl_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "OBLITTED2", "baseobl_sm.pcx");
     }
     if (Rules->tgl_oblit_base_atrocity) {
         atrocity(faction_id, faction_id_fmr, 2, 0);
@@ -3199,11 +3199,11 @@ MOV_UPKEEP:
                             if (veh_fc_id == MapWin->cOwner) {
                                 MapWin->VehID = -1;
                                 parse_says(0, get_noun(iter_fc_id), -1, -1);
-                                popp(ScriptFile, "TOOKARTIFACT", 0, "artstolen_sm.pcx", 0);
+                                autosim_notice_popp(ScriptFile, "TOOKARTIFACT", "artstolen_sm.pcx");
                             } else if (Vehs[iter_id].faction_id == MapWin->cOwner) {
                                 parse_says(0, Vehs[iter_id].name(), -1, -1);
                                 parse_says(1, get_noun(veh_fc_id), -1, -1);
-                                popp(ScriptFile, "TAKENARTIFACT", 0, "artstolen_sm.pcx", 0);
+                                autosim_notice_popp(ScriptFile, "TAKENARTIFACT", "artstolen_sm.pcx");
                             }
                             veh_fc_id = Vehs[veh_id].faction_id;
                             break;
