@@ -476,6 +476,7 @@ struct AutosimRunProfile {
     int render = -1;
     int unlimited_expansion = 0; // old run profiles retain normal AI colony cap
     int archive_interval = 0; // no archive writes in older profiles
+    int timing = 0;
     int size = -1, ocean = -1, erosion = -1, cloud = -1, life = -1;
     int difficulty = -1, observer = -1, monitor = -1;
     std::string mode;
@@ -506,6 +507,7 @@ static int autosim_profile_option(void* data, const char* section,
     if (!strcmp(name, "render_mode")) return autosim_profile_int(value, 2, &p->render);
     if (!strcmp(name, "unlimited_expansion")) return autosim_profile_int(value, 1, &p->unlimited_expansion);
     if (!strcmp(name, "archive_interval")) return autosim_profile_int(value, 10000, &p->archive_interval);
+    if (!strcmp(name, "timing_enabled")) return autosim_profile_int(value, 1, &p->timing);
     if (!strncmp(name, "faction_", 8) && strlen(name) == 9
     && name[8] >= '1' && name[8] <= '7') {
         const char* const allowed[] = {
@@ -547,6 +549,7 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_render_mode = 0;
     cf->autosim_unlimited_expansion = 0;
     cf->autosim_archive_interval = 0;
+    cf->autosim_timing_enabled = 0;
     for (std::string& slot : autosim_new_roster) slot.clear();
     autosim_launcher_active = false;
     autosim_auto_new_game = false;
@@ -591,6 +594,7 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_render_mode = p.render >= 0 ? p.render : (p.fast ? 1 : 0);
     cf->autosim_unlimited_expansion = p.unlimited_expansion;
     cf->autosim_archive_interval = p.archive_interval;
+    cf->autosim_timing_enabled = p.timing;
     autosim_launch_campaign_name = p.name;
     autosim_launch_profile_path = path;
     autosim_auto_new_game = p.mode == "new";
