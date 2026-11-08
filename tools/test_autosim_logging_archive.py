@@ -18,7 +18,6 @@ tele = src("src/telemetry.cpp")
 tele_h = src("src/telemetry.h")
 launcher = src("Run Automation.ps1")
 report = src("tools/campaign_report.py")
-picker = src("tools/Campaign Analyzer.pyw")
 workflow = src(".github/workflows/build-windows.yml")
 thinker_ini = src("docs/thinker.ini")
 
@@ -83,15 +82,22 @@ check("event streams keep UTC timestamps, session names and roster provenance",
       and "checkpoints.jsonl" in tele
       and "MFactions[fc].filename" in tele
       and "MFactions[fc].search_key" in tele)
-check("integrated launcher exposes offline Python reporting and full ZIP",
+check("single launcher owns session picker, report actions and full ZIP",
       "New-Tab 'Campaign tools & archive'" in launcher
-      and "tools\\Campaign Analyzer.pyw" in launcher
+      and "New-Object System.Windows.Forms.ListView" in launcher
+      and "Invoke-CampaignReporter -arguments @('--scan-json', $root)" in launcher
+      and "Invoke-CampaignReporter -arguments @([string]$row.campaign_dir," in launcher
+      and "Generate + open report" in launcher
+      and "Open existing report" in launcher
+      and "Open campaign folder" in launcher
+      and "Choose folder..." in launcher
       and "ZipFile]::CreateFromDirectory" in launcher
-      and "Get-ChildItem -LiteralPath $campaignRoot -Directory" in launcher
-      and "Invoke-Item -LiteralPath $directory" in launcher
+      and "Invoke-Item -LiteralPath $reportPath" in launcher
       and "campaign_report.py" in workflow
-      and "Campaign Analyzer.pyw" in workflow
-      and 'script_folder.name.lower() == "tools"' in picker)
+      and "Campaign Analyzer.pyw" not in launcher
+      and "build/ci/tools/Campaign Analyzer.pyw" not in workflow
+      and 'parser.add_argument("--scan-json"' in report
+      and '"campaign_dir": str(row["campaign_dir"])' in report)
 check("offline CSV/HTML handles independent optional timing/save streams",
       "render_automation_diagnostics" in report
       and 'timings.jsonl' in report and 'checkpoints.jsonl' in report
