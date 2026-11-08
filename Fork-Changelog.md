@@ -4,7 +4,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unmerged AUTO-002 — verified-binary native Council window diagnostics (8 November 2026)
 
-- Verified user's patched `terranx.exe` hash against earlier installed binary and disassembled native Council chain, ballot and Governor-resolution handling. Added optional telemetry-only `CouncWin_init` entry/exit logging, including proposal, vote mask, ballot selections and weights, with exact-original-callsite check and matching `__thiscall` forwarding. Does **not** suppress Council UI or make any decision, and has no runtime verification. Pre-Council save still required to isolate modal safely.
+- Verified user's patched `terranx.exe` hash against earlier installed binary and disassembled native Council chain, ballot and Governor-resolution handling. Added optional telemetry-only `CouncWin_init` entry/exit logging, including proposal, vote mask, ballot selections and weights, with exact-original-callsite check and matching `__thiscall` forwarding. Does **not** suppress Council UI or make any decision. Develop/Release x86 CI at `be514ef` [run 42452468919](https://github.com/Necaladun/thinkerNeca/actions/runs/42452468919) passed; native runtime is unverified. Project notice IDs confirm the logged Empath Guild finished on turn 97 and Council election on turn 117, not the same turn. Pre-Council save is still required to isolate modal safely.
 
 ## Unmerged AUTO-002 — physical F9/F10 fallback and external stop file (8 November 2026)
 
