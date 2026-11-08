@@ -40,6 +40,10 @@ bool autosim_ui_active();
 int autosim_notice_netmsg(NetMessage* msg, const char* label, int delay,
     int style, const char* image);
 int autosim_notice_popp(const char* filename, const char* label, const char* image);
+// Narrow replacement for the native orbital-combat result call at 0x4CF70F.
+// Same five-argument cdecl ABI as popp; never suppress choice/callback UI.
+int __cdecl autosim_orbital_result_popp(const char* filename, const char* label,
+    int a3, const char* image, fp_none fn);
 int autosim_notice_netmsg2(const char* label, const char* image);
 int autosim_notice_dialog(const char* label, int faction_id);
 int autosim_notice_diplomacy(NetMessage* msg, const char* label, int delay,
