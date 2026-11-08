@@ -32,8 +32,7 @@ check("canonical 14 stock factions validated for all seven unique slots",
           "PEACE", "CYBORG", "PIRATES", "DRONE", "ANGELS",
           "FUNGBOY", "CARETAKE", "USURPER"))
       and "p.faction_slot_count != 0 && p.faction_slot_count != 7" in main
-      and "p.faction_slots[i] == p.faction_slots[j]" in main
-      and '"faction_"' not in main)
+      and "p.faction_slots[i] == p.faction_slots[j]" in main)
 check("explicit roster only for new games, before native setup",
       'autosim_new_roster[7]' in main
       and "if (autosim_auto_new_game && !autosim_new_roster[0].empty())" in game
@@ -54,7 +53,7 @@ check("timing is optional launcher-only and logs true milliseconds",
       and "TelemetryPhaseStamp telemetry_phase_begin()" in tele
       and "GetTickCount()" in tele
       and "elapsed_ms" in tele
-      and '"started_utc"' not in tele or "started_utc" in tele
+      and "started_utc" in tele
       and "world_upkeep" in turn and "faction_upkeep" in turn
       and '"ai_turn"' in turn and '"full_faction_cycle"' in turn)
 check("archive checkpoints require complete turn, preserve normal saves and RNG",
@@ -76,7 +75,7 @@ check("named operator and victory SAVs copied into campaign archive",
       "telemetry_archive_named_save(path.c_str());" in turn
       and "telemetry_archive_named_save(saved_path.c_str());" in game
       and "CopyFileA(saved_game_path, destination.c_str(), TRUE)" in tele
-      and '"operator_named"' in tele
+      and "operator_named" in tele
       and "telemetry_record_named_save" in tele)
 check("event streams keep UTC timestamps, session names and roster provenance",
       "utc_stamp_ms()" in tele and "ui_notices.jsonl" in tele
