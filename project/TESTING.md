@@ -988,3 +988,17 @@ No measured A/B results have been obtained. A compile or source contract passing
 6. **Invariants:** all seven AI slots receive the intended global-difficulty class without an observer-only bonus, while genuine faction characteristics and native life remain distinct. Test identical save with two different observers, normal human game and suppression-off mode. The alien-observer global-rules mutation OBS-01 and Stage-1 game-state/RNG risks must be corrected/tested separately before declaring full neutrality.
 
 **Scope:** focus game automation acceptance on Librarian and Transcend. Below-Librarian `limit_project_start` / zero-human prerequisite issue remains documented but deferred. Special single-human scenario victory rules are not a fresh-game acceptance target.
+
+## AUTO-OBS Stage 3 — implementation acceptance and evidence (9 November 2026)
+
+**State:** implementation on draft PR #11; source contracts and CI cannot establish Windows game correctness. No new Windows in-game Stage-3 acceptance or same-build save/reload has been performed.
+
+1. **Profile and expansion:** GUI defaults must emit explicit `unlimited_expansion=1`, and old profiles must fall back to 0. Verify eligibility at 49/50/51 bases+colony units with toggle on/off and both Librarian/Transcend. Scenario no-colony and engine-wide base limit remain, while ordinary human games and distributed Thinker INI remain unchanged.
+2. **Observer neutrality:** run identical same-SAV zero-human A/B with two different living observers (including aliens), compare `GameRules`, shared RNG state, research choice order, cargo/monolith, Mind Worm and project-intel flags, captures and diplomatic/victory state. Locate first divergence, not just differences in final outcome. Native untouched callsites remain unproven.
+3. **Observer elimination:** eliminate the watched AI at multiple phases. Native faction death should complete and camera should move to next living slot 1–7 without changing human mask or ending world. Test last-humanless survivor, no survivors, surrendered allies, post-elimination continuation and reload.
+4. **Pact popup:** create and end pact through `pact_ends` and native `enemies_unpact`. Both unit withdrawals and pact-state changes must remain; no `ENDPACT1/2/3` screen in launcher AI mode even with notice suppression disabled. Normal human pact screens remain.
+5. **Victory and outcome:** test conquest solo/coalition, Governor/Supreme Leader, Corner Market, Ascent, alien Subspace and time-limit. Confirm `result.json` status/reason, raw type, survivor and winner evidence, initial/final observer, last committed versus terminal turn, partial cycle; no blocking endgame screens or second game on exit.
+6. **SAV/telemetry integrity:** no final save is attempted mid-faction, since safe native serializer state at that boundary is not proven. The result must say `not_attempted_partial_cycle` and never invent a completed turn. Previously completed `turns.jsonl`/`bases.jsonl` and autosaves remain valid; confirm same-build ordinary save/reload.
+7. **Regressions:** vanilla normal-human and human Progenitor, loaded simulation, three render modes, suppressed-notices off, x86 Develop and Release, performance timings in actual engine milliseconds, and game progression beyond 50 bases.
+
+**Source coverage:** new `tools/test_autosim_stage3.py` and updated launcher, pact and Mind Worm tests run with Windows CI. Only native Windows evidence can close in-game acceptance.
