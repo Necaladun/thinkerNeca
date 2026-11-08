@@ -2529,7 +2529,7 @@ int __cdecl mod_eliminate_player(int faction_id, int setup_id) {
             }
         }
         if (faction_id != *CurrentPlayerFaction && plr_alien && MFactions[*CurrentPlayerFaction].is_alien()) {
-            interlude(42, 0, 1, 0);
+            autosim_interlude(42, 0, 1, 0);
         }
     }
     return 1;
