@@ -510,7 +510,7 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
 
                 bool relocate = true;
                 if (!*MultiplayerActive && faction_id == player_id) {
-                    if (autosim_ui_active()) {
+                    if (autosim_session_active()) {
                         // Unobserved AI already uses relocate=true. The
                         // observer must not invent a human-only decision.
                         telemetry_record_ui_notice("base_capture", "ESCAPE",
@@ -848,7 +848,7 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
         else { mod_bases_reset(base_region, faction_id, 0); }
     }
     mon_conquer_base(faction_id_atk, old_name);
-    if (base_id >= 0 && faction_id_atk == player_id
+    if (base_id >= 0 && faction_id_atk == player_id && is_human(faction_id_atk)
     && (base->state_flags & BSTATE_ASSISTANT_KILLER_HOME)
     && !(*GamePreferences & PREF_AV_INTERLUDES_DISABLED) && !*MultiplayerActive) {
         parse_says(5, base->name, -1, -1);
@@ -970,7 +970,7 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
         set_base(base_id);
         base_compute(1);
         if (faction_id_atk == player_id) {
-            if (autosim_ui_active()) {
+            if (autosim_session_active()) {
                 // Ownership and base_compute() already completed. Do not
                 // open observer-only colony management during AI turns.
                 telemetry_record_ui_notice("base_capture", "BaseWin_zoom",
@@ -1057,7 +1057,7 @@ void __cdecl mod_base_change(int base_id, int item_id) {
     }
     base->minerals_accumulated = base->minerals_accumulated_2 - mineral_penalty;
     draw_radius(base->x, base->y, 2, 2);
-    if (faction_id == player_id || *SkipTechScreenB) {
+    if ((faction_id == player_id && is_human(faction_id)) || *SkipTechScreenB) {
         return;
     }
     bool new_is_unbuilt_sp = (item_id <= -SP_ID_First)
