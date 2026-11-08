@@ -2239,6 +2239,7 @@ int __cdecl end_of_game(int flag) {
         // serialize an unverified partial-turn save as a finished checkpoint.
         // Existing normal autosaves remain intact for recovery.
         telemetry_record_terminal_result(NULL, "not_attempted_partial_cycle");
+        autosim_monitor_progress("terminal", 0);
         *GameState |= STATE_FINAL_SCORE_DONE;
         *ControlTurnB = 0;
         *ControlTurnA = 1;
