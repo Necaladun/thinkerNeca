@@ -845,6 +845,141 @@ void telemetry_council_resolved(const CouncWindow* win, int native_result,
     council_append(result.str());
 }
 
+
+// Secret Project state is tracked by map coordinates and faction, NOT by
+// base-slot index (native base deletion compacts and reuses those slots).
+// These events describe production transitions, not the AI's motivation.
+static int project_facility_on_queue(const BASE& base) {
+    const int facility = -base.queue_items[0];
+    return base.faction_id > 0 && base.faction_id < MaxPlayerNum
+        && facility >= SP_ID_First && facility <= SP_ID_Last
+        && SecretProjects[facility - SP_ID_First] == SP_Unbuilt
+        ? facility : 0;
+}
+static ProjectQueueState project_state(const BASE& base, int facility) {
+    ProjectQueueState state;
+    state.faction = base.faction_id;
+    state.facility = facility;
+    state.x = base.x;
+    state.y = base.y;
+    state.base_name = base.name;
+    return state;
+}
+static void project_append(const char* event, const ProjectQueueState& state,
+    int previous_facility, int next_facility, const char* source,
+    const char* reason) {
+    if (!recording || !projects_file || !state.facility) return;
+    std::ostringstream out;
+    out << "{\"schema\":1,\"event\":\"" << event << "\""
+        << ",\"event_id\":" << json_string(
+            (std::string(telemetry_get_session_id()) + "-project-"
+                + std::to_string(++project_event_seq)).c_str())
+        << ",\"utc\":" << json_string(utc_stamp_ms().c_str())
+        << ",\"turn\":" << *CurrentTurn
+        << ",\"mission_year\":" << *CurrentMissionYear
+        << ",\"processing_faction\":" << *CurrentFaction
+        << ",\"faction\":" << state.faction
+        << ",\"project_id\":" << state.facility - SP_ID_First
+        << ",\"facility_id\":" << state.facility
+        << ",\"project_name\":" << json_string(Facility[state.facility].name)
+        << ",\"base_name\":" << json_string(state.base_name.c_str())
+        << ",\"base_x\":" << state.x << ",\"base_y\":" << state.y
+        << ",\"previous_facility_id\":";
+    if (previous_facility) out << previous_facility;
+    else out << "null";
+    out << ",\"next_facility_id\":";
+    if (next_facility) out << next_facility;
+    else out << "null";
+    out << ",\"source\":" << json_string(source)
+        << ",\"change_cause\":" << json_string(reason)
+        << ",\"ai_reason\":null,\"reason_status\":\"not_instrumented\"}";
+    if (!append_line(projects_file, out.str())) recorder_failure();
+}
+static void project_transition(const ProjectQueueState* previous,
+    const ProjectQueueState* next, const char* source) {
+    if (previous && next && previous->faction == next->faction
+    && previous->facility == next->facility) return;
+    if (previous && next && previous->faction != next->faction) {
+        project_append("interrupted", *previous, previous->facility, 0,
+            source, "base_owner_changed");
+        project_append("started", *next, 0, next->facility,
+            source, "new_owner_queue");
+    } else if (previous && next) {
+        project_append("changed", *previous, previous->facility, next->facility,
+            source, "production_queue_changed");
+        project_append("started", *next, previous->facility, next->facility,
+            source, "project_switched_to");
+    } else if (previous) {
+        const char* cause = SecretProjects[previous->facility - SP_ID_First] != SP_Unbuilt
+            ? "project_no_longer_available" : "production_queue_replaced_or_base_lost";
+        project_append("abandoned", *previous, previous->facility, 0, source, cause);
+    } else if (next) {
+        project_append("started", *next, 0, next->facility,
+            source, "production_queue_selected");
+    }
+}
+void telemetry_project_queue_changed(int base_id, int previous_item, int next_item) {
+    if (!recording || !projects_file || base_id < 0 || base_id >= *BaseCount
+    || previous_item == next_item) return;
+    const BASE& base = Bases[base_id];
+    const std::pair<int,int> key(base.x, base.y);
+    const auto old = project_queues.find(key);
+    ProjectQueueState previous;
+    const ProjectQueueState* p = NULL;
+    if (old != project_queues.end()) {
+        previous = old->second;
+        p = &previous;
+    } else {
+        const int old_facility = -previous_item;
+        if (old_facility >= SP_ID_First && old_facility <= SP_ID_Last
+        && SecretProjects[old_facility - SP_ID_First] == SP_Unbuilt) {
+            previous = project_state(base, old_facility);
+            p = &previous;
+        }
+    }
+    const int facility = project_facility_on_queue(base);
+    ProjectQueueState next = project_state(base, facility);
+    project_transition(p, facility ? &next : NULL, "mod_base_change");
+    if (!recording) return;
+    if (facility) project_queues[key] = next;
+    else project_queues.erase(key);
+}
+void telemetry_project_completed(int base_id, int facility_id) {
+    if (!recording || !projects_file || base_id < 0 || base_id >= *BaseCount
+    || facility_id < SP_ID_First || facility_id > SP_ID_Last) return;
+    const BASE& base = Bases[base_id];
+    const ProjectQueueState completed = project_state(base, facility_id);
+    project_append("completed", completed, facility_id, 0,
+        "mod_base_production", "native_secret_projects_assignment");
+    project_queues.erase(std::make_pair((int)base.x, (int)base.y));
+}
+static void telemetry_project_reconcile_completed_turn() {
+    if (!recording || !projects_file) return;
+    std::map<std::pair<int,int>, ProjectQueueState> current;
+    for (int i = 0; i < *BaseCount; ++i) {
+        const BASE& b = Bases[i];
+        const int facility = project_facility_on_queue(b);
+        if (!facility) continue;
+        const std::pair<int,int> key(b.x, b.y);
+        current[key] = project_state(b, facility);
+        const auto old = project_queues.find(key);
+        project_transition(old == project_queues.end() ? NULL : &old->second,
+            &current[key], "completed_turn_reconciliation");
+        if (!recording) return;
+    }
+    for (const auto& previous : project_queues) {
+        if (current.find(previous.first) == current.end()) {
+            const char* reason = SecretProjects[previous.second.facility - SP_ID_First]
+                != SP_Unbuilt ? "project_completed_elsewhere_or_unavailable"
+                : "queue_changed_or_base_lost";
+            project_append("abandoned", previous.second,
+                previous.second.facility, 0, "completed_turn_reconciliation", reason);
+            if (!recording) return;
+        }
+    }
+    project_queues.swap(current);
+}
+
 TelemetryPhaseStamp telemetry_phase_begin() {
     TelemetryPhaseStamp stamp;
     if (!recording || !timings_file || !conf.autosim_timing_enabled) return stamp;
@@ -1094,6 +1229,8 @@ void telemetry_record_completed_turn() {
         return;
     }
     if (!telemetry_orbit_snapshot("completed_turn")) return;
+    telemetry_project_reconcile_completed_turn();
+    if (!recording) return;
     last_committed_turn = turn;
     if (!atomic_write(session_dir + "/status.json", status_json("recording"))) {
         recorder_failure();
