@@ -735,33 +735,114 @@ void telemetry_record_ui_notice(const char* source, const char* label, const cha
     }
 }
 
-// Dedicated flushed Council trace for diagnosing stalls and election parity.
-// This only reads existing game state; it never evaluates votes or RNG.
+// Automation-only Council presentation diagnostics. There is deliberately NO
+// routine call_council/CouncWin_init stream and no Council UI information in
+// council.jsonl. Native suppression hooks and decisions remain unchanged.
 void telemetry_record_council_event(const char* phase, int actor, const char* detail) {
-    if (!recording || !council_file) return;
-    const int owner = MapWin ? MapWin->cOwner : 0;
-    std::ostringstream event;
-    event << "{\"schema\":1,\"utc\":" << json_string(utc_stamp_ms().c_str())
-          << ",\"turn\":" << *CurrentTurn
-          << ",\"mission_year\":" << *CurrentMissionYear
-          << ",\"processing_faction\":" << *CurrentFaction
-          << ",\"actor\":" << actor
-          << ",\"observer\":" << owner
-          << ",\"human_mask\":" << (unsigned)FactionStatus[0]
-          << ",\"alive_mask\":" << (unsigned)FactionStatus[1]
-          << ",\"pending\":" << *CouncilSessionPending
-          << ",\"governor\":" << *GovernorFaction
-          << ",\"phase\":" << json_string(phase)
-          << ",\"detail\":" << json_string(detail)
-          << ",\"observer_proposal\":" << ((owner > 0 && owner < MaxPlayerNum) ? CouncilProposal[owner] : -1)
-          << ",\"observer_vote_state\":" << ((owner > 0 && owner < MaxPlayerNum) ? CouncilVoteState[owner] : -1)
-          << ",\"energy\":[";
-    for (int i = 0; i < MaxPlayerNum; ++i) {
-        if (i) event << ',';
-        event << Factions[i].energy_credits;
+    if (!phase || !recording) return;
+    if (strcmp(phase, "modal_fallback")
+        && strcmp(phase, "human_only_offer_omitted")
+        && strcmp(phase, "notice_suppressed")
+        && strcmp(phase, "vote_offer_native_exit")) return;
+    std::ostringstream note;
+    note << "actor=" << actor << " " << (detail ? detail : "");
+    telemetry_record_ui_notice("council", phase, note.str().c_str());
+}
+
+void telemetry_council_call_enter(int faction_id) {
+    council_calling_faction = recording ? faction_id : 0;
+}
+void telemetry_council_call_leave() {
+    council_calling_faction = 0;
+}
+
+static std::ostringstream council_record(const char* type) {
+    std::ostringstream row;
+    row << "{\"schema\":1,\"event\":" << json_string(type)
+        << ",\"utc\":" << json_string(utc_stamp_ms().c_str())
+        << ",\"turn\":" << *CurrentTurn
+        << ",\"mission_year\":" << *CurrentMissionYear
+        << ",\"processing_faction\":" << *CurrentFaction
+        << ",\"meeting_id\":" << json_string(
+            (session_id + "-council-" + std::to_string(council_active_meeting)).c_str());
+    return row;
+}
+static void council_append(const std::string& value) {
+    if (recording && council_file && !append_line(council_file, value))
+        recorder_failure();
+}
+
+void telemetry_council_initialized(const CouncWindow* win, int arg1, int arg2) {
+    if (!recording || !council_file || !win) return;
+    const int proposal = win->proposal_type;
+    if (proposal < PROP_ELECT_PLANETARY_GOVERNOR
+    || proposal > PROP_REINSTATE_UN_CHARTER) return;
+    ++council_meeting_seq;
+    council_active_meeting = council_meeting_seq;
+    council_active_window = win;
+    council_result_written = false;
+    council_governor_before = *GovernorFaction;
+    council_passes_before = ProposalPassCount[proposal];
+    council_state_before = (unsigned)*GameState;
+    std::ostringstream proposal_row = council_record("proposal");
+    proposal_row << ",\"proposal_id\":" << proposal
+        << ",\"candidate_faction\":" << win->candidate_faction_id
+        // The call_council() argument is a verified caller, NOT necessarily
+        // the sponsor of each motion. Do not manufacture a proposer.
+        << ",\"convening_faction\":";
+    if (council_calling_faction > 0 && council_calling_faction < MaxPlayerNum)
+        proposal_row << council_calling_faction;
+    else proposal_row << "null";
+    proposal_row << ",\"proposer_faction\":null"
+        << ",\"native_init_arg1\":" << arg1
+        << ",\"native_init_arg2\":" << arg2
+        << ",\"native_vote_mask\":" << (unsigned)win->vote_faction_mask
+        << "}";
+    council_append(proposal_row.str());
+    if (!recording) return;
+    std::ostringstream ballot_row = council_record("ballots");
+    ballot_row << ",\"proposal_id\":" << proposal
+        << ",\"native_vote_mask\":" << (unsigned)win->vote_faction_mask
+        << ",\"ballots\":[";
+    for (int fc = 1; fc < MaxPlayerNum; ++fc) {
+        if (fc > 1) ballot_row << ',';
+        ballot_row << "{\"faction\":" << fc
+            // Native raw vote codes (including -3) are not yet decoded;
+            // native_vote_weight_raw may be zero or modified in Council.
+            << ",\"choice_raw\":" << win->faction_vote[fc]
+            << ",\"weight_raw\":" << win->faction_vote_count[fc]
+            << ",\"reason\":null,\"reason_status\":\"native_ai_reason_not_instrumented\"}";
     }
-    event << "]}";
-    if (!append_line(council_file, event.str())) recorder_failure();
+    ballot_row << "]}";
+    council_append(ballot_row.str());
+}
+
+void telemetry_council_resolved(const CouncWindow* win, int native_result,
+    int previous_passes, int previous_governor, unsigned previous_game_state) {
+    if (!recording || !council_file || !win
+    || council_active_window != win || council_result_written
+    || !council_active_meeting) return;
+    // 0 is still incomplete, not proof of a failed motion.
+    if (!win->proposal_outcome) return;
+    const int proposal = win->proposal_type;
+    if (proposal < PROP_ELECT_PLANETARY_GOVERNOR
+    || proposal > PROP_REINSTATE_UN_CHARTER) return;
+    council_result_written = true;
+    std::ostringstream result = council_record("resolution");
+    result << ",\"proposal_id\":" << proposal
+        << ",\"outcome_raw\":" << win->proposal_outcome
+        << ",\"native_modal_or_resolution_return\":" << native_result
+        << ",\"candidate_faction\":" << win->candidate_faction_id
+        << ",\"governor_before\":" << previous_governor
+        << ",\"governor_after\":" << *GovernorFaction
+        << ",\"pass_count_before\":" << previous_passes
+        << ",\"pass_count_after\":" << ProposalPassCount[proposal]
+        << ",\"game_state_before\":" << previous_game_state
+        << ",\"game_state_after\":" << (unsigned)*GameState
+        << ",\"victory_type\":" << *GameVictoryType
+        << ",\"native_vote_mask\":" << (unsigned)win->vote_faction_mask
+        << ",\"interpretation\":\"native_codes_not_decoded\"}";
+    council_append(result.str());
 }
 
 TelemetryPhaseStamp telemetry_phase_begin() {
