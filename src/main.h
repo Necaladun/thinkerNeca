@@ -155,6 +155,7 @@ struct Config {
     int autosim_fast_combat = 1; // AUTO-002: temporary fast all-AI presentation (historic option name), 0=off
     int autosim_render_mode = 0; // 0=normal, 1=fast, 2=null map rendering; launcher opt-in only
     int autosim_unlimited_expansion = 0; // launch-profile only; bypass AI colony cap during all-AI automation
+    int autosim_archive_interval = 0; // archive a safe full-cycle SAV every N turns; 0=disabled
     int warn_on_former_replace = 1;
     int manage_player_bases = 0;
     int manage_player_units = 0;
@@ -429,6 +430,7 @@ extern int autosim_new_world_cloud;
 extern int autosim_new_world_life;
 extern int autosim_new_difficulty;
 extern int autosim_new_observer;
+extern std::string autosim_new_roster[7]; // empty: retain native setup for that slot
 extern std::string autosim_launch_campaign_name;
 extern std::string autosim_launch_profile_path;
 extern std::vector<std::pair<std::string,std::string>> faction_pool;
