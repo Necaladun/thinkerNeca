@@ -753,6 +753,22 @@ void telemetry_council_call_leave() {
     council_calling_faction = 0;
 }
 
+static const char* council_proposal_name(int proposal) {
+    switch (proposal) {
+    case PROP_ELECT_PLANETARY_GOVERNOR: return "planetary_governor";
+    case PROP_UNITE_SUPREME_LEADER: return "supreme_leader";
+    case PROP_SALVAGE_UNITY_CORE: return "unity_core";
+    case PROP_GLOBAL_TRADE_PACT: return "global_trade_pact";
+    case PROP_REPEAL_GLOBAL_TRADE_PACT: return "repeal_global_trade_pact";
+    case PROP_LAUNCH_SOLAR_SHADE: return "launch_solar_shade";
+    case PROP_INCREASE_SOLAR_SHADE: return "increase_solar_shade";
+    case PROP_MELT_POLAR_CAPS: return "melt_polar_caps";
+    case PROP_REPEAL_UN_CHARTER: return "repeal_un_charter";
+    case PROP_REINSTATE_UN_CHARTER: return "reinstate_un_charter";
+    default: return "unrecognised";
+    }
+}
+
 static std::ostringstream council_record(const char* type) {
     std::ostringstream row;
     row << "{\"schema\":1,\"event\":" << json_string(type)
@@ -780,6 +796,7 @@ void telemetry_council_initialized(const CouncWindow* win, int arg1, int arg2) {
     council_result_written = false;
     std::ostringstream proposal_row = council_record("proposal");
     proposal_row << ",\"proposal_id\":" << proposal
+        << ",\"proposal_name\":" << json_string(council_proposal_name(proposal))
         << ",\"candidate_faction\":" << win->candidate_faction_id
         // The call_council() argument is a verified caller, NOT necessarily
         // the sponsor of each motion. Do not manufacture a proposer.
@@ -824,6 +841,7 @@ void telemetry_council_resolved(const CouncWindow* win, int native_result,
     council_result_written = true;
     std::ostringstream result = council_record("resolution");
     result << ",\"proposal_id\":" << proposal
+        << ",\"proposal_name\":" << json_string(council_proposal_name(proposal))
         << ",\"outcome_raw\":" << win->proposal_outcome
         << ",\"native_modal_or_resolution_return\":" << native_result
         << ",\"candidate_faction\":" << win->candidate_faction_id
