@@ -242,6 +242,9 @@ void __cdecl control_turn() {
             }
         }
         if (!autosim_ready()) startup_confirmed = false;
+        // Start with actual AI processing, not the startup-confirmation
+        // dialog or map setup. This also stops when control is handed back.
+        telemetry_run_clock_set_active(autosim_ready());
         autosim_null_render_suppress(autosim_ready());
         autosim_monitor_progress("cycle_start", 0);
         // Capture a baseline as soon as the user has handed the last human
@@ -595,6 +598,9 @@ void __cdecl control_turn() {
                     operator_stop ? "OPERATOR_STOP" :
                     operator_menu ? "OPERATOR_MENU" : "PAUSE",
                     "control_dialog");
+                // Neither the quota/pause dialog nor save/menu interaction
+                // is simulation processing time. Resume next AI cycle.
+                telemetry_run_clock_set_active(false);
                 autosim_null_render_suppress(false);
                 autosim_monitor_progress("operator_dialog", 0);
                 draw_map(1);
