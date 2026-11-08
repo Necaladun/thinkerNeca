@@ -394,7 +394,9 @@ try {
     }
     $runTab = New-Tab 'Game & campaign'
     $worldTab = New-Tab 'World generation'
+    $factionTab = New-Tab 'Faction roster'
     $presentationTab = New-Tab 'Presentation & logs'
+    $reportTab = New-Tab 'Campaign tools & archive'
     $monitorTab = New-Tab 'Monitor & recovery'
     function Add-Label($tab, [string]$text, [int]$x, [int]$y, [int]$w, [int]$h) {
         $label = New-Object System.Windows.Forms.Label
@@ -483,8 +485,15 @@ try {
     $telemetry = Add-Check $presentationTab 'Record campaign telemetry, including Council events' 181 ([string]$options['telemetry_enabled'] -eq '1')
     $notices = Add-Check $presentationTab 'Suppress audited noninteractive popups' 223 ([string]$options['suppress_notices'] -eq '1')
     $unlimitedExpansion = Add-Check $presentationTab 'Ignore the AI colony expansion cap while simulating (automation only)' 265 ([string]$options['unlimited_expansion'] -eq '1')
-    [void](Add-Label $presentationTab 'Null Rendering only operates during eligible AI turns. AI visibility and fog-of-war state are unchanged.' 30 330 870 60)
-    [void](Add-Label $presentationTab 'An unknown modal can still stop the engine. The external monitor warns but does not click it.' 30 360 870 60)
+    $timing = Add-Check $presentationTab 'Log phase timings (UTC timestamps and elapsed milliseconds)' 306 ([string]$options['timing_enabled'] -eq '1')
+    $archiveChoices = @(0,5,10,25,50,100)
+    $archiveIndex = [Array]::IndexOf([int[]]$archiveChoices, [int]$options['archive_interval'])
+    if ($archiveIndex -lt 0) { $archiveIndex = 3 }
+    $archiveCadence = Add-Combo $presentationTab 'Archive a full-cycle SAV to the campaign every' 357 @(
+        'Off', '5 turns', '10 turns', '25 turns', '50 turns', '100 turns') $archiveIndex
+    [void](Add-Label $presentationTab 'Null Rendering only operates during eligible AI turns. AI visibility and fog-of-war state are unchanged.' 30 464 870 48)
+    [void](Add-Label $presentationTab 'Archived checkpoints are separate from native autosaves; may consume substantial disk space on huge worlds.' 30 520 870 54)
+    [void](Add-Label $presentationTab 'An unknown modal can still stop the engine. The external monitor warns but does not click it.' 30 580 870 54)
 
     [void](Add-Label $monitorTab 'Monitor runs in this batch console after launching the game.' 30 35 880 35)
     [void](Add-Label $monitorTab 'No-progress warning threshold (seconds)' 30 104 860 25)
@@ -523,6 +532,7 @@ try {
         $source.Enabled=$loadGame.Checked
         $browse.Enabled=$loadGame.Checked
         $worldTab.Enabled=$newGame.Checked
+        $factionTab.Enabled=$newGame.Checked
     }
     $newGame.Add_CheckedChanged($updateMode)
     $loadGame.Add_CheckedChanged($updateMode)
@@ -566,6 +576,8 @@ try {
                 telemetry_enabled=if ($telemetry.Checked) {'1'} else {'0'}
                 suppress_notices=if ($notices.Checked) {'1'} else {'0'}
                 unlimited_expansion=if ($unlimitedExpansion.Checked) {'1'} else {'0'}
+                timing_enabled=if ($timing.Checked) {'1'} else {'0'}
+                archive_interval=[string]$archiveChoices[$archiveCadence.SelectedIndex]
                 fast_combat=if ($render -ge 1) {'1'} else {'0'}
                 render_mode=[string]$render
                 world_size=[string][int]$worldSize.SelectedIndex
@@ -590,7 +602,7 @@ try {
         }
     })
     if ($GuiSelfTest) {
-        if ($tabs.TabPages.Count -ne 4 -or $presentation.Items.Count -ne 3 -or
+        if ($tabs.TabPages.Count -ne 6 -or $presentation.Items.Count -ne 3 -or
             $worldSize.Items.Count -ne 5 -or $turns.Maximum -ne 100000) {
             throw 'Windows WinForms launcher controls failed the GUI smoke test.'
         }
