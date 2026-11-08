@@ -300,6 +300,58 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
 
 } // namespace
 
+void autosim_fill_dialog_state(AutosimDialogState* state, AutosimDialogMode mode) {
+    if (!state) return;
+    state->mode = mode;
+    state->human_mask = (unsigned)FactionStatus[0];
+    state->viewed_faction = MapWin ? MapWin->cOwner : 0;
+    state->telemetry_enabled = conf.telemetry_enabled != 0;
+    state->suppress_notices = conf.autosim_suppress_notices != 0;
+    state->fast_combat = conf.autosim_fast_combat != 0;
+    state->campaign_id = telemetry_get_campaign_id();
+    state->session_id = telemetry_get_session_id();
+    state->campaign_name = telemetry_get_campaign_name();
+    state->save_name = autosim_default_save_name(
+        state->campaign_name.c_str(), *CurrentMissionYear);
+    state->additional_turns = conf.autosim_manual_turns > 0
+        ? conf.autosim_manual_turns : 25;
+    state->start_year = state->end_year = *CurrentMissionYear;
+    state->start_bases = state->end_bases = *BaseCount;
+    state->start_units = state->end_units = *VehCount;
+    for (int i = 1; i < MaxPlayerNum; ++i) {
+        if (is_alive(i)) ++state->alive_factions;
+    }
+}
+
+bool autosim_apply_dialog_options(const AutosimDialogState& state) {
+    if (!telemetry_set_campaign_name(state.campaign_name.c_str()))
+        return false;
+    // Runtime-only knobs. No thinker.ini or save-game preference changes.
+    conf.autosim_suppress_notices = state.suppress_notices ? 1 : 0;
+    conf.autosim_fast_combat = state.fast_combat ? 1 : 0;
+    conf.autosim_manual_turns = state.additional_turns;
+    return true;
+}
+
+void autosim_show_manual_setup() {
+    if (*GameHalted || *MultiplayerActive || *PbemActive || !MapWin)
+        return;
+    AutosimDialogState state;
+    autosim_fill_dialog_state(&state, AUTOSIM_DIALOG_SETUP);
+    if (autosim_show_control_dialog(&state) != AUTOSIM_DIALOG_ARM)
+        return;
+    if (!autosim_apply_dialog_options(state)) {
+        MessageBoxA(*phWnd, "Could not update the campaign name. Check campaigns/ permissions.",
+            "thinkerNeca Simulation Setup", MB_OK | MB_ICONWARNING);
+        return;
+    }
+    const bool all_ai = ((unsigned)FactionStatus[0] & 0xFEu) == 0;
+    MessageBoxA(*phWnd,
+        all_ai ? "Simulation armed. The game will ask for startup confirmation at the next safe turn dispatch."
+               : "Simulation armed. In Scenario Editor, transfer all factions to AI, then End Turn. The startup confirmation appears before autonomous AI processing.",
+        "thinkerNeca Simulation Setup", MB_OK | MB_ICONINFORMATION);
+}
+
 std::string autosim_default_save_name(const char* campaign, int year) {
     char suffix[24] = {};
     snprintf(suffix, sizeof(suffix), "_MY%d", year);
