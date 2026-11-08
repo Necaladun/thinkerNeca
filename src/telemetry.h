@@ -3,6 +3,11 @@
 // Optional campaign telemetry. Game observations remain read-only; changing
 // campaign labels/links only modifies recorder metadata and sidecar files.
 void telemetry_begin_session(const char* source_save);
+// Elapsed active AI simulation wall time, excluding startup/operator windows
+// and all time after terminal outcome until an explicit continuation.
+void telemetry_run_clock_set_active(bool active);
+bool telemetry_run_clock_started();
+unsigned long long telemetry_run_elapsed_ms();
 void telemetry_record_completed_turn();
 // Wall-clock + monotonic timer for actual native engine phase timings.
 // No game RNG, AI calls or turn/state modification.
