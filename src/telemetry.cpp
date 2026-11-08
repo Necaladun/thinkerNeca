@@ -2,6 +2,7 @@
 #include "main.h"
 
 #include <iomanip>
+#include <map>
 #include <sstream>
 
 // TEL-001 is an independent, opt-in file writer. Keep all game-state reads in
@@ -14,7 +15,25 @@ FILE* ui_notices_file = NULL;
 FILE* orbit_file = NULL;
 int orbit_event_seq = 0;
 int orbit_attack_seq = 0;
+int council_meeting_seq = 0;
+int council_calling_faction = 0;
+int council_active_meeting = 0;
+const CouncWindow* council_active_window = NULL;
+bool council_result_written = false;
+int council_governor_before = -1;
+int council_passes_before = 0;
+unsigned council_state_before = 0;
+int project_event_seq = 0;
+struct ProjectQueueState {
+    int faction = 0;
+    int facility = 0;
+    int x = 0;
+    int y = 0;
+    std::string base_name;
+};
+std::map<std::pair<int,int>, ProjectQueueState> project_queues;
 FILE* council_file = NULL;
+FILE* projects_file = NULL;
 FILE* timings_file = NULL;
 FILE* checkpoints_file = NULL;
 std::string campaign_dir;
@@ -294,6 +313,10 @@ void close_files() {
         fclose(council_file);
         council_file = NULL;
     }
+    if (projects_file) {
+        fclose(projects_file);
+        projects_file = NULL;
+    }
     if (timings_file) {
         fclose(timings_file);
         timings_file = NULL;
@@ -323,6 +346,13 @@ void telemetry_begin_session(const char* source_save) {
     last_checkpoint_turn = -1;
     orbit_event_seq = 0;
     orbit_attack_seq = 0;
+    council_meeting_seq = 0;
+    council_calling_faction = 0;
+    council_active_meeting = 0;
+    council_active_window = NULL;
+    council_result_written = false;
+    project_event_seq = 0;
+    project_queues.clear();
     initial_observer = MapWin ? MapWin->cOwner : 0;
     terminal_result_recorded = false;
     campaign_dir.clear();
@@ -475,14 +505,31 @@ void telemetry_begin_session(const char* source_save) {
     ui_notices_file = fopen((session_dir + "/ui_notices.jsonl").c_str(), "wb");
     orbit_file = fopen((session_dir + "/orbit.jsonl").c_str(), "wb");
     council_file = fopen((session_dir + "/council.jsonl").c_str(), "wb");
+    projects_file = fopen((session_dir + "/projects.jsonl").c_str(), "wb");
     timings_file = fopen((session_dir + "/timings.jsonl").c_str(), "wb");
     checkpoints_file = fopen((session_dir + "/checkpoints.jsonl").c_str(), "wb");
     if (!turns_file || !bases_file || !ui_notices_file || !orbit_file
-    || !council_file || !timings_file || !checkpoints_file) {
+    || !council_file || !projects_file || !timings_file || !checkpoints_file) {
         recorder_failure();
         return;
     }
     recording = true;
+    // Existing queues are a baseline, not falsely dated project starts.
+    for (int i = 0; i < *BaseCount; ++i) {
+        const BASE& b = Bases[i];
+        const int facility = -b.queue_items[0];
+        if (b.faction_id > 0 && b.faction_id < MaxPlayerNum
+        && facility >= SP_ID_First && facility <= SP_ID_Last
+        && SecretProjects[facility - SP_ID_First] == SP_Unbuilt) {
+            ProjectQueueState state;
+            state.faction = b.faction_id;
+            state.facility = facility;
+            state.x = b.x;
+            state.y = b.y;
+            state.base_name = b.name;
+            project_queues[std::make_pair((int)b.x, (int)b.y)] = state;
+        }
+    }
     if (!telemetry_orbit_snapshot("session_start")) return;
     if (!atomic_write(session_dir + "/status.json", status_json("recording"))) {
         recorder_failure();
