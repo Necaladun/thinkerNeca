@@ -1,4 +1,4 @@
-param([switch]$SelfTest, [switch]$GuiSelfTest)
+param([switch]$SelfTest, [switch]$GuiSelfTest, [switch]$ReportSelfTest)
 
 # Stage A launch GUI. Nothing in thinker.ini, thinker_user.ini or the game's
 # Alpha Centauri.ini is written. The same thinker.exe is always launched.
@@ -10,7 +10,7 @@ $prefsPath = Join-Path $gameRoot 'automation.ini'
 # It remains available even if terranx crashes before telemetry starts.
 $script:launcherLogPath = $null
 $script:launcherTranscriptStarted = $false
-if (-not $SelfTest) {
+if (-not ($SelfTest -or $GuiSelfTest -or $ReportSelfTest)) {
     try {
         $logs = Join-Path $gameRoot 'automation\logs'
         [void][System.IO.Directory]::CreateDirectory($logs)
@@ -422,6 +422,34 @@ function Invoke-CampaignReporter([string[]]$arguments) {
     } finally {
         $process.Dispose()
     }
+}
+
+if ($ReportSelfTest) {
+    # Exercise the actual CLI bridge with one synthetic, zero-turn session.
+    # This test does not need thinker.exe, a game directory or Tkinter.
+    $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('thinkerneca-report-test-' +
+        [Guid]::NewGuid().ToString('N'))
+    $session = Join-Path $tmp 'campaign-test\sessions\session-001'
+    [void][System.IO.Directory]::CreateDirectory($session)
+    try {
+        [System.IO.File]::WriteAllText((Join-Path $session 'manifest.json'),
+            '{"schema":1,"started_utc":"20261109T000000Z","source_save":null}')
+        [System.IO.File]::WriteAllText((Join-Path $session 'status.json'),
+            '{"schema":1,"state":"closed","last_committed_turn":-1,"updated_utc":"20261109T000000Z"}')
+        [System.IO.File]::WriteAllText((Join-Path $session 'turns.jsonl'), '')
+        $json = Invoke-CampaignReporter -arguments @('--scan-json', $tmp)
+        $rows = @($json | ConvertFrom-Json)
+        if ($rows.Count -ne 1 -or $rows[0].session_id -ne 'session-001' -or
+            $rows[0].status -ne 'Closed') {
+            throw 'Headless campaign/session scan contract failed.'
+        }
+        Write-Host 'AUTO-LAUNCH integrated campaign report bridge passed'
+    } finally {
+        if ([System.IO.Directory]::Exists($tmp)) {
+            [System.IO.Directory]::Delete($tmp, $true)
+        }
+    }
+    exit 0
 }
 
 try {
