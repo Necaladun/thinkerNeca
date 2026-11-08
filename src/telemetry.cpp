@@ -1703,8 +1703,8 @@ void telemetry_combat_exchange(int attacker, int defender, const char* mode,
     bool retreated, bool marine_detached) {
     if (!recording || !combat_file || attacker < 0 || defender < 0
         || attacker >= *VehCount || defender >= *VehCount) return;
-    const VEH& atk = Vehs[attacker];
-    const VEH& def = Vehs[defender];
+    VEH& atk = Vehs[attacker];
+    VEH& def = Vehs[defender];
     std::ostringstream out = tel02_row("hp_exchange");
     out << ",\"mode\":" << json_string(mode)
         << ",\"combat_type_flags\":" << type_flags
@@ -1714,7 +1714,7 @@ void telemetry_combat_exchange(int attacker, int defender, const char* mode,
         << ",\"defender_unit_id\":" << def.unit_id
         << ",\"attacker_reactor\":" << atk.reactor_type()
         << ",\"defender_reactor\":" << def.reactor_type()
-        << ",\"target_x\":" << def.x << ",\"target_y\":" << def.y
+        << ",\"defender_x_at_hook\":" << def.x << ",\"defender_y_at_hook\":" << def.y
         << ",\"offense_final_raw\":" << attack_strength
         << ",\"defense_final_raw\":" << defend_strength
         << ",\"attacker_hp_before\":" << attacker_hp_before
