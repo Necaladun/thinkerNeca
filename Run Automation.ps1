@@ -117,8 +117,8 @@ if ($SelfTest) {
 # Workstation monitor: warning only, never automatically kill the game.
 # The DLL writes <profile>.status atomically at faction/phase boundaries and
 # reads <profile>.command on those same boundaries.
-function Write-RunCommand([string]$profile, [string]$command) {
-    $destination = $profile + '.command'
+function Write-RunCommand([string]$runProfilePath, [string]$command) {
+    $destination = $runProfilePath + '.command'
     [System.IO.File]::WriteAllText($destination, $command + [Environment]::NewLine,
                                   [System.Text.Encoding]::ASCII)
 }
@@ -161,7 +161,7 @@ function Save-GameScreenshot([int]$pidToCapture, [string]$root) {
         Write-Host 'If Null Rendering was active, only previously drawn content may be visible.'
     } finally { $bitmap.Dispose() }
 }
-function Run-Monitor([string]$profile, [int]$warningSeconds) {
+function Run-Monitor([string]$runProfilePath, [int]$warningSeconds) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -173,8 +173,8 @@ public static class AutoMonitorWin32 {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, ref AutoMonitorRect rect);
 }
 '@
-    $statusFile = $profile + '.status'
-    $pidFile = $profile + '.pid'
+    $statusFile = $runProfilePath + '.status'
+    $pidFile = $runProfilePath + '.pid'
     $lastRecord = ''
     $lastProgress = [DateTime]::UtcNow
     $gamePid = 0
@@ -254,21 +254,21 @@ public static class AutoMonitorWin32 {
             switch ($key.Key) {
                 'G' { if ($gamePid -gt 0) { Show-GameWindow $gamePid | Out-Null } }
                 'R' {
-                    Write-RunCommand $profile 'SHOW'
+                    Write-RunCommand $runProfilePath 'SHOW'
                     Write-Host 'Restore rendering queued; applied at next live game phase.'
                     if ($gamePid -gt 0) { Show-GameWindow $gamePid | Out-Null }
                 }
                 'N' {
-                    Write-RunCommand $profile 'NULL'
+                    Write-RunCommand $runProfilePath 'NULL'
                     Write-Host 'Null Rendering queued for next live phase.'
                 }
                 'P' { if ($gamePid -gt 0) { Save-GameScreenshot $gamePid $gameRoot } }
                 'S' {
-                    Write-RunCommand $profile 'STOP'
+                    Write-RunCommand $runProfilePath 'STOP'
                     Write-Host 'Stop queued for next completed full turn.'
                 }
                 'Spacebar' {
-                    Write-RunCommand $profile 'PAUSE'
+                    Write-RunCommand $runProfilePath 'PAUSE'
                     Write-Host 'Pause queued for next completed full turn.'
                 }
                 'Q' { Write-Host 'Monitor closed; game continues.'; return }
