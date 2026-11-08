@@ -6,6 +6,10 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 offscreen visual and fungus notice CI checkpoint (8 November 2026)
+
+[GitHub Actions Windows x86 Develop and Release run 42447573120](https://github.com/Necaladun/thinkerNeca/actions/runs/42447573120) **passed** at source head `d651cff`. Both native cross-builds passed; Develop also passed C++11 host policy and combat-damage tests, `tools/test_autosim_presentation_contract.py` checking movement, artillery loop preservation, native preference scopes and ecology notices, the probe UI source test, other terrain/INI/telemetry/doc tests and artifact packaging. The `thinker-develop-win32` artifact includes `thinker.dll` and `thinker.exe`. This establishes compile/structural consistency only; **there is no Windows gameplay run of these rendering changes**. Large-stack artillery, seen-vs-unseen simulation state/RNG equivalence and fungus ecology save/reload remain high-priority verification.
+
 ## AUTO-002 simulation-only offscreen presentation and ecology notice (8 November 2026)
 
 **Implementation on unmerged `feature/auto-002-noninteractive-ui`; Windows test pending.** User's latest reported popup: *fungus grows near [base], forest destroyed*. `src/base.cpp::mod_base_ecology` emits the `FUNGUSGROWS2` notification (or `FUNGUSGROWS` without destroyed improvement) after `bit_set(BIT_FUNGUS)`, improvement removal and visibility sync. Both now use `autosim_notice_pop2`, suppressing only when `autosim_suppress_notices=1` and actual all-AI control is valid. Event RNG, clean-mineral modifier, terraforming damage and native-life follow-on remain unmodified. The related return-unused `FORESTGROWS`/`KELPGROWS` notices in `src/gameturn.cpp` now use the audited POP2/NetMsg wrappers for either `game_event_popup` configuration.
