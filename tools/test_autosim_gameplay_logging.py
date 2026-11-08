@@ -35,7 +35,9 @@ check("Council event logging never calls native AI vote functions",
       and "win->faction_vote_count[fc]" in tele)
 check("Council sponsor and reason remain explicitly unknown",
       'proposer_faction\\":null' in tele
-      and 'reason_status\\":\\\"native_ai_reason_not_instrumented' in tele
+      and '"native_ai_reason_not_instrumented"' in tele
+      and '"human_choice_not_instrumented"' in tele
+      and '"human"' in tele
       and 'convening_faction' in tele
       and "council_calling_faction" in tele)
 check("Council presentation diagnostics are not Council history",
