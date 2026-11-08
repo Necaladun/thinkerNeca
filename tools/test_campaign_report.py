@@ -82,6 +82,40 @@ class CampaignReportTests(unittest.TestCase):
             self.assertTrue((session1 / "turns.jsonl").is_file())
             self.assertTrue((session2 / "turns.jsonl").is_file())
 
+    def test_phase_timing_and_checkpoint_log_exports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session = fixture(Path(tmp))
+            timers = [
+                {"schema": 1, "phase": "world_upkeep", "faction": 0,
+                 "turn": 2, "mission_year": 2102,
+                 "started_utc": "2026-11-09T00:00:00.001Z",
+                 "ended_utc": "2026-11-09T00:00:00.021Z", "elapsed_ms": 20},
+                {"schema": 1, "phase": "ai_turn", "faction": 2,
+                 "turn": 2, "mission_year": 2102,
+                 "started_utc": "2026-11-09T00:00:00.021Z",
+                 "ended_utc": "2026-11-09T00:00:01.021Z", "elapsed_ms": 1000},
+            ]
+            checkpoints = [
+                {"schema": 1, "turn": 2, "mission_year": 2102,
+                 "utc": "2026-11-09T00:00:01.999Z",
+                 "kind": "completed_cycle", "status": "saved",
+                 "path": "campaign/saves/checkpoint-T00002-MY2102.sav",
+                 "fingerprint": {"present": True, "bytes": 12345}},
+            ]
+            (session / "timings.jsonl").write_text(
+                "".join(json.dumps(v) + "\n" for v in timers), encoding="utf-8")
+            (session / "checkpoints.jsonl").write_text(
+                "".join(json.dumps(v) + "\n" for v in checkpoints), encoding="utf-8")
+            output = generate(campaign)
+            self.assertEqual(len((output / "timings.csv").read_text().splitlines()), 3)
+            self.assertEqual(len((output / "checkpoints.csv").read_text().splitlines()), 2)
+            page = (output / "index.html").read_text(encoding="utf-8")
+            self.assertIn("Native phase timings", page)
+            self.assertIn("ai_turn", page)
+            self.assertIn("1,000", page)
+            self.assertIn("checkpoint-T00002-MY2102.sav", page)
+            self.assertIn("timings.csv", page)
+
     def test_old_campaign_without_label_uses_folder_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             campaign, session = fixture(Path(tmp))
@@ -145,7 +179,7 @@ class CampaignReportTests(unittest.TestCase):
             output = generate(campaign)
             self.assertEqual(
                 (output / "ui_notices.csv").read_text(encoding="utf-8").splitlines(),
-                ["turn,processing_faction,source,label,action"],
+                ["utc,turn,mission_year,processing_faction,source,label,action"],
             )
 
     def test_ui_notice_log_bad_schema_fails_report(self):
