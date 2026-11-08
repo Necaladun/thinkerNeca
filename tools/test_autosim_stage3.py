@@ -108,7 +108,7 @@ verify("actual terminal endgame bypasses native player-only win screens",
 verify("terminal results record partial cycle without synthetic completed turn",
        "telemetry_record_terminal_result(" in telemetry_h
        and "void telemetry_record_terminal_result(" in telemetry
-       and '"result.json"' in telemetry
+       and '"/result.json"' in telemetry
        and "primary_winner_factions" in telemetry
        and "last_committed_turn" in telemetry
        and "terminal_result_recorded ? \"terminal\" : \"closed\"" in telemetry
