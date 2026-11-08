@@ -155,13 +155,13 @@ th{color:#bec9d8} .scroll{overflow-x:auto}
 <h2>Latest base snapshot</h2><div class="scroll"><table><thead><tr>
 <th>Faction</th><th>Name</th><th>Population</th><th>Minerals (surplus)</th><th>Labs</th><th>Eco damage</th>
 </tr></thead><tbody>%s</tbody></table></div>
-<h2>AUTO-002 UI handling (%d recorded actions)</h2>
-<p class="muted">Only explicitly classified notices and optional human UI are suppressed.
-An unknown native modal can still interrupt simulation.</p>
+<details class="panel"><summary>Automation diagnostics — AUTO-002 UI handling (%d recorded actions)</summary>
+<p class="muted">UI suppression is an automation diagnostic, not a game event. Unknown native modals can still interrupt simulation.</p>
 <div class="scroll"><table><thead><tr>
 <th>Turn</th><th>Processing faction</th><th>Source</th><th>Label</th><th>Handling</th>
 </tr></thead><tbody>%s</tbody></table></div>
-<p><a href="factions.csv">Export faction history CSV</a> · <a href="bases.csv">Export base history CSV</a> · <a href="ui_notices.csv">Export UI handling CSV</a></p>
+<p><a href="ui_notices.csv">Export automation UI diagnostics CSV</a></p></details>
+<p><a href="factions.csv">Export faction history CSV</a> · <a href="bases.csv">Export base history CSV</a></p>
 <p class="muted">These are recorded states, not reconstructed events or proven AI motivations.
 Engine base slots may be reused and are not persistent identities. Local/offline report.</p>
 <script id="turn-data" type="application/json">%s</script>
@@ -360,7 +360,9 @@ def render_gameplay_events(meetings, ballots, projects, legacy_traces):
         "<td>{}</td><td>{}</td></tr>".format(
             html.escape(str(row.get("mission_year", ""))),
             html.escape(str(row.get("faction", ""))),
-            html.escape(str(row.get("project_name", ""))),
+            html.escape(str(row.get("project_name", "")) +
+                (" → " + str(row.get("next_project_name")) if
+                 row.get("event") == "changed" and row.get("next_project_name") else "")),
             html.escape(str(row.get("event", ""))),
             html.escape(str(row.get("base_name", ""))),
             html.escape(str(row.get("change_cause", ""))))
@@ -447,7 +449,7 @@ def generate(campaign_dir, session_id=None, output_dir=None):
               ("event_id", "turn", "mission_year", "event", "faction",
                "project_id", "facility_id", "project_name", "base_name",
                "base_x", "base_y", "previous_facility_id", "next_facility_id",
-               "source", "change_cause", "reason_status"), projects)
+               "source", "change_cause", "next_project_name", "reason_status"), projects)
     notices_file = session_dir / "ui_notices.jsonl"
     notices = read_jsonl(notices_file) if notices_file.is_file() else []
     for notice in notices:
@@ -484,10 +486,10 @@ def generate(campaign_dir, session_id=None, output_dir=None):
                            manifest, status, turns, bases, notices)
     legacy_count = sum(1 for row in council_events if
                        "event" not in row and "phase" in row)
-    document = document.replace('<h2>AUTO-002 UI handling',
+    document = document.replace('<details class="panel"><summary>Automation diagnostics',
                                 render_gameplay_events(meetings, ballots, projects,
                                                        legacy_count)
-                                + '<h2>AUTO-002 UI handling', 1)
+                                + '<details class="panel"><summary>Automation diagnostics', 1)
     document = document.replace('<script id="turn-data"',
                                 render_automation_diagnostics(timings, checkpoints)
                                 + '<script id="turn-data"', 1)
