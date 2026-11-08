@@ -482,7 +482,8 @@ void telemetry_record_ui_notice(const char* source, const char* label, const cha
         return;
     }
     std::ostringstream event;
-    event << "{\"schema\":1,\"turn\":" << *CurrentTurn
+    event << "{\"schema\":1,\"utc\":" << json_string(utc_stamp_ms().c_str())
+          << ",\"turn\":" << *CurrentTurn
           << ",\"processing_faction\":" << *CurrentFaction
           << ",\"source\":" << json_string(source)
           << ",\"label\":" << json_string(label)
@@ -498,7 +499,8 @@ void telemetry_record_council_event(const char* phase, int actor, const char* de
     if (!recording || !council_file) return;
     const int owner = MapWin ? MapWin->cOwner : 0;
     std::ostringstream event;
-    event << "{\"schema\":1,\"turn\":" << *CurrentTurn
+    event << "{\"schema\":1,\"utc\":" << json_string(utc_stamp_ms().c_str())
+          << ",\"turn\":" << *CurrentTurn
           << ",\"mission_year\":" << *CurrentMissionYear
           << ",\"processing_faction\":" << *CurrentFaction
           << ",\"actor\":" << actor
