@@ -21,6 +21,7 @@ enum AutosimChildId {
     ID_CANCEL = 6011,
     ID_SUPPRESS = 6012,
     ID_FAST_COMBAT = 6013,
+    ID_EXIT_NO_SAVE = 6014,
 };
 
 struct DialogContext {
@@ -101,6 +102,8 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         const AutosimDialogState& s = *ctx->state;
         SetWindowTextA(dialog, s.mode == AUTOSIM_DIALOG_SETUP
             ? "thinkerNeca - Simulation Setup"
+            : s.mode == AUTOSIM_DIALOG_VICTORY
+            ? "thinkerNeca - Victory / Simulation Paused"
             : "thinkerNeca - Simulation Control");
         RECT bounds = {};
         GetClientRect(dialog, &bounds);
@@ -113,6 +116,8 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
             ? "Prepare a simulation. Hand over all factions in Scenario Editor, then End Turn."
             : s.mode == AUTOSIM_DIALOG_STARTUP
             ? "All factions are AI-controlled. Confirm before starting unattended turns."
+            : s.mode == AUTOSIM_DIALOG_VICTORY
+            ? "World victory reached. Simulation stopped here until you choose an action."
             : "Simulation paused at a completed full-turn boundary.";
         add_child(dialog, "STATIC", intro,
             SS_LEFT, 0, 0, left, 13, inner, 23);
@@ -167,9 +172,14 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         SendDlgItemMessageA(dialog, ID_FAST_COMBAT, BM_SETCHECK,
             s.fast_combat ? BST_CHECKED : BST_UNCHECKED, 0);
 
-        add_child(dialog, "STATIC",
-            "Changes here apply in memory only. Session logging is configured at game load.",
-            SS_LEFT, 0, 0, left, 402, inner, 28);
+        const std::string lower_note = s.mode == AUTOSIM_DIALOG_VICTORY
+            ? s.victory_summary
+                + (s.partial_turn
+                    ? "\r\nTerminal save is an experimental mid-cycle snapshot; reload is unverified."
+                    : "\r\nVictory reached at a turn boundary; verify saved game reload.")
+            : "Changes here apply in memory only. Session logging is configured at game load.";
+        add_child(dialog, "STATIC", lower_note.c_str(),
+            SS_LEFT, 0, 0, left, 402, inner, 56);
 
         const int gap = 8;
         const int y = height - 59;
@@ -184,6 +194,16 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
             ids[0] = ID_START; captions[0] = "Start Simulation";
             ids[1] = ID_TAKE_CONTROL; captions[1] = "Take Control";
             buttons = 2;
+        } else if (s.mode == AUTOSIM_DIALOG_VICTORY) {
+            ids[0] = ID_SAVE_EXIT; captions[0] = "Save && Exit";
+            ids[1] = ID_EXIT_NO_SAVE; captions[1] = "Exit without Save";
+            buttons = 2;
+            if (s.can_continue_after_victory) {
+                ids[2] = ID_SAVE_CONTINUE; captions[2] = "Save && Continue";
+                ids[3] = ID_TAKE_CONTROL; captions[3] = "Take Control";
+                ids[4] = ID_CONTINUE; captions[4] = "Continue AI";
+                buttons = 5;
+            }
         } else if (s.mode == AUTOSIM_DIALOG_RUNNING) {
             ids[0] = ID_SAVE_CONTINUE; captions[0] = "Save && Continue";
             ids[1] = ID_SAVE_EXIT; captions[1] = "Save && Exit";
@@ -246,7 +266,7 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         }
         return FALSE;
     }
-    if (id != ID_SAVE_CONTINUE && id != ID_SAVE_EXIT
+    if (id != ID_SAVE_CONTINUE && id != ID_SAVE_EXIT && id != ID_EXIT_NO_SAVE
     && id != ID_TAKE_CONTROL && id != ID_RESUME
     && id != ID_START && id != ID_ARM && id != ID_CONTINUE
     && id != ID_CANCEL) return FALSE;
@@ -256,6 +276,10 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
     }
     if (id == ID_RESUME) {
         EndDialog(dialog, AUTOSIM_DIALOG_RESUME);
+        return TRUE;
+    }
+    if (id == ID_EXIT_NO_SAVE && ctx->state->mode == AUTOSIM_DIALOG_VICTORY) {
+        EndDialog(dialog, AUTOSIM_DIALOG_EXIT_NO_SAVE);
         return TRUE;
     }
     const std::string campaign = read_field(dialog, ID_CAMPAIGN_NAME);
@@ -308,6 +332,7 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
     EndDialog(dialog,
         id == ID_SAVE_CONTINUE ? AUTOSIM_DIALOG_SAVE_CONTINUE
         : id == ID_SAVE_EXIT ? AUTOSIM_DIALOG_SAVE_EXIT
+        : id == ID_EXIT_NO_SAVE ? AUTOSIM_DIALOG_EXIT_NO_SAVE
         : id == ID_TAKE_CONTROL ? AUTOSIM_DIALOG_TAKE_CONTROL
         : id == ID_START ? AUTOSIM_DIALOG_START
         : id == ID_ARM ? AUTOSIM_DIALOG_ARM : AUTOSIM_DIALOG_CONTINUE);
