@@ -49,7 +49,13 @@ function New-Defaults {
         faction_6 = 'BELIEVE'
         faction_7 = 'PEACE'
         render_mode = '2'
+        world_source = '0'
         world_size = '3'
+        custom_map_x = '80'
+        custom_map_y = '160'
+        rules_mode = '0' # legacy installed-game preferences until explicitly customised
+        rules_mask = '6670' # stock default 0x1A0E
+        rules_random = '0'
         world_ocean = '1'
         world_erosion = '1'
         world_cloud = '1'
@@ -89,7 +95,9 @@ function New-OptionLines($options, [bool]$includeSchema) {
                       'unlimited_expansion', 'timing_enabled', 'archive_interval',
                       'faction_1', 'faction_2', 'faction_3', 'faction_4',
                       'faction_5', 'faction_6', 'faction_7',
-                      'render_mode', 'world_size', 'world_ocean', 'world_erosion',
+                      'render_mode', 'world_source', 'world_size',
+                      'custom_map_x', 'custom_map_y', 'rules_mode',
+                      'rules_mask', 'rules_random', 'world_ocean', 'world_erosion',
                       'world_cloud', 'world_life', 'difficulty', 'observer',
                       'monitor_seconds')) {
         $lines.Add($key + '=' + [string]$options[$key])
@@ -142,7 +150,13 @@ if ($SelfTest) {
             -not $lines.Contains('timing_enabled=1') -or
             -not $lines.Contains('archive_interval=25') -or
             -not $lines.Contains('faction_7=PEACE') -or
+            -not $lines.Contains('world_source=0') -or
             -not $lines.Contains('world_size=3') -or
+            -not $lines.Contains('custom_map_x=80') -or
+            -not $lines.Contains('custom_map_y=160') -or
+            -not $lines.Contains('rules_mode=0') -or
+            -not $lines.Contains('rules_mask=6670') -or
+            -not $lines.Contains('rules_random=0') -or
             -not $lines.Contains('monitor_seconds=45')) {
             throw 'run-profile snapshot mismatch'
         }
@@ -485,6 +499,7 @@ try {
     }
     $runTab = New-Tab 'Game & campaign'
     $worldTab = New-Tab 'World generation'
+    $rulesTab = New-Tab 'Game rules & victory'
     $factionTab = New-Tab 'Faction roster'
     $presentationTab = New-Tab 'Presentation & logs'
     $reportTab = New-Tab 'Campaign tools & archive'
