@@ -61,7 +61,8 @@ static void test_notice_suppression_guards() {
 }
 
 static void test_popup_allowlist_fails_closed() {
-    for (const char* label : {"REACTORUPGRADE", "THESECRET0", "THESECRET1", "TREETIME"}) {
+    for (const char* label : {"REACTORUPGRADE", "THESECRET0", "THESECRET1", "TREETIME",
+                              "WEKILLEDIT", "THEYKILLEDIT", "WEMUFFEDIT", "THEYMUFFEDIT"}) {
         assert(autosim_xpop_policy(label, false) == AUTO_UI_NOTICE);
         assert(autosim_xpop_policy(label, true) == AUTO_UI_NATIVE);
     }
