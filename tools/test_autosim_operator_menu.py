@@ -70,7 +70,9 @@ assert "if (autosim_show_control_dialog(&state) != AUTOSIM_DIALOG_ARM)" in dialo
 # Consent at initial all-AI handover, including a fingerprint-linked loaded
 # session whose local INI no longer contains a positive turn budget.
 loop = turn[turn.index("void __cdecl control_turn()"):]
-assert "bool startup_confirmed = false;" in loop
+# Automatic New Game uses the explicit validated launcher click as consent;
+# a loaded/manual all-AI handover still requires an in-game START dialog.
+assert "bool startup_confirmed = autosim_auto_new_game;" in loop
 assert "autosim_preflight_ready = [&]()" in loop
 assert "((unsigned)FactionStatus[0] & 0xFEu) == 0" in loop
 assert "if (autosim_preflight_ready() && !startup_confirmed)" in loop
