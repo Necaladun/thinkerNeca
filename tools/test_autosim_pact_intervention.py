@@ -69,6 +69,6 @@ assert 'autosim_notice_popp(ScriptFile, "COUNCILHOTGOVLOSE", "council_sm.pcx");'
 assert 'autosim_notice_popp(ScriptFile, "COUNCILHOTGOVNONE", "council_sm.pcx");' in turn
 assert "clear_council_notify(MapWin->cOwner);" in turn
 assert "CouncWin_init(win, faction_id, faction_id_2);" in turn
-assert 'telemetry_record_council_event("CouncWin_init", faction_id, action);' in turn
+assert "telemetry_council_initialized(win, faction_id, faction_id_2);" in turn
 
 print("AUTO-002 pact/intervention source contract passed (native Windows behavioural parity unverified)")
