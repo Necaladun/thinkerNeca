@@ -974,7 +974,29 @@ void __cdecl enemy_diplomacy(int faction_id) {
                     continue;
                 }
             }
+            // Native satellite combat must run once, unchanged. Log state on
+            // each side so an interrupted observer popup can be identified
+            // without inferring destruction from its text alone.
+            const bool trace_satellite = autosim_ui_active() && conf.telemetry_enabled;
+            if (trace_satellite) {
+                char action[256];
+                snprintf(action, sizeof(action),
+                    "enter actor=%d target=%d type=%d base=%d actor_odp=%d deployed=%d target_odp=%d target_n=%d target_m=%d target_e=%d",
+                    faction_id, i, sat_type, base_id, plr.satellites_ODP, plr.ODP_deployed,
+                    Factions[i].satellites_ODP, Factions[i].satellites_nutrient,
+                    Factions[i].satellites_mineral, Factions[i].satellites_energy);
+                telemetry_record_ui_notice("satellite_native", "action_sat_attack", action);
+            }
             action_sat_attack(faction_id, i, sat_type, base_id);
+            if (trace_satellite) {
+                char action[256];
+                snprintf(action, sizeof(action),
+                    "exit actor=%d target=%d type=%d base=%d actor_odp=%d deployed=%d target_odp=%d target_n=%d target_m=%d target_e=%d",
+                    faction_id, i, sat_type, base_id, plr.satellites_ODP, plr.ODP_deployed,
+                    Factions[i].satellites_ODP, Factions[i].satellites_nutrient,
+                    Factions[i].satellites_mineral, Factions[i].satellites_energy);
+                telemetry_record_ui_notice("satellite_native", "action_sat_attack", action);
+            }
             break;
         }
         if (sat_type < 0) {
