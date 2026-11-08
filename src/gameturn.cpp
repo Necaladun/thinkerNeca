@@ -426,9 +426,8 @@ void __cdecl control_turn() {
                     action == AUTO_CYCLE_STOP ? "TURN_LIMIT" :
                     operator_stop ? "OPERATOR_STOP" : "PAUSE",
                     "control_dialog");
-                for (;;) {
-                    AutosimDialogState dialog;
-                    dialog.completed_segment = auto_driver.completed_turns;
+                AutosimDialogState dialog;
+                dialog.completed_segment = auto_driver.completed_turns;
                     dialog.completed_total = total_autosim_turns;
                     dialog.start_year = segment_start_year;
                     dialog.end_year = *CurrentMissionYear;
@@ -444,7 +443,7 @@ void __cdecl control_turn() {
                     dialog.campaign_name = telemetry_get_campaign_name();
                     dialog.save_name = autosim_default_save_name(
                         dialog.campaign_name.c_str(), *CurrentMissionYear);
-
+                for (;;) {
                     const AutosimDialogChoice selection = autosim_show_control_dialog(&dialog);
                     if (selection == AUTOSIM_DIALOG_FAILED) {
                         // Unavailable standard controls: retain the prior
@@ -513,8 +512,7 @@ void __cdecl control_turn() {
                     }
                 }
             }
-            if (!skip_human_turn && action != AUTO_CYCLE_ADVANCE
-            && !switched_to_manual) {
+            if (!skip_human_turn && !autosim_ready() && !switched_to_manual) {
                 Console_human_turn(MapWin);
             }
             if (*ControlTurnA) {
