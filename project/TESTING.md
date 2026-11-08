@@ -6,6 +6,12 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 Council log review and safe-fix blocker (8 November 2026)
+
+**Source of evidence:** uploaded `ui_notices(1).jsonl`, 845 events over turns 80–117. 602 Council trace records, no `diplomacy_guard` records, `human_mask=00000000` and `owner=2` throughout sampled Council events. On turn 117, `call_council(actor=5)` enters with Governor `-1` and exits with Governor `7`, both with `pending=0`. The final event is an F10-origin `OPERATOR_STOP/save_dialog`. The reported popup required user input; whether the click altered the winning result is not known. These are actual Windows log observations, not CI assumptions.
+
+**Fix not safely implementable from available evidence:** native `call_council`/Council window both appear involved, and the Governor transition proves state updates may occur within the same native call. `src/engine.h` only provides function bindings and native `CouncWindow` fields, not a headless state machine; OpenSMACX only supplies vote totals/eligibility. A show-window no-op, skipped Council, global owner impersonation or arbitrary vote answer is rejected as unsafe. No gameplay-code change or compiled fix in this audit. Next stage: inspect/disassemble/trace the exact supported `terranx.exe` native Council entry/callers and compare vote/treasury/resolution state on a reproducible pre-Council save; retain ordinary human regression and all-AI reload tests. Until then Council unattended acceptance is **blocked**.
+
 ## AUTO-002 external-stop and physical-hotkey CI checkpoint (8 November 2026)
 
 [Windows x86 Develop and Release CI run 42451218764](https://github.com/Necaladun/thinkerNeca/actions/runs/42451218764) **passed** at source head `fff9fef`. Both x86 cross-compilations, the new `tools/test_autosim_operator_control.py` structural contract, the existing Council/diplomacy regression, source checks and remaining tests succeeded. The Develop artifact `thinker-develop-win32` contains `thinker.dll` and `thinker.exe`. **No actual Windows runtime test of physical key polling, `autosim-stop.txt`, save/reload, or native Council state was performed by CI.**
