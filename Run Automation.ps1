@@ -160,6 +160,27 @@ if ($SelfTest) {
             -not $lines.Contains('monitor_seconds=45')) {
             throw 'run-profile snapshot mismatch'
         }
+        $again['mode'] = 'new'
+        $again['source_save'] = ''
+        $again['world_source'] = '2'
+        $again['world_size'] = '5'
+        $again['custom_map_x'] = '99'
+        $again['custom_map_y'] = '180'
+        $again['rules_mode'] = '1'
+        $again['rules_mask'] = '513'
+        $again['rules_random'] = '3'
+        $newWorldProfile = New-RunProfile $root $again
+        $newWorldLines = [System.IO.File]::ReadAllText($newWorldProfile)
+        if (-not $newWorldLines.Contains('mode=new') -or
+            -not $newWorldLines.Contains('world_source=2') -or
+            -not $newWorldLines.Contains('world_size=5') -or
+            -not $newWorldLines.Contains('custom_map_x=99') -or
+            -not $newWorldLines.Contains('custom_map_y=180') -or
+            -not $newWorldLines.Contains('rules_mode=1') -or
+            -not $newWorldLines.Contains('rules_mask=513') -or
+            -not $newWorldLines.Contains('rules_random=3')) {
+            throw 'custom world/rules snapshot mismatch'
+        }
         Write-Output 'AUTO-LAUNCH Stage A PowerShell profile smoke passed'
     } finally {
         [System.IO.Directory]::Delete($root, $true)
@@ -1144,6 +1165,18 @@ try {
                     throw ('Selected Planet map is missing: ' + $mapPath)
                 }
             }
+            if ($mode -eq 'new' -and $worldSource.SelectedIndex -eq 0 -and
+                $worldSize.SelectedIndex -eq 6 -and
+                ($customX.Value -gt 256 -or $customY.Value -gt 256)) {
+                $choice = [System.Windows.Forms.MessageBox]::Show(
+                    $form,
+                    'One or both custom map dimensions exceed 256. Very large maps ' +
+                    'may have high memory and save/reload costs. Launch anyway?',
+                    'Very large custom map',
+                    [System.Windows.Forms.MessageBoxButtons]::YesNo,
+                    [System.Windows.Forms.MessageBoxIcon]::Warning)
+                if ($choice -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+            }
             $render=[int]$presentation.SelectedIndex
             $updated = @{
                 mode=$mode
@@ -1202,6 +1235,25 @@ try {
             $factionCombos.Count -ne 7 -or
             $archiveCadence.Items.Count -ne 6 -or $turns.Maximum -ne 100000) {
             throw 'Windows WinForms launcher controls failed the GUI smoke test.'
+        }
+        $worldSource.SelectedIndex = 1
+        if ($worldSize.Enabled -or $worldOcean.Enabled -or $customX.Enabled) {
+            throw 'Fixed-Planet source must disable random size/climate/custom fields.'
+        }
+        $worldSource.SelectedIndex = 0
+        $worldSize.SelectedIndex = 6
+        if (-not $customX.Enabled -or -not $customY.Enabled -or
+            -not $worldOcean.Enabled) {
+            throw 'Generated custom map must enable X/Y and climate.'
+        }
+        $customRules.Checked = $true
+        if (-not $ruleControls[0].Control.Enabled -or
+            -not $randomPersonalities.Enabled) {
+            throw 'Enabling explicit game rules must enable all rule selectors.'
+        }
+        $customRules.Checked = $false
+        if ($ruleControls[0].Control.Enabled) {
+            throw 'Disabled custom rules must defer to installed game settings.'
         }
         $form.Dispose()
         Write-Host 'AUTO-LAUNCH Windows WinForms GUI construction passed'
