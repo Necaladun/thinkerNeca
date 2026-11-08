@@ -71,6 +71,7 @@ jobs:
         run: python tools/test_autosim_council_diplomacy.py
       - name: Test AUTO-002 native Council-window tracing ABI and callsite guard
         run: python tools/test_autosim_council_native_trace.py
+      - name: Test AUTO-002 Council headless native preflight and telemetry contract
         run: python tools/test_autosim_council_headless.py
       - name: Test AUTO-002 physical hotkeys and external-stop control
         run: python tools/test_autosim_operator_control.py
