@@ -93,4 +93,25 @@ assert "mod_world_crater(bx, by);" in events
 # All presentation wrappers preserve the ordinary/human native path.
 assert "return conf.autosim_suppress_notices && autosim_control_active();" in dialog
 assert "return popp(filename, label, 0, image, 0);" in dialog
+# Related late-game source-owned reports ignore their return values.
+for label in ("MADEORBITAL", "MADEAIRDROP", "OBLITTED", "OBLITTED2",
+              "TOOKARTIFACT", "TAKENARTIFACT"):
+    assert f'autosim_notice_popp(ScriptFile, "{label}",' in action
+assert action.index("mod_base_kill(base_id);", action.index("void __cdecl action_oblit(")) < action.index(
+    'autosim_notice_popp(ScriptFile, "OBLITTED"')
+assert action.index("owner_set(tgt_x, tgt_y, Vehs[veh_id].faction_id);") < action.index(
+    'autosim_notice_popp(ScriptFile, "TOOKARTIFACT"')
+for label in ("CORNERFOILED", "CORNERTHEMFOILED", "HOMELESS", "HOMELESSONE"):
+    assert f'autosim_notice_popp(ScriptFile, "{label}",' in base
+for label in ("ESCAPED", "ESCAPED2"):
+    assert f'autosim_notice_netmsg(NetMsg, "{label}"' in base
+for label in ("GOTUNIT", "GAVEUNIT", "GAVEWILD"):
+    assert f'autosim_notice_netmsg(NetMsg, "{label}"' in action
+for label in ("GOTUNITDEFEND", "GOTUNITOFFEND"):
+    assert f'std::strcmp(label, "{label}") == 0' in autosim
+for choice in ('X_pop("KEEPMOVING", 0)',
+               'popp(ScriptFile, "GOTOGOODY", 0',
+               'popp(ScriptFile, flag ? "FUNGALSAC" : "TECTONICSAC"'):
+    assert choice in action, f"Meaningful decision or human message missing: {choice}"
+
 print("AUTO-002 missiles, random events and observed-AI movement source checks passed (not Windows runtime)")
