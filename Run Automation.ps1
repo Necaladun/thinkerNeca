@@ -258,7 +258,9 @@ public static class AutoMonitorWin32 {
                         ' | faction ' + $record['faction'] +
                         ' | ' + $record['phase'] +
                         ' | ' + $record['render'] +
-                        ' (configured=' + $record['configured_render'] + ')')
+                        ' (configured=' + $record['configured_render'] +
+                        ', draws skipped=' + $record['draw_skipped'] +
+                        ', presents skipped=' + $record['screen_skipped'] + ')')
                     $lastRecord = $signature
                     # SMAC takes foreground focus on launch, making the
                     # external console keyboard controls hard to reach.

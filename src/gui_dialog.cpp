@@ -1,6 +1,7 @@
 
 #include "gui_dialog.h"
 #include "autosim.h"
+#include "autosim_render.h"
 
 
 int __thiscall Popup_load_icon(Popup* This, Sprite* a2, int a3, char* a4) {
@@ -253,17 +254,25 @@ void autosim_monitor_progress(const char* phase, int faction) {
     const std::string temporary = destination + ".tmp";
     FILE* file = fopen(temporary.c_str(), "wb");
     if (!file) return;
+    AutosimRenderCounters draw_counters = {};
+    autosim_get_render_counters(&draw_counters);
     fprintf(file,
         "version=1\npid=%lu\nphase=%s\nturn=%d\nyear=%d\nfaction=%d\n"
         "render=%s\nconfigured_render=%d\nnull_phase=%d\n"
-        "null_override=%d\nhuman_mask=%u\n",
+        "null_override=%d\nhuman_mask=%u\n"
+        "draw_skipped=%lu\ndraw_forwarded=%lu\n"
+        "screen_skipped=%lu\nscreen_forwarded=%lu\n",
         (unsigned long)GetCurrentProcessId(), phase ? phase : "unknown",
         *CurrentTurn, *CurrentMissionYear, faction,
         autosim_null_render_active() ? "null" :
             (conf.autosim_render_mode == 2 && autosim_null_override
             ? "restored" : conf.autosim_render_mode ? "fast" : "normal"),
         conf.autosim_render_mode, autosim_null_phase ? 1 : 0,
-        autosim_null_override ? 1 : 0, (unsigned)FactionStatus[0]);
+        autosim_null_override ? 1 : 0, (unsigned)FactionStatus[0],
+        (unsigned long)draw_counters.draw_skipped,
+        (unsigned long)draw_counters.draw_forwarded,
+        (unsigned long)draw_counters.screen_skipped,
+        (unsigned long)draw_counters.screen_forwarded);
     const bool flushed = fflush(file) == 0;
     const bool closed = fclose(file) == 0;
     if (flushed && closed) {

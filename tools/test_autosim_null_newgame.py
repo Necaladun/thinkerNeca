@@ -15,9 +15,10 @@ turn=files["src/gameturn.cpp"]
 game=files["src/game.cpp"]
 main=files["src/main.cpp"]
 launcher=files["Run Automation.ps1"]
-verify("seven explicit native rendering-only entry sites",
+verify("eight explicit map/tile/screen presentation entry sites",
        all(x in render for x in ("0x46AF40","0x46AF90","0x46B040",
-                                "0x46B140","0x46B190","0x46A550","0x46A4A0")))
+                                "0x46B140","0x46B190","0x46A550",
+                                "0x46A4A0","0x5F7320")))
 verify("complete prologue preflight before all detours",
        "for (const auto& s : sites)" in render and
        "memcmp((const void*)s.address,s.expected,s.stolen)" in render and
@@ -26,7 +27,8 @@ verify("trampolines restore native drawing outside all-AI null mode",
        "VirtualAlloc(" in render and "FlushInstructionCache(" in render and
        all(x in render for x in ("original_map(a)","original_tile(x, y, mode)",
                                 "original_mapwin_map(w,a)")) and
-       render.count("if (!autosim_null_render_active())") == 7)
+       render.count("if (!suppress_native_draw())") == 7
+       and "original_screen_update(rect, window)" in render)
 verify("no null rendering hooks in normal mode",
        "if (cf->autosim_render_mode == 2 && autosim_launcher_active)" in files["src/patch.cpp"])
 verify("native visibility and AI mutation paths not intercepted",
@@ -125,3 +127,17 @@ verify("monitor exposes actual render selection and phase state",
 verify("monitor attempts foreground console on first AI processing phase",
        "GetConsoleWindow" in launcher and "consoleFocusAttempted" in launcher
        and "SetForegroundWindow($consoleWindow)" in launcher)
+
+verify("native Win_update_screen uses verified complete 5-byte entry prologue",
+       "e_screen[] = {0xA1,0x30,0x7B,0x9B,0x00}" in render
+       and "0x5F7320,e_screen,sizeof(e_screen)" in render)
+verify("no native Win32 message loop or visibility mutation hooked",
+       "do_all_draws" not in render
+       and "PeekMessage" not in render and "synch_bit(" not in render)
+verify("actual render suppression instrumentation exposed in status",
+       "++screen_skipped" in render and "++screen_forwarded" in render
+       and "++draw_skipped" in render and "++draw_forwarded" in render
+       and 'draw_skipped=%lu' in dialog and 'screen_skipped=%lu' in dialog)
+verify("monitor shows actual skip counters without disabling idle warning",
+       "draws skipped=" in launcher and "presents skipped=" in launcher
+       and "if ($elapsed -ge $warningSeconds -and -not $reportedStall)" in launcher)
