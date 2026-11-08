@@ -11,6 +11,9 @@ namespace {
 FILE* turns_file = NULL;
 FILE* bases_file = NULL;
 FILE* ui_notices_file = NULL;
+FILE* orbit_file = NULL;
+int orbit_event_seq = 0;
+int orbit_attack_seq = 0;
 FILE* council_file = NULL;
 FILE* timings_file = NULL;
 FILE* checkpoints_file = NULL;
@@ -283,6 +286,10 @@ void close_files() {
         fclose(ui_notices_file);
         ui_notices_file = NULL;
     }
+    if (orbit_file) {
+        fclose(orbit_file);
+        orbit_file = NULL;
+    }
     if (council_file) {
         fclose(council_file);
         council_file = NULL;
@@ -308,10 +315,14 @@ void recorder_failure() {
 
 } // namespace
 
+static bool telemetry_orbit_snapshot(const char* phase);
+
 void telemetry_begin_session(const char* source_save) {
     telemetry_end_session();
     last_committed_turn = -1;
     last_checkpoint_turn = -1;
+    orbit_event_seq = 0;
+    orbit_attack_seq = 0;
     initial_observer = MapWin ? MapWin->cOwner : 0;
     terminal_result_recorded = false;
     campaign_dir.clear();
@@ -462,18 +473,201 @@ void telemetry_begin_session(const char* source_save) {
     turns_file = fopen((session_dir + "/turns.jsonl").c_str(), "wb");
     bases_file = fopen((session_dir + "/bases.jsonl").c_str(), "wb");
     ui_notices_file = fopen((session_dir + "/ui_notices.jsonl").c_str(), "wb");
+    orbit_file = fopen((session_dir + "/orbit.jsonl").c_str(), "wb");
     council_file = fopen((session_dir + "/council.jsonl").c_str(), "wb");
     timings_file = fopen((session_dir + "/timings.jsonl").c_str(), "wb");
     checkpoints_file = fopen((session_dir + "/checkpoints.jsonl").c_str(), "wb");
-    if (!turns_file || !bases_file || !ui_notices_file || !council_file
-    || !timings_file || !checkpoints_file) {
+    if (!turns_file || !bases_file || !ui_notices_file || !orbit_file
+    || !council_file || !timings_file || !checkpoints_file) {
         recorder_failure();
         return;
     }
     recording = true;
+    if (!telemetry_orbit_snapshot("session_start")) return;
     if (!atomic_write(session_dir + "/status.json", status_json("recording"))) {
         recorder_failure();
     }
+}
+
+// Dedicated orbital event ledger. These functions only read already-computed
+// game state and never call native AI routines or advance game RNG.
+static std::ostringstream orbit_record(const char* event) {
+    std::ostringstream out;
+    out << "{\"schema\":1,\"seq\":" << ++orbit_event_seq
+        << ",\"event\":" << json_string(event)
+        << ",\"utc\":" << json_string(utc_stamp_ms().c_str())
+        << ",\"turn\":" << *CurrentTurn
+        << ",\"mission_year\":" << *CurrentMissionYear
+        << ",\"processing_faction\":" << *CurrentFaction;
+    return out;
+}
+
+static bool orbit_append(const std::string& line) {
+    if (!recording || !orbit_file) return true;
+    if (!append_line(orbit_file, line)) {
+        recorder_failure();
+        return false;
+    }
+    return true;
+}
+
+static const char* orbit_target_name(int target_type) {
+    switch (target_type) {
+    case 0: return "nutrient";
+    case 1: return "mineral";
+    case 2: return "energy";
+    case 3: return "odp";
+    case 4: return "geosync";
+    default: return "unknown";
+    }
+}
+
+static int orbit_geosync_at(int base_id) {
+    return base_id >= 0 && base_id < *BaseCount
+        && has_fac_built(FAC_GEOSYNC_SURVEY_POD, base_id) ? 1 : 0;
+}
+
+static bool telemetry_orbit_snapshot(const char* phase) {
+    if (!recording || !orbit_file) return true;
+    int geosync[MaxPlayerNum] = {};
+    int flechette[MaxPlayerNum] = {};
+    for (int i = 0; i < *BaseCount; ++i) {
+        const int faction = Bases[i].faction_id;
+        if (faction > 0 && faction < MaxPlayerNum) {
+            geosync[faction] += has_fac_built(FAC_GEOSYNC_SURVEY_POD, i) ? 1 : 0;
+            flechette[faction] += has_fac_built(FAC_FLECHETTE_DEFENSE_SYS, i) ? 1 : 0;
+        }
+    }
+    std::ostringstream out = orbit_record("inventory_snapshot");
+    out << ",\"phase\":" << json_string(phase) << ",\"factions\":[";
+    for (int i = 1; i < MaxPlayerNum; ++i) {
+        if (i > 1) out << ',';
+        const Faction& f = Factions[i];
+        out << "{\"id\":" << i
+            << ",\"nutrient\":" << f.satellites_nutrient
+            << ",\"mineral\":" << f.satellites_mineral
+            << ",\"energy\":" << f.satellites_energy
+            << ",\"odp\":" << f.satellites_ODP
+            << ",\"odp_deployed\":" << f.ODP_deployed
+            << ",\"geosync\":" << geosync[i]
+            << ",\"flechette\":" << flechette[i] << "}";
+    }
+    out << "]}";
+    return orbit_append(out.str());
+}
+
+void telemetry_orbit_launch(int faction_id, int base_id, int facility_id, int before_count) {
+    if (!recording || !orbit_file || faction_id <= 0 || faction_id >= MaxPlayerNum) return;
+    int after_count = before_count;
+    switch (facility_id) {
+    case FAC_SKY_HYDRO_LAB: after_count = Factions[faction_id].satellites_nutrient; break;
+    case FAC_NESSUS_MINING_STATION: after_count = Factions[faction_id].satellites_mineral; break;
+    case FAC_ORBITAL_POWER_TRANS: after_count = Factions[faction_id].satellites_energy; break;
+    case FAC_ORBITAL_DEFENSE_POD: after_count = Factions[faction_id].satellites_ODP; break;
+    default: return;
+    }
+    std::ostringstream out = orbit_record("launch");
+    out << ",\"faction\":" << faction_id
+        << ",\"base_id\":" << base_id
+        << ",\"facility_id\":" << facility_id
+        << ",\"type\":" << json_string(
+            facility_id == FAC_SKY_HYDRO_LAB ? "nutrient" :
+            facility_id == FAC_NESSUS_MINING_STATION ? "mineral" :
+            facility_id == FAC_ORBITAL_POWER_TRANS ? "energy" : "odp")
+        << ",\"before\":" << before_count << ",\"after\":" << after_count;
+    if (base_id >= 0 && base_id < *BaseCount) {
+        const BASE& base = Bases[base_id];
+        out << ",\"base_name\":" << json_string(base.name)
+            << ",\"x\":" << base.x << ",\"y\":" << base.y;
+    }
+    out << "}";
+    orbit_append(out.str());
+}
+
+OrbitAttackTrace telemetry_orbit_begin_attack(int attacker, int defender,
+    int target_type, int base_id, int reserved_odp) {
+    OrbitAttackTrace trace;
+    if (!recording || !orbit_file) return trace;
+    if (attacker <= 0 || attacker >= MaxPlayerNum
+        || defender <= 0 || defender >= MaxPlayerNum) return trace;
+    const Faction& atk = Factions[attacker];
+    const Faction& def = Factions[defender];
+    trace.id = ++orbit_attack_seq;
+    trace.attacker_odp = atk.satellites_ODP;
+    trace.attacker_deployed = atk.ODP_deployed;
+    trace.target_nutrient = def.satellites_nutrient;
+    trace.target_mineral = def.satellites_mineral;
+    trace.target_energy = def.satellites_energy;
+    trace.target_odp = def.satellites_ODP;
+    trace.target_geosync = orbit_geosync_at(base_id);
+    std::ostringstream out = orbit_record("attack_decision");
+    out << ",\"attack_id\":" << trace.id
+        << ",\"source\":\"enemy_strategy\""
+        << ",\"attacker\":" << attacker << ",\"defender\":" << defender
+        << ",\"target_type\":" << target_type
+        << ",\"target_name\":" << json_string(orbit_target_name(target_type))
+        << ",\"target_base_id\":" << base_id
+        << ",\"reserve_required\":" << reserved_odp
+        << ",\"attacker_odp\":" << trace.attacker_odp
+        << ",\"attacker_deployed\":" << trace.attacker_deployed
+        << ",\"defender_odp\":" << trace.target_odp
+        << ",\"diplomatic_flags\":" << (unsigned)atk.diplo_status[defender]
+        << ",\"defender_before\":{\"nutrient\":" << trace.target_nutrient
+        << ",\"mineral\":" << trace.target_mineral
+        << ",\"energy\":" << trace.target_energy
+        << ",\"odp\":" << trace.target_odp
+        << ",\"geosync\":" << trace.target_geosync << "}}";
+    orbit_append(out.str());
+    return trace;
+}
+
+void telemetry_orbit_end_attack(const OrbitAttackTrace& trace, int attacker,
+    int defender, int target_type, int base_id) {
+    if (trace.id < 0 || !recording || !orbit_file) return;
+    const Faction& atk = Factions[attacker];
+    const Faction& def = Factions[defender];
+    int destroyed = 0;
+    switch (target_type) {
+    case 0: destroyed = trace.target_nutrient - def.satellites_nutrient; break;
+    case 1: destroyed = trace.target_mineral - def.satellites_mineral; break;
+    case 2: destroyed = trace.target_energy - def.satellites_energy; break;
+    case 3: destroyed = trace.target_odp - def.satellites_ODP; break;
+    case 4: destroyed = trace.target_geosync - orbit_geosync_at(base_id); break;
+    }
+    std::ostringstream out = orbit_record("attack_result");
+    out << ",\"attack_id\":" << trace.id
+        << ",\"attacker\":" << attacker << ",\"defender\":" << defender
+        << ",\"target_type\":" << target_type
+        << ",\"target_name\":" << json_string(orbit_target_name(target_type))
+        << ",\"target_base_id\":" << base_id
+        << ",\"result\":" << json_string(destroyed > 0 ? "target_destroyed" :
+            (atk.satellites_ODP < trace.attacker_odp ? "attacker_odp_lost" :
+            "no_confirmed_inventory_delta"))
+        << ",\"result_basis\":\"inventory_delta\""
+        << ",\"target_destroyed_count\":" << destroyed
+        << ",\"attacker_odp_before\":" << trace.attacker_odp
+        << ",\"attacker_odp_after\":" << atk.satellites_ODP
+        << ",\"attacker_deployed_before\":" << trace.attacker_deployed
+        << ",\"attacker_deployed_after\":" << atk.ODP_deployed
+        << ",\"defender_after\":{\"nutrient\":" << def.satellites_nutrient
+        << ",\"mineral\":" << def.satellites_mineral
+        << ",\"energy\":" << def.satellites_energy
+        << ",\"odp\":" << def.satellites_ODP
+        << ",\"geosync\":" << orbit_geosync_at(base_id) << "}}";
+    orbit_append(out.str());
+}
+
+void telemetry_orbit_environment_loss(int faction_id, const char* cause,
+    int lost_mineral, int lost_energy, int lost_odp) {
+    if (!recording || !orbit_file
+        || (!lost_mineral && !lost_energy && !lost_odp)) return;
+    std::ostringstream out = orbit_record("environmental_loss");
+    out << ",\"faction\":" << faction_id
+        << ",\"cause\":" << json_string(cause)
+        << ",\"mineral_lost\":" << lost_mineral
+        << ",\"energy_lost\":" << lost_energy
+        << ",\"odp_lost\":" << lost_odp << "}";
+    orbit_append(out.str());
 }
 
 void telemetry_record_ui_notice(const char* source, const char* label, const char* action) {
@@ -771,6 +965,7 @@ void telemetry_record_completed_turn() {
         recorder_failure();
         return;
     }
+    if (!telemetry_orbit_snapshot("completed_turn")) return;
     last_committed_turn = turn;
     if (!atomic_write(session_dir + "/status.json", status_json("recording"))) {
         recorder_failure();
