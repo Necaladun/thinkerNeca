@@ -45,6 +45,17 @@ const uint32_t GameRulesOptions[][2] = {
 static uint32_t custom_game_rules = 0;
 static uint32_t custom_more_rules = 0;
 
+// An explicit Continue after true victory starts a new optional AI segment.
+// The turn driver consumes this at its next full-cycle boundary, not from
+// inside a Council, production or combat hook.
+static bool autosim_post_victory_segment_pending = false;
+bool autosim_take_post_victory_segment_reset() {
+    const bool pending = autosim_post_victory_segment_pending;
+    autosim_post_victory_segment_pending = false;
+    return pending;
+}
+
+
 
 const char* resource_icon(int res_type, bool ocean, bool add) {
     if (res_type == RES_NUTRIENT) {
@@ -2203,17 +2214,15 @@ int __cdecl end_of_game(int flag) {
         return 0;
     }
     if (autosim_session_active()) {
-        // The game state already contains native victory flags. Never show the
-        // observer-relative win/loss screens, credits or GAMEOVERMAN prompt.
-        // Preserve known victory-history markers using the actual faction,
-        // not CurrentPlayerFaction (which is only the camera in this mode).
+        // Normal native victory detection above has already completed.
+        // Here the observer is only a camera, not the loser or winner.
         int winner = 0;
         if (*GameVictoryType == VIC_UNIFY_SOLO || *GameVictoryType == VIC_UNIFY_COOP) {
             int alive_count = 0;
             for (int fc = 1; fc < MaxPlayerNum; ++fc) {
                 if (is_alive(fc)) { winner = fc; ++alive_count; }
             }
-            if (alive_count != 1) winner = 0; // do not invent coalition leader
+            if (alive_count != 1) winner = 0;
         } else {
             unsigned flag_value = 0;
             if (*GameVictoryType == VIC_DIPLOMATIC_SOLO
@@ -2224,25 +2233,153 @@ int __cdecl end_of_game(int flag) {
             || *GameVictoryType == VIC_ECONOMIC_COOP
             || *GameVictoryType == VIC_ECONOMIC_LOSS) {
                 flag_value = PFLAG_UNK_40000;
+            } else if (*GameVictoryType == VIC_ALIEN_SOLO
+            || *GameVictoryType == VIC_ALIEN_COOP
+            || *GameVictoryType == VIC_ALIEN_LOSS) {
+                flag_value = PFLAG_UNK_100000;
             }
             if (flag_value) {
                 for (int fc = 1; fc < MaxPlayerNum; ++fc) {
                     if ((unsigned)Factions[fc].player_flags & flag_value) {
-                        if (winner) { winner = 0; break; } // ambiguous results
+                        if (winner) { winner = 0; break; }
                         winner = fc;
                     }
                 }
             }
         }
-        if (winner) mon_winning_unify(winner, -1);
-        // A victory can occur during upkeep or one faction's action. Never
-        // serialize an unverified partial-turn save as a finished checkpoint.
-        // Existing normal autosaves remain intact for recovery.
-        telemetry_record_terminal_result(NULL, "not_attempted_partial_cycle");
-        autosim_monitor_progress("terminal", 0);
+        if (winner && (*GameVictoryType == VIC_UNIFY_SOLO
+            || *GameVictoryType == VIC_UNIFY_COOP
+            || *GameVictoryType == VIC_DIPLOMATIC_SOLO
+            || *GameVictoryType == VIC_DIPLOMATIC_COOP
+            || *GameVictoryType == VIC_DIPLOMATIC_LOSS
+            || *GameVictoryType == VIC_ECONOMIC_SOLO
+            || *GameVictoryType == VIC_ECONOMIC_COOP
+            || *GameVictoryType == VIC_ECONOMIC_LOSS)) {
+            mon_winning_unify(winner, -1);
+        }
+        // This is a completed native victory phase, not necessarily a
+        // completed full faction cycle. Record it before showing controls.
+        telemetry_record_terminal_result(NULL, "operator_decision_pending");
+        autosim_null_render_suppress(false);
+        autosim_monitor_progress("victory_paused", 0);
+        draw_map(1);
+
+        AutosimDialogState dialog;
+        autosim_fill_dialog_state(&dialog, AUTOSIM_DIALOG_VICTORY);
+        // end_of_game is called after a turn/faction phase, before the
+        // completed-cycle telemetry checkpoint. A manual save at this point
+        // can be serialized, but reload semantics still need Windows tests.
+        dialog.partial_turn = true;
+        dialog.can_continue_after_victory = false;
+        for (int fc = 1; fc < MaxPlayerNum; ++fc)
+            if (is_alive(fc)) dialog.can_continue_after_victory = true;
+
+        const char* victory_name = "Unclassified world ending";
+        switch (*GameVictoryType) {
+        case VIC_UNIFY_SOLO: case VIC_UNIFY_COOP:
+            victory_name = "Conquest"; break;
+        case VIC_DIPLOMATIC_SOLO: case VIC_DIPLOMATIC_COOP:
+        case VIC_DIPLOMATIC_LOSS:
+            victory_name = "Supreme Leader"; break;
+        case VIC_ECONOMIC_SOLO: case VIC_ECONOMIC_COOP:
+        case VIC_ECONOMIC_LOSS:
+            victory_name = "Economic"; break;
+        case VIC_TRANSCEND_PLR: case VIC_TRANSCEND_UNK:
+        case VIC_TRANSCEND_LOSS:
+            victory_name = "Transcendence"; break;
+        case VIC_ALIEN_SOLO: case VIC_ALIEN_COOP:
+        case VIC_ALIEN_LOSS:
+            victory_name = "Alien Subspace"; break;
+        case VIC_TIME_LIMIT: victory_name = "Time limit"; break;
+        case VIC_SUDDEN_DEATH: victory_name = "Scenario objective"; break;
+        default: break;
+        }
+        char victory_summary[256];
+        snprintf(victory_summary, sizeof(victory_summary),
+            "MY%d: %s victory. %s (observer %d, raw type %d).",
+            *CurrentMissionYear, victory_name,
+            winner ? MFactions[winner].formal_name_faction
+                   : "Winner not yet established from native state",
+            MapWin->cOwner, *GameVictoryType);
+        dialog.victory_summary = victory_summary;
+        telemetry_record_ui_notice("autosim", "VICTORY_PAUSE", victory_summary);
+
+        for (;;) {
+            const AutosimDialogChoice choice = autosim_show_control_dialog(&dialog);
+            if (choice == AUTOSIM_DIALOG_FAILED) {
+                // Never silently close a world at victory if modal creation
+                // fails. Provide an explicit retry or exit fallback.
+                if (MessageBoxA(*phWnd,
+                    "Victory was recorded, but the control dialog could not open.\n"
+                    "Retry the controls, or cancel to exit without a new save.",
+                    "thinkerNeca Victory", MB_RETRYCANCEL | MB_ICONWARNING) == IDRETRY)
+                    continue;
+                telemetry_record_ui_notice("autosim", "VICTORY", "dialog_failed_explicit_exit");
+                break;
+            }
+            if (choice == AUTOSIM_DIALOG_EXIT_NO_SAVE) {
+                telemetry_record_ui_notice("autosim", "VICTORY", "exit_without_save");
+                break;
+            }
+            if (!autosim_apply_dialog_options(dialog)) {
+                MessageBoxA(*phWnd,
+                    "Could not write campaign metadata. Check campaigns/ permissions.",
+                    "thinkerNeca Victory", MB_OK | MB_ICONWARNING);
+                continue;
+            }
+            if (choice == AUTOSIM_DIALOG_SAVE_CONTINUE
+            || choice == AUTOSIM_DIALOG_SAVE_EXIT) {
+                std::string saved_path, error;
+                if (!autosim_save_named(dialog.save_name, &saved_path, &error)) {
+                    MessageBoxA(*phWnd, error.c_str(),
+                        "thinkerNeca Victory Save", MB_OK | MB_ICONWARNING);
+                    continue;
+                }
+                if (!telemetry_record_named_save(saved_path.c_str())) {
+                    MessageBoxA(*phWnd,
+                        "Save succeeded, but campaign-link metadata could not be written.",
+                        "thinkerNeca Victory Save", MB_OK | MB_ICONWARNING);
+                }
+                telemetry_record_terminal_result(saved_path.c_str(),
+                    "saved_post_victory_checkpoint_reload_unverified");
+                telemetry_record_ui_notice("autosim", "VICTORY_SAVED",
+                    saved_path.c_str());
+                if (choice == AUTOSIM_DIALOG_SAVE_EXIT) break;
+            }
+            if (choice == AUTOSIM_DIALOG_CONTINUE
+            || choice == AUTOSIM_DIALOG_SAVE_CONTINUE
+            || choice == AUTOSIM_DIALOG_TAKE_CONTROL) {
+                // Explicit post-victory sandbox continuation: there is no
+                // remaining ordinary win condition to enforce. Preserve
+                // historical winner flags/monuments and telemetry, but clear
+                // terminal control bits so native AI turns may proceed.
+                const int victory_type = *GameVictoryType;
+                *GameState &= ~(STATE_GAME_DONE | STATE_FINAL_SCORE_DONE
+                    | STATE_VICTORY_CONQUER | STATE_VICTORY_ECONOMIC);
+                *GameVictoryType = VIC_NONE;
+                if (victory_type == VIC_ALIEN_SOLO
+                || victory_type == VIC_ALIEN_COOP
+                || victory_type == VIC_ALIEN_LOSS)
+                    *GameMoreRules &= ~MRULES_UNK_80;
+                telemetry_resume_after_victory();
+                if (choice == AUTOSIM_DIALOG_TAKE_CONTROL) {
+                    set_human(MapWin->cOwner, true);
+                    telemetry_record_ui_notice("autosim", "VICTORY",
+                        "post_victory_take_human_control");
+                } else {
+                    autosim_post_victory_segment_pending = true;
+                    telemetry_record_ui_notice("autosim", "VICTORY",
+                        "post_victory_ai_continue_new_segment");
+                }
+                autosim_monitor_progress("victory_continued", 0);
+                return 0; // resume caller's normal, unfinished turn phases
+            }
+        }
+        // Exit is a real choice, not an automatic consequence of winning.
         *GameState |= STATE_FINAL_SCORE_DONE;
         *ControlTurnB = 0;
         *ControlTurnA = 1;
+        autosim_monitor_progress("victory_exit", 0);
         return 1;
     }
     int victor_id = 0;
