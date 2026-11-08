@@ -1,5 +1,11 @@
 # thinkerNeca — fork changelog
 
+## Unmerged AUTO-002/TEL-ORBIT — guarded native orbital popup and basic event ledger (9 November 2026)
+
+- Direct `action_sat_attack` satellite hit/miss notifications bypassed the earlier `X_pop/X_pops` filters, calling native `popp` at `0x4CF70F`. Added exact five-byte post-Scient callsite preflight and opt-in suppression of the four passive result labels; default human and suppression-off `popp` calls remain native, and orbital combat/RNG code is unchanged.
+- Added telemetry-only per-session `orbit.jsonl`: actual satellite launches, executed AI orbital strike decision inputs and inventory-derived outcome, solar-storm/asteroid losses, and faction orbital inventories at session start/completed turn. The stream is independent of popup suppression and uses the existing recorder's flush/error/session lifecycle.
+- Develop/Release Windows x86 CI and source checks passed at `d13c734` (run [42509596293](https://github.com/Necaladun/thinkerNeca/actions/runs/42509596293)). Actual Windows satellite-combat suppression, unchanged RNG/state parity, and save/reload remain unverified. Detailed orbital AI and missile-interception logging is deferred.
+
 ## Unmerged AUTO-LOG — comprehensive automation launcher and campaign archive (9 November 2026)
 
 - Draft PR #11 adds explicit new-game selection of all seven native faction slots from fourteen SMAC/X stock factions; old profiles retain existing faction setup and loading a SAV cannot change its roster.
