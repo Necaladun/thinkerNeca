@@ -632,9 +632,12 @@ void __cdecl control_turn() {
             telemetry_phase_end(cycle_timing, "full_faction_cycle", 0);
             telemetry_record_completed_turn();
             autosim_monitor_progress("turn_completed", 0);
-            // Optional campaign archive snapshot from the same safe full-
-            // cycle point used by the ordinary operator Save & Continue.
-            telemetry_archive_completed_turn();
+            // A loaded game can finish its first partial faction cycle
+            // without executing the earlier factions. Never archive that
+            // incomplete world state as a whole-cycle checkpoint.
+            if (!first_cycle_partial) {
+                telemetry_archive_completed_turn();
+            }
             if (autosim_take_post_victory_segment_reset()) {
                 // The operator explicitly elected to keep simulating after
                 // an actual victory. Start their new turn quota at this
