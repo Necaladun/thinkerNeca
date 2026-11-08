@@ -15,17 +15,23 @@ assert "void __thiscall autosim_trace_CouncWin_init(CouncWindow* win," in turn
 assert "void __thiscall autosim_trace_CouncWin_init(CouncWindow* win," in hdr
 trace = turn[turn.index("void __thiscall autosim_trace_CouncWin_init("):
              turn.index("int __cdecl autosim_council_announcement(")]
-assert 'const bool trace = conf.telemetry_enabled;' in trace
-assert trace.count('telemetry_record_council_event("CouncWin_init", faction_id, action);') == 2
-assert trace.index("CouncWin_init(win, faction_id, faction_id_2);") > trace.index('"enter arg1=')
-assert trace.index("CouncWin_init(win, faction_id, faction_id_2);") < trace.index('"exit proposal=')
-for field in ("win->proposal_type", "win->candidate_faction_id",
-              "win->proposal_outcome", "win->vote_faction_mask",
-              "win->faction_vote[0]", "win->faction_vote[7]",
-              "win->faction_vote_count[0]", "win->faction_vote_count[7]"):
-    assert field in trace, f"missing native Council state field: {field}"
+assert "CouncWin_init(win, faction_id, faction_id_2);" in trace
+assert "telemetry_council_initialized(win, faction_id, faction_id_2);" in trace
+assert trace.index("CouncWin_init(win, faction_id, faction_id_2);") < trace.index(
+    "telemetry_council_initialized(win, faction_id, faction_id_2);")
+assert "telemetry_council_resolved(win" in trace
 assert "game_random" not in trace and "game_rand(" not in trace
 assert "CouncWin_set_vote" not in trace and "CouncWin_make_resolution" not in trace
+
+telemetry = (root / "src/telemetry.cpp").read_text(encoding="utf-8")
+for field in ("win->proposal_type", "win->candidate_faction_id",
+              "win->proposal_outcome", "win->vote_faction_mask",
+              "win->faction_vote[fc]", "win->faction_vote_count[fc]"):
+    assert field in telemetry, f"missing native Council state: {field}"
+assert "council_record(\"proposal\")" in telemetry
+assert "council_record(\"ballots\")" in telemetry
+assert "council_record(\"resolution\")" in telemetry
+assert '"reason_status"'.replace('"', '\\"') in telemetry
 
 hook = patch[patch.index("// Native Council-only hooks:"):
              patch.index("write_call(0x43F2F4, (int)diplomacy_check);")]
