@@ -18,6 +18,12 @@ int __thiscall Popup_load_icon(Popup* This, Sprite* a2, int a3, char* a4) {
 // This is a runtime guard: no user-controlled input is bypassed unless
 // Scenario Editor has actually handed every faction to AI. No preferences
 // or native game-mode flags are changed.
+bool autosim_session_active() {
+    return autosim_launcher_active && conf.autosim_manual_turns > 0
+        && ((unsigned)FactionStatus[0] & 0xFEu) == 0
+        && !*MultiplayerActive && !*PbemActive;
+}
+
 bool autosim_control_active() {
     const int owner = MapWin->cOwner;
     return autosim_launcher_active && auto_turn_eligible(conf.autosim_manual_turns,
