@@ -81,6 +81,8 @@ jobs:
         run: python tools/test_autosim_lategame_notices.py
       - name: Check AUTO-002 missile, random-event and observed-AI movement notices
         run: python tools/test_autosim_missile_move_ui.py
+      - name: Check AUTO-002 sea-level, tidal colony and atrocity notices
+        run: python tools/test_autosim_sealevel_atrocity.py
       - name: Validate distributed thinker.ini options
         run: python tools/test_thinker_ini_contract.py
       - name: Test offline TEL-001 campaign report
