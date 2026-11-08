@@ -426,6 +426,77 @@ def campaign_display_name(campaign_dir):
     return campaign_dir.name
 
 
+
+# TEL-LOG-02: dedicated gameplay streams. Older sessions may lack these files.
+TEL02_FIELDS = {
+    "production": ("event_id", "utc", "turn", "mission_year", "event",
+        "processing_faction", "faction", "base_slot", "base_name", "base_x",
+        "base_y", "previous_item", "new_item", "unit_id", "unit_name",
+        "facility_id", "facility_name", "mineral_cost", "minerals_after",
+        "vehicle_slot", "vehicle_instance", "actual_morale", "source",
+        "reason_status"),
+    "units": ("event_id", "utc", "turn", "mission_year", "event",
+        "processing_faction", "vehicle_slot", "vehicle_instance", "faction",
+        "previous_faction", "unit_id", "unit_name", "x", "y", "morale",
+        "damage_taken", "home_base_slot", "cause", "cause_status"),
+    "combat": ("event_id", "utc", "turn", "mission_year", "event", "mode",
+        "processing_faction", "combat_type_flags", "attacker_instance",
+        "defender_instance", "attacker_slot", "defender_slot",
+        "attacker_faction", "defender_faction", "attacker_unit_id",
+        "defender_unit_id", "attacker_reactor", "defender_reactor",
+        "defender_x_at_hook", "defender_y_at_hook", "offense_final_raw",
+        "defense_final_raw", "attacker_hp_before", "attacker_hp_after",
+        "defender_hp_before", "defender_hp_after", "retreated",
+        "marine_detachment", "result_scope"),
+    "research": ("event_id", "utc", "turn", "mission_year", "event",
+        "processing_faction", "faction", "tech_id", "tech_name",
+        "source_faction", "source_status", "shared", "previously_owned",
+        "acquisition_kind", "previous_target", "new_target",
+        "timing_basis", "reason_status"),
+}
+
+
+def render_tel02_streams(streams):
+    if not any(streams.values()):
+        return ('<details class="panel"><summary>Production, units, combat and '
+                'research events (none recorded)</summary>'
+                '<p>No TEL-LOG-02 events in this session.</p></details>')
+    headings = {'production': 'Production', 'units': 'Vehicle lifecycle',
+                'combat': 'Combat HP exchanges', 'research': 'Research'}
+    summary = ''.join(
+        '<tr><td>' + html.escape(headings[name]) + '</td><td>'
+        + str(len(streams[name])) + '</td><td><a href="' + name
+        + '.csv">CSV</a></td></tr>' for name in TEL02_FIELDS)
+    events = [(name, row) for name, rows in streams.items() for row in rows]
+    def sequence(pair):
+        try:
+            return int(str(pair[1].get("event_id", "")).rsplit("-evt-", 1)[1])
+        except (IndexError, ValueError):
+            return -1
+    events.sort(key=sequence)
+    recent = ''.join(
+        '<tr><td>' + html.escape(str(row.get("mission_year", "")))
+        + '</td><td>' + html.escape(name)
+        + '</td><td>' + html.escape(str(row.get("event", "")))
+        + '</td><td>' + html.escape(str(row.get(
+            "unit_name", row.get("facility_name",
+            row.get("tech_name", row.get("mode", ""))))))
+        + '</td></tr>' for name, row in events[-60:])
+    return (
+        '<details class="panel" open><summary>Production, units, combat and '
+        'research events</summary><p>Read-only source events. Vehicle IDs '
+        'are valid only within this session; removed units have unknown cause '
+        'unless a specific source identified it. Combat entries describe '
+        'HP exchanges before post-combat cleanup, not final base captures. '
+        'Research targets are sampled at completed turns.</p>'
+        '<table><thead><tr><th>Stream</th><th>Records</th><th>Export'
+        '</th></tr></thead><tbody>' + summary + '</tbody></table>'
+        '<h3>Most recent events (up to 60)</h3><table><thead><tr>'
+        '<th>MY</th><th>Stream</th><th>Event</th><th>Subject</th></tr>'
+        '</thead><tbody>' + recent + '</tbody></table></details>'
+    )
+
+
 def generate(campaign_dir, session_id=None, output_dir=None):
     session_root = campaign_dir / "sessions"
     sessions = sorted(path for path in session_root.iterdir() if path.is_dir())
@@ -463,6 +534,22 @@ def generate(campaign_dir, session_id=None, output_dir=None):
                "project_id", "facility_id", "project_name", "base_name",
                "base_x", "base_y", "previous_facility_id", "next_facility_id",
                "source", "change_cause", "next_project_name", "reason_status"), projects)
+    tel02_streams = {}
+    tel02_ids = set()
+    for name, fields in TEL02_FIELDS.items():
+        event_path = session_dir / (name + ".jsonl")
+        events = read_jsonl(event_path) if event_path.is_file() else []
+        for event in events:
+            if event.get("schema") != SCHEMA:
+                raise ValueError(f"{name}: unsupported event schema")
+            event_id = event.get("event_id")
+            if not isinstance(event_id, str) or not event_id:
+                raise ValueError(f"{name}: missing event_id")
+            if event_id in tel02_ids:
+                raise ValueError(f"{name}: duplicate session event_id {event_id}")
+            tel02_ids.add(event_id)
+        write_csv(output / (name + ".csv"), fields, events)
+        tel02_streams[name] = events
     notices_file = session_dir / "ui_notices.jsonl"
     notices = read_jsonl(notices_file) if notices_file.is_file() else []
     for notice in notices:
@@ -508,6 +595,7 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     document = document.replace('<details class="panel"><summary>Automation diagnostics',
                                 render_gameplay_events(meetings, ballots, projects,
                                                        legacy_count)
+                                + render_tel02_streams(tel02_streams)
                                 + '<details class="panel"><summary>Automation diagnostics', 1)
     document = document.replace('<script id="turn-data"',
                                 render_automation_diagnostics(timings, checkpoints)
