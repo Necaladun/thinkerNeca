@@ -19,6 +19,9 @@ enum AutosimChildId {
 
 struct DialogContext {
     AutosimDialogState* state;
+    bool ready = false;
+    bool save_name_dirty = false;
+    bool refreshing = false;
 };
 
 std::string trim_text(const std::string& value) {
@@ -89,6 +92,7 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
     if (message == WM_INITDIALOG) {
         DialogContext* ctx = reinterpret_cast<DialogContext*>(lparam);
         SetWindowLongPtrA(dialog, DWLP_USER, (LONG_PTR)ctx);
+        SetWindowTextA(dialog, "thinkerNeca - Simulation Control");
         const AutosimDialogState& s = *ctx->state;
         RECT bounds = {};
         GetClientRect(dialog, &bounds);
@@ -148,6 +152,7 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
                 0, ids[i], left + i * (button_width + gap),
                 y, button_width, 31);
         }
+        ctx->ready = true;
         return TRUE;
     }
     DialogContext* ctx = reinterpret_cast<DialogContext*>(
@@ -162,6 +167,19 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
     }
     if (message != WM_COMMAND || !ctx) return FALSE;
     const int id = LOWORD(wparam);
+    if (ctx->ready && HIWORD(wparam) == EN_CHANGE) {
+        if (id == ID_SAVE_NAME && !ctx->refreshing) {
+            ctx->save_name_dirty = true;
+        } else if (id == ID_CAMPAIGN_NAME && !ctx->save_name_dirty) {
+            const std::string name = read_field(dialog, ID_CAMPAIGN_NAME);
+            const std::string suggested = autosim_default_save_name(
+                name.c_str(), ctx->state->end_year);
+            ctx->refreshing = true;
+            SetDlgItemTextA(dialog, ID_SAVE_NAME, suggested.c_str());
+            ctx->refreshing = false;
+        }
+        return FALSE;
+    }
     if (id != ID_SAVE_CONTINUE && id != ID_SAVE_EXIT
     && id != ID_TAKE_CONTROL && id != ID_RESUME) return FALSE;
     if (id == ID_RESUME) {
@@ -236,7 +254,7 @@ AutosimDialogChoice autosim_show_control_dialog(AutosimDialogState* state) {
     tpl->cx = 460; tpl->cy = 345;
     // The trailing six bytes are zero (no menu, default dialog class,
     // zero-length title); set caption after creation in WM_INITDIALOG.
-    DialogContext ctx = {state};
+    DialogContext ctx = {state, false, false, false};
     const INT_PTR result = DialogBoxIndirectParamA(GetModuleHandleA(NULL), tpl,
         *phWnd, autosim_dialog_proc, (LPARAM)&ctx);
     if (result == -1) return AUTOSIM_DIALOG_FAILED;
