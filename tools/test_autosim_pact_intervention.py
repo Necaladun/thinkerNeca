@@ -14,6 +14,7 @@ policy = (ROOT / "src/autosim.h").read_text(encoding="utf-8")
 ui = (ROOT / "src/gui_dialog.cpp").read_text(encoding="utf-8")
 engine = (ROOT / "src/engine.cpp").read_text(encoding="utf-8")
 patch = (ROOT / "src/patch.cpp").read_text(encoding="utf-8")
+talk = (ROOT / "src/faction_talk.cpp").read_text(encoding="utf-8")
 
 # Intervention status must not be invented: current source declares war
 # for the third party only when at least one original belligerent is human.
@@ -39,13 +40,26 @@ assert rupture.index("autosim_notice_diplomacy(NetMsg, \"ENEMYPACTENDS\"") < rup
 assert "plr2.diplo_status[faction_id_1] &= " in rupture
 # The source-owned ENEMYPACTENDS filter was not effective until the native
 # third-party breakup entrypoint used this audited equivalent implementation.
-# No native pact_ends/net_pact_ends entrypoint or withdrawal action is changed.
+# The native pact_ends hook and both withdrawals are preserved; the
+# additional automation guard skips only the passive ENDPACT1/2/3 modal.
 assert "Fenemies_unpact enemies_unpact = (Fenemies_unpact)0x55CE20;" in engine
 assert "write_jump(0x55CE20, (int)enemies_unpact);" in patch
 assert "write_jump(0x53C650, (int)pact_ends);" in patch
 assert "write_jump(0x539660, (int)net_pact_ends);" in patch
 assert "Fpact_ends pact_ends = (Fpact_ends)0x53C650;" in engine
 assert "Fnet_pact_ends net_pact_ends = (Fnet_pact_ends)0x539660;" in engine
+
+# The source-owned pact_ends keeps both withdrawals before suppressing the
+# passive human report; the native hook remains the same.
+pact = talk[talk.index("void __cdecl pact_ends("):
+            talk.index("void __cdecl pact_of_brotherhood(")]
+assert pact.index("treaty_off(faction_id, faction_id_2, DIPLO_PACT);") < pact.index(
+    "pact_withdraw(faction_id, faction_id_2)")
+assert pact.index("pact_withdraw(faction_id_2, faction_id)") < pact.index(
+    "if (autosim_session_active())")
+assert pact.index("if (autosim_session_active())") < pact.index("draw_map(1);")
+assert 'telemetry_record_ui_notice("diplomacy", "ENDPACT1/2/3"' in pact
+assert "X_pop(\"ENDPACT3\", 0);" in pact and 'Popup_start(&cur_popup, PopupScriptFile, "ENDPACT1"' in pact
 
 # The source-owned Governor winner report is already a one-way notice
 # and notification clearing remains. Native resolution is reused by the
