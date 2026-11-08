@@ -3662,6 +3662,13 @@ int __cdecl mod_base_production() {
             else if (facility_id == FAC_NESSUS_MINING_STATION) { plr->satellites_mineral++; }
             else if (facility_id == FAC_ORBITAL_POWER_TRANS) { plr->satellites_energy++; }
             else if (facility_id == FAC_ORBITAL_DEFENSE_POD) { plr->satellites_ODP++; }
+            // Log the completed launch, not a tentative AI production choice.
+            const int orbit_after_count =
+                facility_id == FAC_SKY_HYDRO_LAB ? plr->satellites_nutrient :
+                facility_id == FAC_NESSUS_MINING_STATION ? plr->satellites_mineral :
+                facility_id == FAC_ORBITAL_POWER_TRANS ? plr->satellites_energy :
+                plr->satellites_ODP;
+            telemetry_orbit_launch(faction_id, *CurrentBaseID, facility_id, orbit_after_count - 1);
             if (!(plr->player_flags & PFLAG_MAP_REVEALED)) {
                 for (int i = 0; i < *MapAreaTiles; i++) {
                     MAP* sq = &(*MapTiles)[i];
