@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""AUTO-002 satellite lifecycle and native orbital-strike trace source contract.
+"""AUTO-002 satellite lifecycle and active C++ orbital-strike UI contract.
 
-A structural test. Exact native popp callsite was identified from the
-user's terranx.exe; actual Windows hook execution and state parity remain pending.
+Structural test, not a Windows x86 gameplay test. The native EXE's
+action_sat_attack is replaced by basewin.cpp via a write_jump.
 """
 from pathlib import Path
 
@@ -16,6 +16,8 @@ turn = (ROOT / "src/gameturn.cpp").read_text(encoding="utf-8")
 actions = (ROOT / "src/veh_action.cpp").read_text(encoding="utf-8")
 patch = (ROOT / "src/patch.cpp").read_text(encoding="utf-8")
 engine = (ROOT / "src/engine.cpp").read_text(encoding="utf-8")
+basewin = (ROOT / "src/basewin.cpp").read_text(encoding="utf-8")
+ui_header = (ROOT / "src/gui_dialog.h").read_text(encoding="utf-8")
 
 # Script.txt: offensive attack results and passive Planet Buster interception.
 for label in ("WEKILLEDIT", "THEYKILLEDIT", "WEMUFFEDIT", "THEYMUFFEDIT",
@@ -47,19 +49,37 @@ assert 'return X_pops_18(ScriptFile, label, -1, 0, 0, a2, 1, 1, fn);' in ui
 assert 'return X_pops_18(ScriptFile, label, -1, 0, a2, a3, 1, 1, fn);' in ui
 assert "write_jump(0x5BF930," not in patch
 
-# Native action_sat_attack at 0x4CF480 calls popp directly at 0x4CF70F.
-# Exact post-Scient byte preflight; no broad popp hook or gameplay rewrite.
-assert 'const byte orbital_result_expected[] = {0xE8, 0x8C, 0xC9, 0xFB, 0xFF};' in patch
-assert 'if (!memcmp((const void*)0x4CF70F, orbital_result_expected,' in patch
-assert 'write_call(0x4CF70F, (int)autosim_orbital_result_popp);' in patch
-assert 'AUTO-002: orbital result popp hook skipped' in patch
-assert 'int __cdecl autosim_orbital_result_popp(const char* filename, const char* label,' in ui
-assert 'if (autosim_ui_active() && !fn && label' in ui
-assert 'return popp(filename, label, a3, image, fn);' in ui
-assert 'telemetry_record_ui_notice("native_orbital_popp", label, "suppressed_orbital_result");' in ui
-for label in ("WEKILLEDIT", "THEYKILLEDIT", "WEMUFFEDIT", "THEYMUFFEDIT"):
-    assert f'!strcmp(label, "{label}")' in ui
-
+# The active implementation is C++ basewin.cpp::action_sat_attack, NOT the
+# original terranx.exe body (which was incorrectly hooked in an earlier pass).
+assert "write_jump(0x4CF480, (int)action_sat_attack);" in patch
+assert "write_jump(0x4A0260, (int)sat_attack);" in patch
+assert "write_call(0x4CF70F," not in patch
+assert "autosim_orbital_result_popp" not in patch
+assert "autosim_orbital_result_popp" not in ui
+assert "autosim_orbital_result_popp" not in ui_header
+active = basewin.split("void __cdecl action_sat_attack(", 1)[1].split(
+    "void __cdecl sat_attack(", 1)[0]
+assert "game_rand() % 100 >= OrbitalAttackChance" in active
+assert "double_cross(faction_id, faction_id_tgt, -1);" in active
+assert "++Factions[faction_id].ODP_deployed;" in active
+assert "--Factions[faction_id].satellites_ODP;" in active
+assert "set_fac(FAC_GEOSYNC_SURVEY_POD, base_id, 0);" in active
+for label in ("WEMUFFEDIT", "THEYMUFFEDIT", "WEKILLEDIT", "THEYKILLEDIT"):
+    assert active.count(
+        f'autosim_notice_popp(ScriptFile, "{label}", "satbat_sm.pcx");') == 1
+    assert f'popp(ScriptFile, "{label}", 0, "satbat_sm.pcx", 0);' not in active
+assert active.count("autosim_notice_popp(") == 4
+# This general wrapper has an explicit human/opt-out native fallback.
+assert 'if (autosim_ui_active()) {' in ui
+assert 'telemetry_record_ui_notice("popp", label, "suppressed_notice");' in ui
+assert "return popp(filename, label, 0, image, 0);" in ui
+# Do not suppress manual Orbital Attack View's command/selection dialogs.
+manual = basewin.split("void __cdecl sat_attack(", 1)[1].split(
+    "void BaseWin_support_zoom(", 1)[0]
+for label in ("NOKILLERS", "KILLERSDEPLOYED"):
+    assert f'popp(ScriptFile, "{label}", 0, "space_sm.pcx", 0);' in manual
+assert 'Popup_start(&cur_popup, PopupScriptFile, "WHICHGSP",' in manual
+assert "BasePop_exec_3(&cur_popup, 0, 0);" in manual
 
 # Source-owned satellite construction already preserves counts and visibility.
 for counter in ("satellites_nutrient++", "satellites_mineral++",
@@ -106,9 +126,9 @@ assert turn.index("Factions[i].satellites_ODP = 0;") < turn.index(
 assert turn.index("Factions[i].satellites_mineral = 0;") < turn.index(
     'autosim_notice_pop2("ASTEROID"')
 
-# Native attack implementation / Orbital Attack View must remain untouched.
+# Active combat and Orbital Attack View remain hooked at the established entrypoints.
 assert "write_jump(0x4CF480, (int)action_sat_attack);" in patch
 assert "write_jump(0x4A0260, (int)sat_attack);" in patch
 assert "Faction_sat_attack action_sat_attack = (Faction_sat_attack)0x4CF480;" in engine
 
-print("AUTO-002 orbital lifecycle/native popup routing contract passed (Windows test pending)")
+print("AUTO-002 active C++ orbital result suppression contract passed (Windows test pending)")
