@@ -425,6 +425,12 @@ extern std::string startup_load_path;
 extern bool autosim_launcher_active;
 extern bool autosim_auto_new_game;
 extern int autosim_new_world_size;
+extern int autosim_new_world_source; // 0 generated, 1 Planet, 2 Huge Planet
+extern int autosim_new_custom_x; // native Custom Map X (actual map width is 2*x)
+extern int autosim_new_custom_y;
+extern bool autosim_new_rules_override;
+extern uint32_t autosim_new_rules_mask; // regular low 16-bit game rules
+extern int autosim_new_random_leaders; // bit 0 personality, bit 1 social agenda
 extern int autosim_new_world_ocean;
 extern int autosim_new_world_erosion;
 extern int autosim_new_world_cloud;
