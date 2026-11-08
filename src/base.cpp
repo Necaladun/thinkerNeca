@@ -3223,10 +3223,10 @@ void __cdecl mod_base_ecology() {
             parse_num(0, 20);
             parse_num(1, 1000 * abs(*ClimateFutureChange) / 15);
             if (faction_id == player_id) {
-                popp(ScriptFile, "TRIGGERWARMING", 0, "searis_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "TRIGGERWARMING", "searis_sm.pcx");
             } else {
                 parse_says(0, get_noun(faction_id), -1, -1);
-                popp(ScriptFile, "TRIGGERWARMING2", 0, "searis_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "TRIGGERWARMING2", "searis_sm.pcx");
             }
             return;
         }
@@ -3257,7 +3257,7 @@ void __cdecl mod_base_ecology() {
             parse_says(0, get_title(player_id), -1, -1);
             parse_says(1, get_name(player_id), -1, -1);
             if (is_known(vx, vy, player_id)) {
-                popp(ScriptFile, "VOLCANO", 0, "volc_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "VOLCANO", "volc_sm.pcx");
             }
         }
     }
@@ -3675,7 +3675,7 @@ int __cdecl mod_base_production() {
                 }
                 plr->player_flags |= PFLAG_MAP_REVEALED;
                 if (faction_id == player_id && !(*GameState & STATE_GAME_DONE)) {
-                    popp(ScriptFile, "SEEMAP", 0, "space_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "SEEMAP", "space_sm.pcx");
                     set_dirty();
                     draw_map(1);
                     GraphicWin_redraw(WorldWin);
@@ -3715,7 +3715,7 @@ int __cdecl mod_base_production() {
                 parse_num(2, Rules->subspace_gen_req);
                 parse_num(3, Rules->base_size_subspace_gen);
                 parse_says(0, base->name, -1, -1);
-                popp(ScriptFile, "GENERATORME", 0, "subgen_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "GENERATORME", "subgen_sm.pcx");
             } else if (facility_id < SP_ID_First
             && !(*GameState & STATE_GAME_DONE)
             && *GameWarnings & WARN_STOP_NEW_FAC_BUILT
@@ -3754,7 +3754,12 @@ int __cdecl mod_base_production() {
                 } else if (gov_manage_production()) {
                     strcat(StrBuffer, "G");
                 }
-                if (!plr_alien) {
+                if (is_satellite && autosim_ui_active()) {
+                    // Preserve facility_announced above, including for the
+                    // observed AI faction. Only skip the finished-build modal.
+                    telemetry_record_ui_notice("satellite_production", StrBuffer,
+                        "suppressed_completion_popup");
+                } else if (!plr_alien) {
                     popb(StrBuffer, WARN_STOP_NEW_FAC_BUILT, -1, "facblt_sm.pcx", 0);
                 } else {
                     popb(StrBuffer, WARN_STOP_NEW_FAC_BUILT, -1, "alfacblt_sm.pcx", 0);
@@ -3787,7 +3792,12 @@ int __cdecl mod_base_production() {
                 } else {
                     warn_flag = WARN_STOP_NEW_FAC_BUILT;
                 }
-                popb(StrBuffer, warn_flag, -1, icon, 0);
+                if (is_satellite && autosim_ui_active()) {
+                    telemetry_record_ui_notice("satellite_production", StrBuffer,
+                        "suppressed_completion_popup");
+                } else {
+                    popb(StrBuffer, warn_flag, -1, icon, 0);
+                }
             }
         } else if (project_id < 0) {
             if (facility_id == FAC_SUBSPACE_GENERATOR) {
@@ -3804,7 +3814,7 @@ int __cdecl mod_base_production() {
                     parse_says(1, get_title(faction_id), -1, -1);
                     parse_says(2, get_name(faction_id), -1, -1);
                     parse_says(3, get_noun(faction_id), -1, -1);
-                    popp(ScriptFile, "GENERATOR", 0, "subgen_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "GENERATOR", "subgen_sm.pcx");
                 }
             } else {
                 parse_says(0, base->name, -1, -1);
@@ -3812,9 +3822,9 @@ int __cdecl mod_base_production() {
                     const char* label = is_satellite ? "PRODUCE3" : "PRODUCE2";
                     const char* image = is_satellite ? "space_sm.pcx" : "secproj_sm.pcx";
                     if (conf.game_event_popup) {
-                        popp(ScriptFile, label, 0, image, 0);
+                        autosim_notice_popp(ScriptFile, label, image);
                     } else {
-                        NetMsg_pop(NetMsg, label, 5000, 0, image);
+                        autosim_notice_netmsg(NetMsg, label, 5000, 0, image);
                     }
                 }
             }
