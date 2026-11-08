@@ -977,6 +977,8 @@ void __cdecl enemy_diplomacy(int faction_id) {
             // Native satellite combat must run once, unchanged. Log state on
             // each side so an interrupted observer popup can be identified
             // without inferring destruction from its text alone.
+            const OrbitAttackTrace orbit_trace =
+                telemetry_orbit_begin_attack(faction_id, i, sat_type, base_id, max_busters);
             const bool trace_satellite = autosim_ui_active() && conf.telemetry_enabled;
             if (trace_satellite) {
                 char action[256];
@@ -988,6 +990,7 @@ void __cdecl enemy_diplomacy(int faction_id) {
                 telemetry_record_ui_notice("satellite_native", "action_sat_attack", action);
             }
             action_sat_attack(faction_id, i, sat_type, base_id);
+            telemetry_orbit_end_attack(orbit_trace, faction_id, i, sat_type, base_id);
             if (trace_satellite) {
                 char action[256];
                 snprintf(action, sizeof(action),
