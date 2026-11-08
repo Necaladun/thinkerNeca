@@ -11,6 +11,8 @@ void telemetry_end_session();
 // made by the Simulation Control window includes an explicit opt-in campaign
 // link; loading it offers to start a NEW session within the existing campaign.
 const char* telemetry_get_campaign_name();
+const char* telemetry_get_campaign_id();
+const char* telemetry_get_session_id();
 bool telemetry_set_campaign_name(const char* name);
 bool telemetry_record_named_save(const char* save_path);
 void telemetry_note_loaded_save(const char* source_path);
