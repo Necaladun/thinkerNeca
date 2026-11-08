@@ -486,7 +486,12 @@ void __cdecl control_turn() {
                                 "thinkerNeca Save Game", MB_OK | MB_ICONWARNING);
                             continue;
                         }
-                        telemetry_record_named_save(path.c_str());
+                        if (!telemetry_record_named_save(path.c_str())) {
+                            MessageBoxA(*phWnd,
+                                "Save succeeded, but its campaign-link sidecar could not be"
+                                " written. Loading it later will create a new telemetry campaign.",
+                                "thinkerNeca Campaign", MB_OK | MB_ICONWARNING);
+                        }
                         telemetry_record_ui_notice("autosim", "SAVED",
                             path.c_str());
                         if (selection == AUTOSIM_DIALOG_SAVE_EXIT) {
