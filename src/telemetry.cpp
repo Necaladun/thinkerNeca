@@ -618,6 +618,51 @@ void telemetry_archive_completed_turn() {
     telemetry_phase_end(timer, "archive_save", 0);
 }
 
+void telemetry_archive_named_save(const char* saved_game_path) {
+    if (!recording || !checkpoints_file || !saved_game_path || !saved_game_path[0])
+        return;
+    const std::string folder = session_dir + "/saves";
+    const char* name = strrchr(saved_game_path, '/');
+    const char* other = strrchr(saved_game_path, '\\');
+    if (!name || (other && other > name)) name = other;
+    name = name ? name + 1 : saved_game_path;
+    // Save names are validated upstream by autosim_save_named, and never
+    // interpreted as paths here. Only copy its existing basename.
+    if (strstr(name, "..") || strchr(name, '/') || strchr(name, '\\'))
+        return;
+
+    char prefix[80] = {};
+    snprintf(prefix, sizeof(prefix), "named-T%05d-MY%d-%lu-",
+        *CurrentTurn, *CurrentMissionYear, (unsigned long)GetTickCount());
+    const std::string destination = folder + "/" + prefix + name;
+    const TelemetryPhaseStamp timer = telemetry_phase_begin();
+    const char* result = "copied";
+    if (!make_dir(folder, true)) {
+        result = "failed_directory";
+    } else if (!CopyFileA(saved_game_path, destination.c_str(), TRUE)) {
+        result = "failed_copy";
+    } else {
+        const std::string sidecar = std::string(saved_game_path) + ".autosim-campaign";
+        if (GetFileAttributesA(sidecar.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            const std::string target_sidecar = destination + ".autosim-campaign";
+            if (!CopyFileA(sidecar.c_str(), target_sidecar.c_str(), TRUE))
+                result = "copied_sidecar_failed";
+        }
+    }
+    const bool copied = !strcmp(result, "copied") || !strcmp(result, "copied_sidecar_failed");
+    std::ostringstream event;
+    event << "{\"schema\":1,\"utc\":" << json_string(utc_stamp_ms().c_str())
+          << ",\"turn\":" << *CurrentTurn
+          << ",\"mission_year\":" << *CurrentMissionYear
+          << ",\"kind\":\"operator_named\",\"status\":" << json_string(result)
+          << ",\"source\":" << json_string(saved_game_path)
+          << ",\"path\":" << (copied ? json_string(destination.c_str()) : "null")
+          << ",\"fingerprint\":"
+          << (copied ? file_fingerprint(destination.c_str()) : "null") << "}";
+    if (!append_line(checkpoints_file, event.str())) recorder_failure();
+    telemetry_phase_end(timer, "named_save_archive_copy", 0);
+}
+
 void telemetry_record_completed_turn() {
     if (!recording || *CurrentTurn <= last_committed_turn) {
         return;
