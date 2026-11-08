@@ -211,6 +211,21 @@ draw();
 """ % (title, title, state, len(turns), last_turn, manifest["starting_turn"], body_rows, base_rows, len(notices), notice_rows, data, metrics)
 
 
+def campaign_display_name(campaign_dir):
+    """Use an editable label when present; legacy campaigns keep folder names."""
+    path = campaign_dir / "campaign.json"
+    if not path.is_file():
+        return campaign_dir.name
+    try:
+        metadata = json.loads(path.read_text(encoding="utf-8"))
+        name = metadata.get("display_name")
+        if metadata.get("schema") == SCHEMA and isinstance(name, str) and name.strip():
+            return name
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    return campaign_dir.name
+
+
 def generate(campaign_dir, session_id=None, output_dir=None):
     session_root = campaign_dir / "sessions"
     sessions = sorted(path for path in session_root.iterdir() if path.is_dir())
@@ -247,7 +262,7 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     base_rows = ({"turn": record["turn"], **base} for record in bases for base in record["bases"])
     write_csv(output / "bases.csv", BASE_FIELDS, base_rows)
     (output / "index.html").write_text(
-        render_html(campaign_dir.name, session_dir.name, manifest, status, turns, bases, notices),
+        render_html(campaign_display_name(campaign_dir), session_dir.name, manifest, status, turns, bases, notices),
         encoding="utf-8")
     return output
 
@@ -314,6 +329,7 @@ def summarize_session(session_dir):
         "campaign_dir": campaign_dir,
         "session_id": session_dir.name,
         "folder": campaign_dir.name,
+        "campaign_name": campaign_display_name(campaign_dir),
         "player": "Unknown",
         "years": "No snapshots",
         "turns": "0",
