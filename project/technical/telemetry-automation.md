@@ -381,3 +381,50 @@ manual saves still write their former shared paths; sessions/campaign
 folders retain existing naming; no ZIP/archive/checkpoints. New-game map
 setup/handover is still manual. No batch controller, victory final SAV,
 terminal reporting or observer replacement is part of Stage A.
+
+
+### AUTO-NULL / AUTO-NEW trial: Null Rendering, monitor, zero-input New Game
+
+`Run Automation.bat` opens an approximately 1.5x larger four-tab
+WinForms launcher: **Game & campaign**, **World generation**,
+**Presentation & logs**, **Monitor & recovery**. New-profile options:
+`render_mode=0` normal, `1` fast, `2` Null; size 0–4,
+ocean/erosion/cloud/native life 0–2, difficulty 0–5, observed slot 1–7,
+monitor warning 30–60 s (default 45). The existing run-profile transport
+remains process-local; normal thinker.exe has these settings disabled.
+
+The first Null Rendering implementation only installs native x86
+entrypoint gates when an explicit launcher profile selects Null. It
+preflights and preserves whole original prologues for
+`draw_tile`, `draw_tile_fixup`, `draw_tile_fixup_2`, `draw_tiles`,
+`draw_map`, `MapWin_draw_map`, and `MapWin_draw_tile`; when not
+actively suppressing, executable gateways call the original routines.
+`do_all_draws` is deliberately **not** skipped because it also invokes
+task/event dispatch. This is an experimental renderer-only bypass,
+not a guaranteed zero-cost or visibility-neutral implementation; Windows
+state parity is required. The main turn loop enables the gate only
+inside all-AI cycles, turns it off for the operator menu and at exit.
+Unclassified `X_pop` dialogs attempt to restore drawing before entering
+the native modal. Other popup entrypoints can still block without it.
+
+The DLL atomically writes `<run-profile>.status` with game PID,
+phase, year/turn, faction, render status and human mask; the PowerShell
+console uses its file update as a progress heartbeat. It warns at
+the configured no-progress threshold without killing the game.
+Console shortcuts: `G` Show Game, `R` Restore Rendering at next live
+game phase, `N` Null at next live phase, `P` capture current game
+window PNG under `automation/screenshots/`, `S` request stop after
+completed cycle, Space request pause, `Q` close monitor without closing
+game. If already stuck in a native modal, the game thread cannot
+consume restore commands; G/P only inspect any current/stale GUI.
+
+New Game is **experimental**. The launcher feeds quick-start native
+`map_menu(1)` and `config_game(1)` from explicit profile choices,
+so it does not use TOPMENU/DIFFICULTY/WORLDSIZE interactive dialogs.
+Unlike ordinary quick-start, human mask is zero before native
+`setup_game`, which allocates all starts by the AI route; the observed
+faction is merely a valid viewer and player-only `planetfall` is skipped.
+Run-local settings are not saved into the ordinary player INI.
+Successful invariant validation skips the old in-game START prompt.
+No custom roster/fixed seed yet, no victory lifecycle or multi-run
+scheduler. **Native Windows setup and AI parity unverified.**

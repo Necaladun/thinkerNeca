@@ -782,3 +782,50 @@ roundtrip/unique snapshot without opening GUI, not WinForms display or
 actual game environment propagation. Stage B save routing/ZIP, Stage C
 automatic new world and multi-run scheduling, terminal victory processing
 and observed-faction handover on elimination are **not implemented**.
+
+
+## AUTO-NULL / AUTO-NEW — Windows acceptance checkpoint (8 November 2026)
+
+**Source audit and Windows CI, not game runtime:** draft PR #11 adds
+seven x86 native drawing-entry gates with exact supported-executable
+prologue preflights and a preserved executable gateway per entry. The
+gates skip map/tile drawing *only* when an all-AI Null Rendering phase
+is active; they do not replace AI algorithms, unit visibility or
+`synch_bit`/fog state. Unknown render preimage disables Null Rendering
+rather than applying partial hooks. Avoid gating `do_all_draws`:
+the native routine contains task/event-loop work and must keep pumping.
+A source test checks boundaries and controls. Windows run, comparison
+against fast mode and native game-state parity remain required.
+
+**Console monitor:** per-run `automation/profiles/<id>.ini.status` updated
+at phase/faction/turn transitions, while `*.command` conveys SHOW,
+NULL, STOP or PAUSE to the next processed phase. PowerShell remains
+running after the short-lived Thinker launcher exits and resolves the
+actual terranx process ID from the game's status. A threshold of
+30–60 sec (45 default) with no *observed phase change* raises a warning,
+not proof of a freeze and NEVER terminates the process. G opens the
+game window; R requests a render restoration and exposes the window;
+N restores Null; P screenshots the current native window; S/Space
+request stop/pause at a completed cycle; Q closes only the console.
+If the game main thread is already blocked, the render command cannot
+be consumed until it resumes; the window/screenshot may contain a stale
+or blank image. Unknown `X_pop` paths restore native presentation
+before displaying the modal, but unaudited native/NetMsg paths remain
+possible (user specifically observed an orbital/satellite interception
+failure popup). Do NOT claim full popup coverage.
+
+**New Game:** launcher tab selects difficulty, map size, ocean/erosion/
+cloud/native-life and initial observer. Native `map_menu(1)` invokes
+`size_of_planet`, `custom_planet` and quick `config_game(1)`; code
+clears the human mask before `setup_game` so the observed faction
+uses normal AI starting-pod allocation and skips the human-only
+`planetfall`. It suppresses the quick-start preferences writes,
+does not enter Scenario Editor/ALL mode and checks living view owner,
+zero human bits and no editor/omniscient flags before simulation.
+The validated launcher click replaces the in-game START dialog only
+for generated new worlds. **High-risk Windows acceptance:** inspect
+all factions' starting pods/bases, difficulty/credits/tech, non-observer
+parity, map seed and settings; first turn, 100-turn run, F10, saves,
+same-build reload, normal thinker.exe unchanged. The explicit faction
+roster and fixed seed are not yet available in this GUI. Native world
+creation can still have untested UI coupling despite compiling.

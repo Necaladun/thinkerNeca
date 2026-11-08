@@ -1,5 +1,10 @@
 # thinkerNeca — fork changelog
 
+## Unmerged AUTO-NULL / AUTO-NEW experimental simulation features (8 November 2026)
+
+- Draft PR #11 adds tabbed pre-game automation setup (approximately 1.5x previous size), optional native map/tile Null Rendering gates, lightweight PowerShell progress monitor with warning/recovery commands, and profile-driven native no-menu New Game initialization with all factions under AI control from initial setup. This changes no native save format or ordinary game setup and leaves campaign-owned SAV/ZIP, terminal victory/report and batch cycling for separate work. Source/CI only; **Windows game validation pending**.
+
+
 ## Unmerged AUTO-LAUNCH Stage A — isolated automation launcher (8 November 2026)
 
 - Adds a separate `Run Automation.bat` + PowerShell WinForms pre-game setup for new/native setup or loading an existing SAV, campaign naming and turn/telemetry/notice/fast settings. GUI defaults go to a separate `automation.ini`; an immutable run-profile INI is passed through the original `thinker.exe` to `terranx.exe` via inherited process environment. Normal game launches now ignore legacy automation toggles in the Thinker INIs. Profile provenance is fingerprinted in session manifests. Stage B campaign-owned saves/ZIP, Stage C automatic new games/batching, victory finalisation and observer replacement remain deferred. Windows game validation pending.

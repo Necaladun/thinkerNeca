@@ -170,3 +170,16 @@ observed faction after elimination are **not implemented** in this pass.
 only the explicit run profile enables telemetry/unattended play. Start from
 an existing SAV or enter native new-game setup and manually hand all factions
 to AI. Campaign save redirection/ZIP and automated game generation are later stages.
+
+
+**AUTO-NULL / AUTO-NEW trial (8 Nov, draft PR #11; Windows runtime pending):**
+larger four-tab PowerShell launcher selects normal/fast/null rendering and
+world-generation settings. Native map/tile draw entrypoints are preflighted
+and gated during all-AI turn phases, with a reversible renderer override.
+The launcher console polls per-run faction/phase status, warns after 30–60
+seconds without progress (default 45), offers Show Game, Restore/Null,
+screenshot and safe-boundary Pause/Stop, and never auto-kills a stalled game.
+Experimental native New Game quick-start clears human control before initial
+AI setup, omits player planetfall, and skips its redundant in-game Start
+prompt; no official runtime acceptance yet. Save ZIP, victory, observer
+elimination and multi-game batches remain deferred.

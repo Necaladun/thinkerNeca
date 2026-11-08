@@ -100,7 +100,10 @@ if ($SelfTest) {
         if (-not $lines.Contains('[automation]') -or
             -not $lines.Contains('schema=1') -or
             -not $lines.Contains('mode=load') -or
-            -not $lines.Contains('turns=100')) {
+            -not $lines.Contains('turns=100') -or
+            -not $lines.Contains('render_mode=2') -or
+            -not $lines.Contains('world_size=3') -or
+            -not $lines.Contains('monitor_seconds=45')) {
             throw 'run-profile snapshot mismatch'
         }
         Write-Output 'AUTO-LAUNCH Stage A PowerShell profile smoke passed'
