@@ -2472,6 +2472,8 @@ int __cdecl end_of_game(int flag) {
                 telemetry_resume_after_victory();
                 if (choice == AUTOSIM_DIALOG_TAKE_CONTROL) {
                     set_human(MapWin->cOwner, true);
+                    // Post-victory human play is not unattended AI runtime.
+                    telemetry_run_clock_set_active(false);
                     telemetry_record_ui_notice("autosim", "VICTORY",
                         "post_victory_take_human_control");
                 } else {
