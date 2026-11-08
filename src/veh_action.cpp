@@ -1719,7 +1719,7 @@ void __cdecl action_give(int veh_id, int faction_id_tgt) {
         if (near_id >= 0) {
             parse_says(4, Bases[near_id].name, -1, -1);
             if (*GameLanguage || is_human(faction_id)) {
-                NetMsg_pop(NetMsg, "GOTUNIT", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "GOTUNIT", 5000, 0, 0);
             // simplify check to remove region_base_plan
             } else if (Units[veh->unit_id].plan == PLAN_DEFENSE) {
                 X_pop("GOTUNITDEFEND", 0);
@@ -1730,9 +1730,9 @@ void __cdecl action_give(int veh_id, int faction_id_tgt) {
     } else if (faction_id == player_id) {
         parse_says(3, get_noun(faction_id_tgt), -1, -1);
         if (faction_id_tgt) {
-            NetMsg_pop(NetMsg, "GAVEUNIT", 5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "GAVEUNIT", 5000, 0, 0);
         } else {
-            NetMsg_pop(NetMsg, "GAVEWILD", 5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "GAVEWILD", 5000, 0, 0);
         }
     }
 }
