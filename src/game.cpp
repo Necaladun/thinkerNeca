@@ -2368,6 +2368,7 @@ int __cdecl end_of_game(int flag) {
                         "Save succeeded, but campaign-link metadata could not be written.",
                         "thinkerNeca Victory Save", MB_OK | MB_ICONWARNING);
                 }
+                telemetry_archive_named_save(saved_path.c_str());
                 telemetry_record_terminal_result(saved_path.c_str(),
                     "saved_post_victory_checkpoint_reload_unverified");
                 telemetry_record_ui_notice("autosim", "VICTORY_SAVED",
