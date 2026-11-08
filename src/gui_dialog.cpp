@@ -310,22 +310,6 @@ int autosim_notice_popp(const char* filename, const char* label,
     return popp(filename, label, 0, image, 0);
 }
 
-// The original terranx.exe action_sat_attack() calls popp directly at
-// 0x4CF70F (E8 8C C9 FB FF), bypassing X_pop and X_pops. All four
-// success/failure labels are passive: native combat state is updated before
-// this call and its return value is unused. Preserve every original argument
-// when ordinary human play or notice suppression is disabled.
-int __cdecl autosim_orbital_result_popp(const char* filename, const char* label,
-    int a3, const char* image, fp_none fn) {
-    if (autosim_ui_active() && !fn && label
-    && (!strcmp(label, "WEKILLEDIT") || !strcmp(label, "THEYKILLEDIT")
-        || !strcmp(label, "WEMUFFEDIT") || !strcmp(label, "THEYMUFFEDIT"))) {
-        telemetry_record_ui_notice("native_orbital_popp", label, "suppressed_orbital_result");
-        return 0;
-    }
-    return popp(filename, label, a3, image, fn);
-}
-
 // Only wrap explicitly audited one-way POP2 call sites; the global POP2
 // routine is also used by gameplay events whose behaviour is unclassified.
 void autosim_notice_pop2(const char* label, const char* image, int recipient) {
