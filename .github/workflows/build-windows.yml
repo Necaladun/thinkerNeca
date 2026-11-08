@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - feature/auto-002-noninteractive-ui
 
 # One build per live PR revision; cancel superseded CI jobs.
 concurrency:
@@ -65,6 +66,8 @@ jobs:
           build/ci/test_autosim_policy
       - name: Test AUTO-002 probe notice and choice source contract
         run: python tools/test_autosim_probe_ui.py
+      - name: Test AUTO-002 Council human-diplomacy guard and trace source contract
+        run: python tools/test_autosim_council_diplomacy.py
       - name: Check AUTO-002 full-turn presentation and autosave source contract
         run: python tools/test_autosim_presentation_contract.py
       - name: Validate distributed thinker.ini options
