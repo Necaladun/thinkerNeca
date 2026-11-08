@@ -1,5 +1,12 @@
 # thinkerNeca — fork changelog
 
+## Unmerged TEL-LOG-01 — Council political and Secret Project event histories (9 November 2026)
+
+- Replaced the high-volume Council native execution trace with `council.jsonl` gameplay records for real proposals, native faction ballot arrays and raw resolutions. Linked meeting IDs and ballot-level raw codes/weights are machine-readable; the motion proposer and each AI motive remain explicitly unverified, while the convening faction is recorded where the native `call_council` caller is known. No re-evaluation of votes, native hook/preflight change, modal fallback change or suppression behavior change.
+- The existing `ui_notices.jsonl` is automation diagnostics, not political/economic history: retained meaningful Council suppression/guard notices, dropped per-turn call traces, and moved the UI diagnostics table behind a collapsed section in the Campaign Analyzer.
+- Added `projects.jsonl` with a verified `SecretProjects[]` completion hook and non-mutating queue-transition observations (`started`, `changed`, `abandoned`, `interrupted`) at `mod_base_change` plus full-cycle reconciliation for direct native queue modifications and base ownership/loss. Events identify faction, base name/coordinates and project, without claiming AI motivation or silently reinterpreting existing queues at session start.
+- One-window Campaign Analyzer now exports `council_meetings.csv`, `council_ballots.csv`, `projects.csv` and displays the histories. Legacy `council.jsonl` debugging records remain readable but are never presented as real motions. Added synthetic reader and source contracts to CI; actual Windows Council/project and same-build save/reload verification remains pending.
+
 ## Unmerged AUTO-LAUNCH — native new-game world and custom-rule controls (9 November 2026)
 
 - Expanded the single WinForms Automation Launcher with **Very Huge** (the sixth native 80×160 preset), direct **Custom Map** native X/Y dimensions (16–512), the stock **Map of Planet** and **Huge Map of Planet** files, and the existing generated-world climate controls. Fixed-map selections use the game's original map loader rather than random map generation and fail clearly when the requested file is absent.
