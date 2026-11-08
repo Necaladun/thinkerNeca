@@ -17,8 +17,10 @@ actions = (ROOT / "src/veh_action.cpp").read_text(encoding="utf-8")
 patch = (ROOT / "src/patch.cpp").read_text(encoding="utf-8")
 engine = (ROOT / "src/engine.cpp").read_text(encoding="utf-8")
 
-# Script.txt: attack succeeds/fails for both local and foreign faction.
-for label in ("WEKILLEDIT", "THEYKILLEDIT", "WEMUFFEDIT", "THEYMUFFEDIT"):
+# Script.txt: offensive attack results and passive Planet Buster interception.
+for label in ("WEKILLEDIT", "THEYKILLEDIT", "WEMUFFEDIT", "THEYMUFFEDIT",
+              "WEMUSTSAC", "THEYMUSTSAC", "WESHOTIT", "THEYSHOTIT",
+              "WESHOTIT2", "THEYSHOTIT2"):
     assert f'std::strcmp(label, "{label}") == 0' in policy
     assert f'"{label}"' in host
 assert 'if (!label || has_callback)' in policy  # AI-only no-callback classification
