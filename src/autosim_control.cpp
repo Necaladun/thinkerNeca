@@ -254,7 +254,8 @@ AutosimDialogChoice autosim_show_control_dialog(AutosimDialogState* state) {
     tpl->cx = 460; tpl->cy = 345;
     // The trailing six bytes are zero (no menu, default dialog class,
     // zero-length title); set caption after creation in WM_INITDIALOG.
-    DialogContext ctx = {state, false, false, false};
+    DialogContext ctx = {};
+    ctx.state = state;
     const INT_PTR result = DialogBoxIndirectParamA(GetModuleHandleA(NULL), tpl,
         *phWnd, autosim_dialog_proc, (LPARAM)&ctx);
     if (result == -1) return AUTOSIM_DIALOG_FAILED;
@@ -297,7 +298,7 @@ bool autosim_save_named(const std::string& name, std::string* output_path,
     }
     char temp_name[120] = {};
     snprintf(temp_name, sizeof(temp_name), "saves/.autosim-%lu-%lu.tmp.sav",
-        (unsigned long)GetCurrentProcessId(), (unsigned long)GetTickCount());
+        GetCurrentProcessId(), GetTickCount());
     // mod_save_daemon is the same version-12 patched serializer invoked by
     // native save_game(). It returns 0 on success, unlike save_game().
     if (mod_save_daemon(temp_name) != 0) {
