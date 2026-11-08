@@ -113,7 +113,11 @@ inline AutoUiAction autosim_xpop_policy(const char* label, bool has_callback) {
     if (!label || has_callback) {
         return AUTO_UI_NATIVE;
     }
-    if (std::strcmp(label, "GOTUNITDEFEND") == 0
+    // Intervention reports ignore the return value. Actual AI relations
+    // are handled by intervention()/double_cross(), not by the popup.
+    if (std::strcmp(label, "AIDSUS") == 0
+        || std::strcmp(label, "AIDSTHEM") == 0
+        || std::strcmp(label, "GOTUNITDEFEND") == 0
         || std::strcmp(label, "GOTUNITOFFEND") == 0
         || std::strcmp(label, "REACTORUPGRADE") == 0
         || std::strcmp(label, "THESECRET0") == 0
