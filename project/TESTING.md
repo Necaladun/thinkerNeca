@@ -729,3 +729,28 @@ F9 focus, quick tap timing, F10 system-message handling and game-native
 modal capture. Verify `autosim-stop.txt` (game EXE directory) triggers
 Save Game -> menu after a completed faction cycle with the game
 out of foreground. Do not treat source structural tests as runtime proof.
+
+
+### AUTO-002C all-proposals headless Council trial — 8 November 2026
+
+**Implementation on PR #11, native Windows gameplay not yet validated for
+non-Governor proposals.** The previous `ba5c6d82` MY2195 Governor election
+is user-tested, with native resolution=1, Governor faction 1, and AI
+continuation. New source widens its valid `CouncilProposal` IDs to all
+stock 0–9. Static binary inspection of the uploaded `terranx.exe` shows
+`CouncWin_init` computes nonhuman ballots without testing whether the
+proposal is Governor; `CouncWin_make_resolution` has different election,
+ordinary-motion and veto branches and calls the native Council action.
+Unknown proposal IDs and zero/incomplete native ballots retain the native
+window. `council.jsonl` before/after records now include proposal name,
+weighted ballots, pass-count delta, GameState/VictoryType snapshot.
+
+**Acceptance still open:** for each stock proposal family confirm no-click
+vote and correct winner/pass/fail/veto; inspect ProposalPassCount, trade-
+pact/Charter/sea-level side effects, Council eligibility/cooldowns, real
+vote bribery/credit/tech transfers, repeated elections and same-build
+save/reload. In particular Supreme Leader may declare native victory and
+stop at existing endgame UI; this is **not a voting failure** and victory
+handler changes are expressly postponed. Verify normal-human/opt-out and
+unknown-state fallback. Passing x86 CI establishes compilation and source
+contracts only, not Council correctness.

@@ -151,3 +151,13 @@ turn-boundary consumption, and preserves the external `autosim-stop.txt`
 fallback. Foreground focus and timing remain possible causes; awaiting
 Windows testing. First Council Governor success does not verify other
 proposals or vote purchases.
+
+
+**AUTO-002C expanded Council trial (8 Nov; PR #11 draft):** After a
+successful MY2195 all-AI Governor election on Windows, the same native
+headless-resolution hook has been extended to stock Council proposals
+0–9. Existing native ballots, thresholds, veto and motion actions are
+preserved; proposal-specific before/after snapshots go to
+`council.jsonl`. Non-Governor resolutions have **no Windows gameplay
+acceptance yet**. Victory termination, final save/report and changing the
+observed faction after elimination are **not implemented** in this pass.

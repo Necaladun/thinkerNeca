@@ -320,3 +320,30 @@ foreground; while another application has focus use
 `autosim-stop.txt` in the executable directory to trigger the next
 safe-boundary Save/Exit UI. This only adds input telemetry; native
 Council vote logic is unchanged. Test Windows behaviour separately.
+
+
+### AUTO-002C Council proposal generalisation (8 November 2026; experimental)
+
+**Only Council voting is in scope.** On existing draft PR #11, the
+Windows-tested Governor-only `CouncWin_make_resolution(win,1)` headless path
+now accepts **all ten stock `CouncilProposal` IDs 0–9** (Governor, Supreme
+Leader, Unity Core salvage, Global Trade Pact/repeal, solar shade launch/
+increase, polar cap melting, UN Charter repeal/reinstatement). Binary review
+of the supplied `terranx.exe`: `CouncWin_init` at `0x4278E6..0x427974`
+precomputes nonhuman ballots irrespective of proposal; native
+`CouncWin_make_resolution` at `0x424410` handles Governor candidate tally,
+Supreme Leader threshold, ordinary motions, veto and the Council-action
+virtual call. The hook does not recompute AI ballots, write Council state,
+invent vote results, or fake popup responses. Unknown proposal IDs, invalid
+mode or native unresolved ballots still take the original modal path.
+
+The separate flushed `council.jsonl` now includes stock proposal name,
+proposal ID, candidate, vote array and native weights **before** resolution,
+and native return, outcome, per-proposal `ProposalPassCount` before/after,
+Governor, pending state, game-state flags and victory-type **after**. These
+are diagnostic snapshots, not verified AI vote parity. Supreme Leader
+approval may set a native victory flag and encounter the **unchanged**
+end-of-game presentation/save lifecycle; terminal saving, winner attribution,
+and automatic camera reassignment if the observed faction is eliminated are
+**deferred** and not implemented in this change. Test all categories of
+vote and ordinary human Council separately before merge.

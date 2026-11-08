@@ -95,58 +95,97 @@ int __cdecl autosim_council_human_vote_offer(const char* label, int flags,
     return choice;
 }
 
+// Exact native proposal identifiers (engine_enums.h). Keep the diagnostic
+// names independent of the game's localisation/script tables and never call
+// proposal_menu, council_get_vote or any RNG routine from this display helper.
+static const char* autosim_council_proposal_name(int proposal) {
+    switch (proposal) {
+    case PROP_ELECT_PLANETARY_GOVERNOR: return "planetary_governor";
+    case PROP_UNITE_SUPREME_LEADER: return "supreme_leader";
+    case PROP_SALVAGE_UNITY_CORE: return "unity_core";
+    case PROP_GLOBAL_TRADE_PACT: return "global_trade_pact";
+    case PROP_REPEAL_GLOBAL_TRADE_PACT: return "repeal_global_trade_pact";
+    case PROP_LAUNCH_SOLAR_SHADE: return "launch_solar_shade";
+    case PROP_INCREASE_SOLAR_SHADE: return "increase_solar_shade";
+    case PROP_MELT_POLAR_CAPS: return "melt_polar_caps";
+    case PROP_REPEAL_UN_CHARTER: return "repeal_un_charter";
+    case PROP_REINSTATE_UN_CHARTER: return "reinstate_un_charter";
+    default: return "unrecognised";
+    }
+}
+
 // Replace only the exact native six-byte CouncWindow virtual modal execution
-// call. The constructor already computes every AI ballot, including the
-// observed AI. We reuse native make_resolution without recasting ballots.
-// Any incomplete voting state falls back to the original interactive window.
+// call. Native CouncWin_init already computes all AI ballots, including the
+// observed AI, for every standard Council proposal. Reuse native
+// make_resolution without recasting votes; this preserves native election
+// thresholds, policy effects, vetoes and Supreme Leader decisions.
+// Unknown proposals/incomplete ballots retain the original modal window.
 int __thiscall autosim_council_modal_or_resolve(CouncWindow* win,
     int a2, void* a3, void* a4) {
     typedef int(__thiscall *NativeModal)(CouncWindow*, int, void*, void*);
     NativeModal original = (NativeModal)(*(void***)win)[0xE4 / sizeof(void*)];
     if (!autosim_ui_active()) return original(win, a2, a3, a4);
     const int owner = MapWin->cOwner;
+    const int proposal = win->proposal_type;
+    // Do not infer a vote for unknown or future modded proposal identifiers.
+    // All ten official Council proposals are represented by this interval.
     if (owner <= 0 || owner >= MaxPlayerNum ||
-        win->proposal_type != PROP_ELECT_PLANETARY_GOVERNOR ||
+        proposal < PROP_ELECT_PLANETARY_GOVERNOR ||
+        proposal > PROP_REINSTATE_UN_CHARTER ||
         FactionStatus[0] || *MultiplayerActive || *PbemActive) {
-        telemetry_record_council_event("modal_fallback", owner,
-            "proposal_or_mode_not_eligible");
+        char reason[128];
+        snprintf(reason, sizeof(reason),
+            "proposal=%d owner=%d human_mask=%08X multiplayer=%d pbem=%d",
+            proposal, owner, (unsigned)FactionStatus[0],
+            *MultiplayerActive, *PbemActive);
+        telemetry_record_council_event("modal_fallback", owner, reason);
         return original(win, a2, a3, a4);
     }
-    // Native CouncWin_init has ALREADY precomputed AI ballots for every
-    // nonhuman faction (up to three passes, 0x4278E6..0x427974).
-    // This includes the observed AI. A nonzero observed ballot is normal,
-    // NOT proof that the Council has resolved. Do not rerun
-    // council_get_vote or CouncWin_set_vote: they can recalculate ballots.
-    //
-    // In the normal single-player vote-button path, set_vote ultimately
-    // calls make_resolution(win, 1). This native routine checks every
-    // living faction's ballot and returns 0 without applying a resolution
-    // when a ballot remains 0. Reuse it directly, with no synthetic choice.
+    // Native CouncWin_init (0x4278E6..0x427974) precomputes ballots
+    // for all nonhuman voters, irrespective of proposal type, across up
+    // to three passes. Council_make_resolution (0x424410) implements the
+    // native Governor candidate tally, Supreme Leader supermajority,
+    // ordinary yes/no, veto and the actual Council action via its vtable.
+    // It returns zero without applying the motion if a required ballot
+    // is still uncast. Do not rerun council_get_vote or set_vote.
     if (win->proposal_outcome != 0) {
         telemetry_record_council_event("headless_already_resolved", owner,
             "native_resolution_preceded_modal");
         return 0;
     }
 
-    char before[288];
+    const int previous_passes = ProposalPassCount[proposal];
+    const unsigned previous_game_state = (unsigned)*GameState;
+    char before[544];
     snprintf(before, sizeof(before),
-        "proposal=%d candidate=%d outcome=%d mask=%08X "
-        "votes=%d,%d,%d,%d,%d,%d,%d,%d",
-        win->proposal_type, win->candidate_faction_id,
-        win->proposal_outcome, (unsigned)win->vote_faction_mask,
+        "proposal=%d name=%s candidate=%d outcome=%d pass_count=%d "
+        "mask=%08X votes=%d,%d,%d,%d,%d,%d,%d,%d "
+        "weights=%d,%d,%d,%d,%d,%d,%d,%d",
+        proposal, autosim_council_proposal_name(proposal),
+        win->candidate_faction_id, win->proposal_outcome, previous_passes,
+        (unsigned)win->vote_faction_mask,
         win->faction_vote[0], win->faction_vote[1],
         win->faction_vote[2], win->faction_vote[3],
         win->faction_vote[4], win->faction_vote[5],
-        win->faction_vote[6], win->faction_vote[7]);
+        win->faction_vote[6], win->faction_vote[7],
+        win->faction_vote_count[0], win->faction_vote_count[1],
+        win->faction_vote_count[2], win->faction_vote_count[3],
+        win->faction_vote_count[4], win->faction_vote_count[5],
+        win->faction_vote_count[6], win->faction_vote_count[7]);
     telemetry_record_council_event("headless_native_ballots", owner, before);
 
     const int resolved = CouncWin_make_resolution(win, 1);
-    char after[320];
+    char after[512];
     snprintf(after, sizeof(after),
-        "native_make_resolution=%d outcome=%d candidate=%d "
-        "governor=%d pending=%d mask=%08X votes=%d,%d,%d,%d,%d,%d,%d,%d",
+        "proposal=%d name=%s native_make_resolution=%d outcome=%d "
+        "candidate=%d governor=%d pending=%d pass_count_before=%d "
+        "pass_count_after=%d game_state_before=%08X game_state_after=%08X "
+        "victory_type=%d mask=%08X votes=%d,%d,%d,%d,%d,%d,%d,%d",
+        proposal, autosim_council_proposal_name(proposal),
         resolved, win->proposal_outcome, win->candidate_faction_id,
         *GovernorFaction, *CouncilSessionPending,
+        previous_passes, ProposalPassCount[proposal],
+        previous_game_state, (unsigned)*GameState, *GameVictoryType,
         (unsigned)win->vote_faction_mask,
         win->faction_vote[0], win->faction_vote[1],
         win->faction_vote[2], win->faction_vote[3],
@@ -154,8 +193,8 @@ int __thiscall autosim_council_modal_or_resolve(CouncWindow* win,
         win->faction_vote[6], win->faction_vote[7]);
     telemetry_record_council_event("headless_native_resolution", owner, after);
     if (!resolved || win->proposal_outcome == 0) {
-        // Native implementation reports missing ballots; retain the UI
-        // rather than forcing an election or leaving it pending.
+        // Native implementation reported an incomplete ballot or outcome.
+        // Retain the UI; do not force a passage, veto, election or victory.
         telemetry_record_council_event("modal_fallback", owner,
             "native_resolution_incomplete");
         return original(win, a2, a3, a4);
