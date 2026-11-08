@@ -9,6 +9,7 @@ enum AutosimDialogMode {
     AUTOSIM_DIALOG_RUNNING,
     AUTOSIM_DIALOG_STARTUP,
     AUTOSIM_DIALOG_SETUP,
+    AUTOSIM_DIALOG_VICTORY, // true world victory, may occur mid-cycle
 };
 
 enum AutosimDialogChoice {
@@ -21,6 +22,7 @@ enum AutosimDialogChoice {
     AUTOSIM_DIALOG_ARM = 6,
     AUTOSIM_DIALOG_CONTINUE = 7,
     AUTOSIM_DIALOG_CANCEL = 8,
+    AUTOSIM_DIALOG_EXIT_NO_SAVE = 9,
 };
 
 struct AutosimDialogState {
@@ -44,6 +46,9 @@ struct AutosimDialogState {
     int alive_factions = 0;
     int additional_turns = 25;
     bool allow_resume = false;
+    bool can_continue_after_victory = true;
+    bool partial_turn = false;
+    std::string victory_summary;
     std::string campaign_name;
     std::string save_name;  // Basename without directory or .sav extension.
 };
