@@ -1227,6 +1227,21 @@ bool patch_setup(Config* cf) {
     write_call(0x5BCC70, (int)mod_wants_to_attack); // tech_val
     write_call(0x5BCC85, (int)mod_wants_to_attack); // tech_val
     write_call(0x427F4A, (int)diplomacy_check); // CouncWin::init
+    // AUTO-002: extra read-only tracing on the verified patched terranx.exe
+    // call from council() to CouncWin::init. Verify the original target
+    // before writing, since other executables/patches may differ.
+    // Do not hook normal human games or sessions without active telemetry.
+    if (cf->telemetry_enabled && cf->autosim_manual_turns > 0) {
+        const uintptr_t callsite = 0x4284CA;
+        const uint8_t opcode = *(const uint8_t*)callsite;
+        const int32_t displacement = *(const int32_t*)(callsite + 1);
+        if (opcode == 0xE8
+            && (uintptr_t)(callsite + 5 + displacement) == 0x427230) {
+            write_call((int)callsite, (int)autosim_trace_CouncWin_init);
+        } else {
+            OutputDebugStringA("thinkerNeca AUTO-002: native Council trace hook skipped (unknown executable)\n");
+        }
+    }
     write_call(0x43F2F4, (int)diplomacy_check); // DiploPop::start
     write_call(0x4A2589, (int)diplomacy_check); // ReportWin::draw_intel
     write_call(0x4A26CE, (int)diplomacy_check); // ReportWin::draw_intel
