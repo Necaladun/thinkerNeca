@@ -90,3 +90,12 @@ verify("tabs and roughly 50pct larger launcher",
        all(x in launcher for x in ('Game & campaign','World generation',
                                   'Presentation & logs','Monitor & recovery')))
 print("AUTO-NULL / AUTO-NEW static contracts passed; Windows acceptance pending")
+
+# Native image must still be PAGE_EXECUTE_READWRITE while E9 detours are installed.
+patch_src=files["src/patch.cpp"]
+verify("null render hooks installed before game image returns to read/execute",
+       patch_src.index("autosim_install_null_render_hooks()") <
+       patch_src.index("VirtualProtect(AC_IMAGE_BASE, AC_IMAGE_LEN, PAGE_EXECUTE_READ, &attrs)"))
+verify("game executable was first made writable for verified patch setup",
+       patch_src.index("VirtualProtect(AC_IMAGE_BASE, AC_IMAGE_LEN, PAGE_EXECUTE_READWRITE, &attrs)") <
+       patch_src.index("autosim_install_null_render_hooks()"))

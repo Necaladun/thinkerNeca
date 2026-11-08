@@ -2157,14 +2157,19 @@ bool patch_setup(Config* cf) {
     }
     */
 
-    if (!VirtualProtect(AC_IMAGE_BASE, AC_IMAGE_LEN, PAGE_EXECUTE_READ, &attrs)) {
-        return false;
-    }
+    // AUTO-NULL native entrypoint detours MUST be installed while the
+    // executable image is still writable. write_jump() writes E9+rel32
+    // directly and does not call VirtualProtect on its own. Placing this
+    // after PAGE_EXECUTE_READ caused an access violation in DLL startup
+    // before a SAV or new-game profile could reach telemetry.
     if (cf->autosim_render_mode == 2 && autosim_launcher_active) {
         if (!autosim_install_null_render_hooks()) {
             cf->autosim_render_mode = 1; // fail safe: fast, not half-patched
             OutputDebugStringA("thinkerNeca: Null Rendering unavailable; fast presentation active\n");
         }
+    }
+    if (!VirtualProtect(AC_IMAGE_BASE, AC_IMAGE_LEN, PAGE_EXECUTE_READ, &attrs)) {
+        return false;
     }
     return true;
 }

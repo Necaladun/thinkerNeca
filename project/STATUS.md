@@ -192,3 +192,11 @@ PowerShell writes `automation/logs/launcher-*.log` before starting
 the game and logs PID handoff/errors. Windows-native launcher-GUI
 construction CI added. Root cause of the game failing to start is
 **not yet established**; subsequent Windows evidence required.
+
+
+**AUTO-NULL startup crash candidate (9 Nov, draft PR #11):** Two user
+logs show thinker.exe creating terranx.exe, which exits before the
+first simulation heartbeat or campaign recorder. The renderer detours
+were installed after executable pages had been restored to read/execute;
+source patch now installs them while pages are writable. Awaiting
+Windows user confirmation and actual crash-code evidence.

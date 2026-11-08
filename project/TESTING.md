@@ -856,3 +856,30 @@ validation, game setup or native renderer; verify Load SAV and New Game
 start and create campaign telemetry when enabled; normal thinker.exe
 continues unchanged. Preserve any relevant `debug.txt` from the
 installation. No diagnosis of the original early termination yet.
+
+
+### AUTO-NULL early native exit — 9 November 2026
+
+**User's two real Windows launch logs (new and loaded SAV):** both
+PowerShell WinForms and `thinker.exe` started successfully, a child
+`terranx.exe` PID was written, then the process exited before the
+first `<profile>.status` heartbeat or `telemetry_begin_session`
+(the latter is why no campaign directory was created). Exact game
+exit code unavailable in the monitor log. Both launches used the
+current Null Rendering-default launcher unless the user changed its
+presentation option; the run profile was not uploaded.
+
+**Confirmed source-level defect, strong candidate for both crashes:**
+`patch_setup` previously called `VirtualProtect(AC_IMAGE_BASE,...,
+PAGE_EXECUTE_READ)` and *afterwards* called
+`autosim_install_null_render_hooks()`. That function uses
+`write_jump` to write directly into the game image without changing
+page protection. If native prologue preflight passed (as checked against
+the uploaded stock `terranx.exe`), this write can trigger an access
+violation before the first game frame. Moved the guarded hook install
+**before** read/execute protection is restored, and added a regression
+asserting the page-protection order. This is source diagnosis plus native
+binary disassembly, **not yet a Windows runtime correction**. Require
+new user test for loading a SAV in Null and Fast modes, New Game,
+status/telemetry, monitor and normal human startup. Do not merge pending
+actual Windows confirmation and all other native acceptance.

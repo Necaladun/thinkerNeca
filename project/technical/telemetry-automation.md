@@ -446,3 +446,12 @@ The resulting console log is independent of campaign telemetry because
 `campaigns/` is only created after the game successfully initialises.
 This is diagnosis and observability, not proof that the previous
 game-start failure was fixed.
+
+
+**Null Rendering startup protection-order fix (9 Nov):** `patch_setup`
+now calls `autosim_install_null_render_hooks` while the native executable
+image is writable, *before* restoring `PAGE_EXECUTE_READ`. Previously
+`write_jump` attempted to write the seven x86 detours after permissions
+were read/execute; this is a likely cause of the game disappearing before
+any recorder heartbeat on both New and Load routes. The static regression
+checks order; runtime is still unverified.
