@@ -6,6 +6,12 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 patched terranx.exe inspection and native Council trace (8 November 2026)
+
+**Source artifact verified:** uploaded `terranx(4).exe` SHA-256 `01901cbf7196b0c5d0df9540a029520f5df8fd9a6b343deef8b5663872805fcf`, same as the user-reported installed game executable. Static Win32 x86 `objdump` disassembly shows `call_council` (`0x52C880`) calling `council` (`0x428350`) at `0x52D9C2`, and `council` calling `CouncWin_init` (`0x427230`) at `0x4284CA`. Window initialization populates AI votes with `council_get_vote` and can call `CouncWin_set_vote`; native resolution calculates outcomes and changes Governor state. A UI/window lifecycle is interleaved, preventing an established safe show/no-show bypass. The Council election is user-observed to often coincide with Deirdre building the Empath Guild; **the Guild as a direct trigger and exact AI selection timing have not been confirmed**.
+
+**New non-mutating code on AUTO-002:** a preflighted patch at `0x4284CA`, enabled only for `telemetry_enabled=1` and `autosim_manual_turns>0`, forwards to the original `__thiscall CouncWin_init` via a matching wrapper. It records entry immediately before native code and exit with proposal, candidate, outcome, mask, ballots and vote counts to `ui_notices.jsonl` as `source=council_native`. It does not skip the Council, bypass a modal, forge votes or alter Governor. Structural regression `tools/test_autosim_council_native_trace.py` must pass with Win32 Develop/Release compilation; these tests do not prove runtime behaviour. An exact *pre-Council saved game* and Windows in-game run remain needed before any headless fix or vote-parity acceptance.
+
 ## AUTO-002 Council log review and safe-fix blocker (8 November 2026)
 
 **Source of evidence:** uploaded `ui_notices(1).jsonl`, 845 events over turns 80–117. 602 Council trace records, no `diplomacy_guard` records, `human_mask=00000000` and `owner=2` throughout sampled Council events. On turn 117, `call_council(actor=5)` enters with Governor `-1` and exits with Governor `7`, both with `pending=0`. The final event is an F10-origin `OPERATOR_STOP/save_dialog`. The reported popup required user input; whether the click altered the winning result is not known. These are actual Windows log observations, not CI assumptions.
