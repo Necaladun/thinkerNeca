@@ -2304,7 +2304,7 @@ void __cdecl turn_upkeep() {
             }
         }
         if (aliens_arrive) {
-            popp(ScriptFile, "ALIENSARRIVE", 0, "al_land_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "ALIENSARRIVE", "al_land_sm.pcx");
             autosim_interlude(21, 0, 1, 0);
         }
     }
@@ -2354,7 +2354,7 @@ void __cdecl turn_upkeep() {
             plr.player_flags |= PFLAG_UNK_2000;
             parse_says(0, get_title(*CurrentPlayerFaction), -1, -1);
             parse_says(1, get_name(*CurrentPlayerFaction), -1, -1);
-            popp(ScriptFile, "ASCENT", 0, "asctran_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "ASCENT", "asctran_sm.pcx");
         }
     }
     if ((*CurrentTurn & 3) == 1) {
@@ -2714,7 +2714,7 @@ void __cdecl production_phase(int faction_id) {
                 if (!is_alien(faction_id)) {
                     autosim_notice_popp(ScriptFile, "SANCTIONSEND", "council_sm.pcx");
                 } else {
-                    popp(ScriptFile, "SANCTIONSENDALIEN", 0, "Alopdir.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "SANCTIONSENDALIEN", "Alopdir.pcx");
                 }
             }
         }
