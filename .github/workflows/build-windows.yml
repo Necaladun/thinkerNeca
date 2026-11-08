@@ -107,15 +107,17 @@ jobs:
         run: python tools/test_project_docs.py
       - name: Check independent minor-terrain SAV decoder
         run: python tools/test_minor_save.py
-      - name: Upload Windows Develop binaries
+      - name: Stage automation launcher beside the Windows binaries
+        run: cp "Run Automation.bat" "Run Automation.ps1" build/ci/
+      - name: Upload Windows Develop binaries and Stage A launcher
         uses: actions/upload-artifact@v4
         with:
           name: thinker-develop-win32
           path: |
             build/ci/thinker.dll
             build/ci/thinker.exe
-            Run Automation.bat
-            Run Automation.ps1
+            build/ci/Run Automation.bat
+            build/ci/Run Automation.ps1
           if-no-files-found: error
 
   # Compile-only parity check. Custom Titanium/Inspector native hooks remain
