@@ -15,6 +15,17 @@ from pathlib import Path
 import sys
 
 SCHEMA = 1
+
+def format_simulation_duration(milliseconds):
+    """Active in-game AI wall time, excluding launcher/operator pauses.
+
+    Old recordings have no duration: show unavailable, not a fabricated zero.
+    """
+    if isinstance(milliseconds, bool) or not isinstance(milliseconds, (int, float)) or milliseconds < 0:
+        return "Not recorded"
+    seconds = int(milliseconds) // 1000
+    return f"{seconds // 3600}:{(seconds // 60) % 60:02}:{seconds % 60:02}"
+
 METRICS = (
     ("population", "Population"),
     ("bases", "Bases"),
@@ -486,6 +497,12 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     write_csv(output / "bases.csv", BASE_FIELDS, base_rows)
     document = render_html(campaign_display_name(campaign_dir), session_dir.name,
                            manifest, status, turns, bases, notices)
+    runtime_text = html.escape(format_simulation_duration(status.get("simulation_elapsed_ms")))
+    document = document.replace(
+        '<h2>Latest faction standings</h2>',
+        '<p class="muted">Active AI run time: <strong>' + runtime_text
+        + '</strong> (operator/startup/post-victory pauses excluded)</p>'
+        + '<h2>Latest faction standings</h2>', 1)
     legacy_count = sum(1 for row in council_events if
                        "event" not in row and "phase" in row)
     document = document.replace('<details class="panel"><summary>Automation diagnostics',
@@ -570,6 +587,7 @@ def summarize_session(session_dir):
         "status": "Unreadable",
         "started": "Unknown",
         "updated": "Unknown",
+        "runtime": "Not recorded",
         "source_save": "Not recorded",
         "factions": "",
         "error": None,
@@ -594,6 +612,7 @@ def summarize_session(session_dir):
 
         info["started"] = local_time(manifest.get("started_utc"))
         info["updated"] = local_time(status.get("updated_utc"))
+        info["runtime"] = format_simulation_duration(status.get("simulation_elapsed_ms"))
         info["source_save"] = manifest.get("source_save") or "Not recorded"
         info["status"] = str(status.get("state", "unknown")).replace("_", " ").title()
         if last:
