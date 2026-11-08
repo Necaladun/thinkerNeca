@@ -34,6 +34,14 @@ checks = {
         all(f"cf->{k} = 0;" in cpp for k in
         ("telemetry_enabled", "autosim_manual_turns",
          "autosim_suppress_notices", "autosim_fast_combat")),
+    "automation-only expansion override is explicit and does not alter thinker.ini":
+        "unlimited_expansion = '1'" in ps and
+        "unlimited_expansion=1" in ps and
+        '"unlimited_expansion"' in cpp and
+        "cf->autosim_unlimited_expansion = 0;" in cpp and
+        "cf->autosim_unlimited_expansion = p.unlimited_expansion;" in cpp and
+        "autosim_unlimited_expansion = 0;" in hdr and
+        "unlimited_expansion=if ($unlimitedExpansion.Checked)" in ps,
     "simulation guard requires launcher opt-in":
         "autosim_launcher_active && auto_turn_eligible" in ui and
         "autosim_launcher_active && auto_turn_eligible" in turn and
