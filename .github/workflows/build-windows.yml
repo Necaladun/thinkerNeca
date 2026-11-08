@@ -83,6 +83,8 @@ jobs:
         run: |
           python tools/test_autosim_launch_profile.py
           pwsh -NoProfile -File './Run Automation.ps1' -SelfTest
+      - name: Test AUTO-LAUNCH native custom map sources and regular game-rule profiles
+        run: python tools/test_autosim_game_setup.py
       - name: Test AUTO-NULL renderer gates, monitor and zero-input new-game contracts
         run: python tools/test_autosim_null_newgame.py
       - name: Check AUTO-002 full-turn presentation and autosave source contract
