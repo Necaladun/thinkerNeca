@@ -574,14 +574,142 @@ try {
     [void](Add-Label $runTab 'No regular INI files are edited. SAVs still use existing folders (Stage B later).' 28 480 880 50)
     [void](Add-Label $runTab 'New-game engine automation is experimental; normal thinker.exe remains unchanged.' 28 535 880 50)
 
-    [void](Add-Label $worldTab 'These options apply only to New Game.' 28 21 870 30)
-    $difficulty = Add-Combo $worldTab 'Difficulty' 75 @('Citizen','Specialist','Talent','Librarian','Thinker','Transcend') (Get-Selected 'difficulty' 5)
-    $worldSize = Add-Combo $worldTab 'World size' 159 @('Tiny','Small','Standard','Large','Huge') (Get-Selected 'world_size' 4)
-    $worldOcean = Add-Combo $worldTab 'Ocean coverage' 243 @('Low','Average','High') (Get-Selected 'world_ocean' 2)
-    $worldErosion = Add-Combo $worldTab 'Erosion' 327 @('Low','Average','High') (Get-Selected 'world_erosion' 2)
-    $worldCloud = Add-Combo $worldTab 'Cloud cover' 411 @('Low','Average','High') (Get-Selected 'world_cloud' 2)
-    $worldLife = Add-Combo $worldTab 'Native life' 495 @('Low','Average','High') (Get-Selected 'world_life' 2)
-    $observer = Add-Combo $worldTab 'Initial observer (not a human faction)' 579 @('Faction slot 1','Faction slot 2','Faction slot 3','Faction slot 4','Faction slot 5','Faction slot 6','Faction slot 7') ([Math]::Max(0,(Get-Selected 'observer' 7)-1))
+    [void](Add-Label $worldTab 'New-game world. Fixed Planet maps use original game map files; climate settings only affect generated worlds.' 28 10 912 38)
+    function Add-WorldSelect([string]$label,[int]$x,[int]$y,[int]$w,[string[]]$choices,[int]$selected) {
+        [void](Add-Label $worldTab $label $x $y $w 23)
+        $combo = New-Object System.Windows.Forms.ComboBox
+        $combo.DropDownStyle = 'DropDownList'
+        $combo.SetBounds($x,($y+26),$w,30)
+        [void]$combo.Items.AddRange([object[]]$choices)
+        $combo.SelectedIndex = [Math]::Max(0,[Math]::Min($choices.Length-1,$selected))
+        $worldTab.Controls.Add($combo)
+        return $combo
+    }
+    $difficulty = Add-WorldSelect 'Difficulty' 28 58 280 @(
+        'Citizen','Specialist','Talent','Librarian','Thinker','Transcend') (Get-Selected 'difficulty' 5)
+    $observer = Add-WorldSelect 'Initial observer (not a human faction)' 365 58 320 @(
+        'Faction slot 1','Faction slot 2','Faction slot 3','Faction slot 4',
+        'Faction slot 5','Faction slot 6','Faction slot 7') ([Math]::Max(0,(Get-Selected 'observer' 7)-1))
+    $worldSource = Add-WorldSelect 'Map source' 28 143 820 @(
+        'Generated Planet (random terrain + selected climate)',
+        'Map of Planet (maps\xplanet.mp)',
+        'Huge Map of Planet (maps\xplanetx.mp)') (Get-Selected 'world_source' 2)
+    $worldSize = Add-WorldSelect 'Generated Planet size' 28 229 340 @(
+        'Tiny (24 x 48)','Small (32 x 64)','Standard (40 x 80)',
+        'Large (50 x 100)','Huge (64 x 128)','Very Huge (80 x 160)',
+        'Custom dimensions') (Get-Selected 'world_size' 6)
+    [void](Add-Label $worldTab 'Custom X (native half-width)' 410 229 205 24)
+    [void](Add-Label $worldTab 'Custom Y (height)' 644 229 193 24)
+    $customX = New-Object System.Windows.Forms.NumericUpDown
+    $customY = New-Object System.Windows.Forms.NumericUpDown
+    foreach ($control in @($customX,$customY)) {
+        $control.Minimum = 16
+        $control.Maximum = 512
+        $control.SetBounds($(if ($control -eq $customX) {410} else {644}),255,160,30)
+        $worldTab.Controls.Add($control)
+    }
+    $initialX = 80
+    if (![int]::TryParse([string]$options['custom_map_x'],[ref]$initialX)) { $initialX = 80 }
+    $initialY = 160
+    if (![int]::TryParse([string]$options['custom_map_y'],[ref]$initialY)) { $initialY = 160 }
+    $customX.Value = [decimal][Math]::Min(512,[Math]::Max(16,$initialX))
+    $customY.Value = [decimal][Math]::Min(512,[Math]::Max(16,$initialY))
+    [void](Add-Label $worldTab 'Native Custom Map X is doubled internally (MapAreaX = 2 * X). Values 16–512; large dimensions are experimental.' 28 310 895 40)
+
+    $worldOcean = Add-WorldSelect 'Ocean coverage' 28 371 275 @(
+        'Low','Average','High') (Get-Selected 'world_ocean' 2)
+    $worldErosion = Add-WorldSelect 'Erosion' 365 371 275 @(
+        'Low','Average','High') (Get-Selected 'world_erosion' 2)
+    $worldCloud = Add-WorldSelect 'Cloud cover' 28 462 275 @(
+        'Low','Average','High') (Get-Selected 'world_cloud' 2)
+    $worldLife = Add-WorldSelect 'Native life' 365 462 275 @(
+        'Low','Average','High') (Get-Selected 'world_life' 2)
+    [void](Add-Label $worldTab 'A fixed Map of Planet ignores generated size, climate and Thinker random-map generation. Installed map files are required.' 28 573 890 60)
+    $updateWorldSource = {
+        $generated = $worldSource.SelectedIndex -eq 0
+        $worldSize.Enabled = $generated
+        $isCustom = $generated -and $worldSize.SelectedIndex -eq 6
+        $customX.Enabled = $isCustom
+        $customY.Enabled = $isCustom
+        foreach ($setting in @($worldOcean,$worldErosion,$worldCloud,$worldLife)) {
+            $setting.Enabled = $generated
+        }
+    }
+    $worldSource.Add_SelectedIndexChanged($updateWorldSource)
+    $worldSize.Add_SelectedIndexChanged($updateWorldSource)
+    & $updateWorldSource
+
+    # The native custom-game dialog has 15 ordinary bit choices, an inverted
+    # Unity Survey choice, and two GameState leader-randomisation choices.
+    # Preserve the exact enum bits instead of the native dialog's UI bit order.
+    $customRules = New-Object System.Windows.Forms.CheckBox
+    $customRules.Text = 'Use explicitly selected game rules (off = installed-game saved rules)'
+    $customRules.SetBounds(28,18,865,34)
+    $customRules.Checked = ([string]$options['rules_mode'] -eq '1')
+    $rulesTab.Controls.Add($customRules)
+    [void](Add-Label $rulesTab 'The checkboxes apply only to NEW games. They do not modify the game INI or a loaded save.' 28 55 886 29)
+    [void](Add-Label $rulesTab 'Victory conditions' 28 91 850 28)
+    $initialRuleMask = 6670 # 0x1A0E: the game native default
+    if (![int]::TryParse([string]$options['rules_mask'],[ref]$initialRuleMask) -or
+        $initialRuleMask -lt 0 -or $initialRuleMask -gt 65535) { $initialRuleMask = 6670 }
+    $ruleControls = New-Object 'System.Collections.Generic.List[object]'
+    function Add-RuleChoice([string]$label,[int]$bit,[int]$x,[int]$y,[bool]$inverted) {
+        $cb = New-Object System.Windows.Forms.CheckBox
+        $cb.Text = $label
+        $cb.SetBounds($x,$y,432,32)
+        $cb.Checked = ((($initialRuleMask -band $bit) -ne 0) -xor $inverted)
+        $rulesTab.Controls.Add($cb)
+        $ruleControls.Add([pscustomobject]@{Control=$cb; Bit=$bit; Inverted=$inverted})
+    }
+    Add-RuleChoice 'Transcendence victory' 0x0800 28 124 $false
+    Add-RuleChoice 'Conquest victory' 0x0002 480 124 $false
+    Add-RuleChoice 'Economic victory' 0x0004 28 163 $false
+    Add-RuleChoice 'Diplomatic victory' 0x0008 480 163 $false
+    Add-RuleChoice 'Cooperative victory enabled' 0x1000 28 202 $false
+
+    [void](Add-Label $rulesTab 'Custom game rules' 28 249 850 27)
+    Add-RuleChoice 'Do or Die (no escape from defeat)' 0x0001 28 284 $false
+    Add-RuleChoice 'Look First (exploration preview)' 0x0010 480 284 $false
+    Add-RuleChoice 'Tech Stagnation' 0x0020 28 323 $false
+    Add-RuleChoice 'Spoils of War' 0x4000 480 323 $false
+    Add-RuleChoice 'Blind Research' 0x0200 28 362 $false
+    Add-RuleChoice 'Intense Rivalry' 0x0040 480 362 $false
+    Add-RuleChoice 'Unity Survey available at start' 0x0100 28 401 $true
+    Add-RuleChoice 'No Unity Pod scattering' 0x2000 480 401 $false
+    Add-RuleChoice 'Bell Curve combat' 0x8000 28 440 $false
+    Add-RuleChoice 'Time Warp' 0x0080 480 440 $false
+    Add-RuleChoice 'Ironman' 0x0400 28 479 $false
+
+    [void](Add-Label $rulesTab 'Faction-leader randomisation' 28 527 860 27)
+    $randomPersonalities = New-Object System.Windows.Forms.CheckBox
+    $randomPersonalities.Text = 'Random faction leader personalities'
+    $randomPersonalities.SetBounds(28,559,410,32)
+    $randomPersonalities.Checked = (([int]$options['rules_random'] -band 1) -ne 0)
+    $rulesTab.Controls.Add($randomPersonalities)
+    $randomAgendas = New-Object System.Windows.Forms.CheckBox
+    $randomAgendas.Text = 'Random faction leader social agendas'
+    $randomAgendas.SetBounds(480,559,423,32)
+    $randomAgendas.Checked = (([int]$options['rules_random'] -band 2) -ne 0)
+    $rulesTab.Controls.Add($randomAgendas)
+    $ruleDefaults = New-Object System.Windows.Forms.Button
+    $ruleDefaults.Text = 'Restore stock rules'
+    $ruleDefaults.SetBounds(28,625,230,41)
+    $rulesTab.Controls.Add($ruleDefaults)
+    $ruleDefaults.Add_Click({
+        foreach ($entry in $ruleControls) {
+            $entry.Control.Checked = (((6670 -band $entry.Bit) -ne 0) -xor $entry.Inverted)
+        }
+        $randomPersonalities.Checked = $false
+        $randomAgendas.Checked = $false
+    })
+    $updateRulesEnabled = {
+        foreach ($entry in $ruleControls) { $entry.Control.Enabled = $customRules.Checked }
+        $randomPersonalities.Enabled = $customRules.Checked
+        $randomAgendas.Enabled = $customRules.Checked
+        $ruleDefaults.Enabled = $customRules.Checked
+    }
+    $customRules.Add_CheckedChanged($updateRulesEnabled)
+    & $updateRulesEnabled
 
     [void](Add-Label $factionTab 'Seven specific faction slots. Each identity must be unique. Applies only to a New Game.' 28 10 900 34)
     $factionIds = [string[]]@('GAIANS','HIVE','UNIV','MORGAN','SPARTANS','BELIEVE','PEACE',
