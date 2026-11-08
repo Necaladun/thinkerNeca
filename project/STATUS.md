@@ -4,7 +4,7 @@
 
 ## AUTO-002/TEL-ORBIT orbital popup and event pass (9 November 2026; unmerged)
 
-Draft [PR #11](https://github.com/Necaladun/thinkerNeca/pull/11) now has a guarded redirect of native orbital hit/miss `popp` callsite `0x4CF70F` (the prior `X_pop` policy missed it), plus standalone `orbit.jsonl` launch, AI attack/result, environmental loss and snapshot records. Source contracts and Windows x86 Develop/Release builds passed at `d13c734`; **no installed Windows runtime check or same-build SAV regression yet**. Logging is independent of UI suppression; detailed AI-production/rejected-target reasons and defensive interception analysis remain deferred. See [TEL-ORBIT](WORK-QUEUE.md) and [testing](TESTING.md).
+Draft [PR #11](https://github.com/Necaladun/thinkerNeca/pull/11) now suppresses the four passive orbital hit/miss notices in the **active `basewin.cpp::action_sat_attack()` C++ implementation** through `autosim_notice_popp`, only in eligible unattended simulation. The original `terranx.exe` body was already redirected by `write_jump(0x4CF480, ...)`; the earlier attempted hook into its unreachable `0x4CF70F` callsite has been removed after a Windows report showed `WEKILLEDIT` still displaying. Standalone `orbit.jsonl` records launches, AI attack decisions/results, environmental losses and inventories independently of UI suppression. The corrected source awaits final Windows x86 CI and actual Windows gameplay/save-reload validation; deeper orbital AI/defence logging remains deferred. See [TEL-ORBIT](WORK-QUEUE.md) and [testing](TESTING.md).
 
 ## PR #4 — current Develop scope
 
