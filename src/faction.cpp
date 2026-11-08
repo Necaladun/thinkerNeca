@@ -2489,7 +2489,7 @@ int __cdecl mod_eliminate_player(int faction_id, int setup_id) {
         } else { // The faction has been eradicated
             snprintf(file, StrBufLen, "%s2.pcx", m->filename);
         }
-        popp(ScriptFile, name, 0, file, 0);
+        autosim_notice_popp(ScriptFile, name, file);
         if (!setup_val) {
             mon_killed_faction(setup_id, faction_id);
         }
@@ -2522,9 +2522,9 @@ int __cdecl mod_eliminate_player(int faction_id, int setup_id) {
                 MapWin_set_center(MapWin, x, y, 1);
                 parse_says(6, get_adjective(faction_id), -1, -1);
                 if (!plr_alien) {
-                    popp(ScriptFile, "TRACKED", 0, "escpod_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "TRACKED", "escpod_sm.pcx");
                 } else {
-                    popp(ScriptFile, "TRACKED", 0, "al_pod_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "TRACKED", "al_pod_sm.pcx");
                 }
             }
         }
