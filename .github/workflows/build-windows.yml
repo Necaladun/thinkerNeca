@@ -73,6 +73,8 @@ jobs:
         run: python tools/test_autosim_council_native_trace.py
       - name: Check TEL-LOG-01 Council and Secret Project game events versus UI suppression
         run: python tools/test_autosim_gameplay_logging.py
+      - name: Check TEL-LOG-02 source hooks and analyzer output
+        run: python tools/test_autosim_log02.py
       - name: Check AUTO-TIME campaign folder naming and pause-excluded runtime
         run: python tools/test_autosim_campaign_naming_timing.py
       - name: Test AUTO-002 Council headless native preflight and telemetry contract
