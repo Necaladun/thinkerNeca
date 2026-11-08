@@ -346,6 +346,11 @@ void __cdecl control_turn() {
             // turns. Collect pending F9/F10 without dispatching gameplay
             // input; consume only after this entire cycle has completed.
             autosim_collect_queued_keys();
+            // A file command bypasses the native keyboard/event pump.
+            // Like F10 it is only acted on after a complete faction cycle.
+            if (!first_cycle_partial) {
+                autosim_collect_stop_file();
+            }
             // All faction phases have completed for this turn.
             telemetry_record_completed_turn();
             const AutoCycleAction action = auto_driver.on_cycle(
