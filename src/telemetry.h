@@ -4,6 +4,17 @@
 // campaign labels/links only modifies recorder metadata and sidecar files.
 void telemetry_begin_session(const char* source_save);
 void telemetry_record_completed_turn();
+// Wall-clock + monotonic timer for actual native engine phase timings.
+// No game RNG, AI calls or turn/state modification.
+struct TelemetryPhaseStamp {
+    unsigned long long started_ticks = 0;
+    char started_utc[40] = {};
+};
+TelemetryPhaseStamp telemetry_phase_begin();
+void telemetry_phase_end(const TelemetryPhaseStamp& stamp, const char* phase, int faction);
+// Optional full-cycle game-state checkpoint stored in the active campaign archive.
+// Does not replace native autosaves or run during Ironman RNG-mutating saves.
+void telemetry_archive_completed_turn();
 // Terminal result is recorded once at the exact faction/phase boundary,
 // without pretending an incomplete turn was a completed cycle.
 void telemetry_record_terminal_result(const char* save_path, const char* save_status);
