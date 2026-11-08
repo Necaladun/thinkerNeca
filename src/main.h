@@ -156,6 +156,7 @@ struct Config {
     int autosim_render_mode = 0; // 0=normal, 1=fast, 2=null map rendering; launcher opt-in only
     int autosim_unlimited_expansion = 0; // launch-profile only; bypass AI colony cap during all-AI automation
     int autosim_archive_interval = 0; // archive a safe full-cycle SAV every N turns; 0=disabled
+    int autosim_timing_enabled = 0; // only requested phase timing during explicit launcher sessions
     int warn_on_former_replace = 1;
     int manage_player_bases = 0;
     int manage_player_units = 0;
