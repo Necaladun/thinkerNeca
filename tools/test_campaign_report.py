@@ -93,6 +93,77 @@ class CampaignReportTests(unittest.TestCase):
             self.assertIn("Faction 1", html_text)
             self.assertEqual(len((output / "factions.csv").read_text(encoding="utf-8").splitlines()), 15)
 
+    def test_structured_council_project_ledgers_and_legacy_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session = fixture(Path(tmp))
+            council = [
+                {"schema": 1, "phase": "call_council", "actor": 4,
+                 "detail": "legacy debug-only; not a real meeting"},
+                {"schema": 1, "event": "proposal", "turn": 2,
+                 "mission_year": 2102, "meeting_id": "session-001-council-1",
+                 "proposal_id": 7, "convening_faction": 2,
+                 "proposer_faction": None, "candidate_faction": -1},
+                {"schema": 1, "event": "ballots", "turn": 2,
+                 "mission_year": 2102, "meeting_id": "session-001-council-1",
+                 "proposal_id": 7, "ballots": [
+                     {"faction": 2, "choice_raw": -3, "weight_raw": 17,
+                      "reason": None,
+                      "reason_status": "native_ai_reason_not_instrumented"},
+                     {"faction": 4, "choice_raw": 1, "weight_raw": 19,
+                      "reason": None,
+                      "reason_status": "native_ai_reason_not_instrumented"}]},
+                {"schema": 1, "event": "resolution", "turn": 2,
+                 "mission_year": 2102, "meeting_id": "session-001-council-1",
+                 "proposal_id": 7, "outcome_raw": 2,
+                 "governor_after": 4, "pass_count_after": 1},
+            ]
+            projects = [
+                {"schema": 1, "event": "started", "turn": 1,
+                 "mission_year": 2101, "faction": 2, "project_id": 4,
+                 "facility_id": 74, "project_name": "Empath Guild",
+                 "base_name": "<North>", "base_x": 12, "base_y": 6,
+                 "source": "mod_base_change", "change_cause": "production_queue_selected"},
+                {"schema": 1, "event": "changed", "turn": 2,
+                 "mission_year": 2102, "faction": 2, "project_id": 4,
+                 "facility_id": 74, "project_name": "Empath Guild",
+                 "next_facility_id": 85, "next_project_name": "Hunter-Seeker Algorithm",
+                 "base_name": "<North>", "base_x": 12, "base_y": 6,
+                 "source": "mod_base_change", "change_cause": "production_queue_changed"},
+            ]
+            (session / "council.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in council), encoding="utf-8")
+            (session / "projects.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in projects), encoding="utf-8")
+            (session / "ui_notices.jsonl").write_text(
+                json.dumps({"schema": 1, "turn": 2, "mission_year": 2102,
+                            "source": "council", "label": "modal_fallback",
+                            "action": "native UI"}) + "\n", encoding="utf-8")
+            output = generate(campaign)
+            import csv
+            with (output / "council_meetings.csv").open(encoding="utf-8") as fp:
+                meetings = list(csv.DictReader(fp))
+            with (output / "council_ballots.csv").open(encoding="utf-8") as fp:
+                ballots = list(csv.DictReader(fp))
+            with (output / "projects.csv").open(encoding="utf-8") as fp:
+                events = list(csv.DictReader(fp))
+            self.assertEqual(len(meetings), 1)
+            self.assertEqual(meetings[0]["proposer_faction"], "")
+            self.assertEqual(meetings[0]["outcome_raw"], "2")
+            self.assertEqual([x["choice_raw"] for x in ballots], ["-3", "1"])
+            self.assertEqual(len(events), 2)
+            page = (output / "index.html").read_text(encoding="utf-8")
+            self.assertIn("Melt Polar Caps", page)
+            self.assertIn("native_ai_reason_not_instrumented", page)
+            self.assertIn("1 legacy Council diagnostic records", page)
+            self.assertIn("Empath Guild", page)
+            self.assertIn("Hunter-Seeker Algorithm", page)
+            self.assertIn("&lt;North&gt;", page)
+            self.assertNotIn("<North>", page)
+            self.assertIn("<details class=\"panel\"><summary>Automation diagnostics", page)
+            self.assertIn("modal_fallback", page)
+            self.assertEqual(len((output / "ui_notices.csv").read_text(
+                encoding="utf-8").splitlines()), 2)
+
     def test_editable_name_and_multiple_sessions_share_one_campaign(self):
         with tempfile.TemporaryDirectory() as tmp:
             campaign, session1 = fixture(Path(tmp))
