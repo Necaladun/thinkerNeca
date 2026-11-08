@@ -68,12 +68,13 @@ class CampaignPicker(tk.Tk):
 
         table_frame = ttk.Frame(outer)
         table_frame.pack(fill="both", expand=True)
-        columns = ("player", "years", "turns", "bases", "units", "status", "updated")
+        columns = ("campaign_name", "player", "years", "turns", "bases", "units", "status", "updated")
         self.tree = ttk.Treeview(
             table_frame, columns=columns, show="headings", selectmode="browse", height=12
         )
         specs = (
-            ("player", "Played faction / mode", 210, "w"),
+            ("campaign_name", "Campaign", 220, "w"),
+            ("player", "Played faction / mode", 175, "w"),
             ("years", "Years recorded", 125, "w"),
             ("turns", "Turns", 75, "center"),
             ("bases", "Bases", 60, "center"),
@@ -158,7 +159,7 @@ class CampaignPicker(tk.Tk):
         for index, row in enumerate(self.all_rows):
             haystack = " ".join(
                 str(row[key]) for key in (
-                    "folder", "player", "years", "status", "started",
+                    "folder", "campaign_name", "player", "years", "status", "started",
                     "updated", "source_save", "factions", "session_id",
                 )
             ).casefold()
@@ -169,7 +170,7 @@ class CampaignPicker(tk.Tk):
             self.tree.insert(
                 "", "end", iid=iid,
                 values=tuple(row[key] for key in (
-                    "player", "years", "turns", "bases",
+                    "campaign_name", "player", "years", "turns", "bases",
                     "units", "status", "updated",
                 )),
             )
@@ -197,7 +198,8 @@ class CampaignPicker(tk.Tk):
             )
         else:
             self.detail_label.set(
-                f"Folder: {row['folder']}  ·  Session: {row['session_id']}\n"
+                f"Campaign: {row['campaign_name']}  ·  Session: {row['session_id']}\n"
+                f"Folder: {row['folder']}\n"
                 f"Started: {row['started']}  ·  Status: {row['status']}  ·  "
                 f"Source save: {row['source_save']}\n"
                 f"Alive factions: {row['factions'] or 'Not recorded'}"
