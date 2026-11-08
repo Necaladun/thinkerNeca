@@ -1788,7 +1788,7 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                 }
                 const int defender_hp_before = veh_def->cur_hitpoints();
                 veh_def->damage_taken += damage_value;
-                telemetry_combat_exchange(veh_id_atk, veh_id_def, "artillery",
+                telemetry_combat_exchange(veh_id_atk, veh_id_def, faction_id_def, "artillery",
                     combat_type, offense_out, defense_out,
                     veh_atk->cur_hitpoints(), defender_hp_before,
                     veh_atk->cur_hitpoints(), veh_def->cur_hitpoints(),
@@ -2053,7 +2053,7 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
     bool def_alive = veh_def_last_hp > 0;
     // Log the resolved HP exchange BEFORE stack/base cleanup reindexes units.
     // Victories and captures remain separately authoritative native events.
-    telemetry_combat_exchange(veh_id_atk, veh_id_def, "direct_or_duel",
+    telemetry_combat_exchange(veh_id_atk, veh_id_def, faction_id_def, "direct_or_duel",
         combat_type, offense_out, defense_out,
         veh_atk_hp, veh_def_hp, veh_atk_last_hp, veh_def_last_hp,
         def_has_moved != 0, marine_detach != 0);
