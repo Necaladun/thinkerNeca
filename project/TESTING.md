@@ -6,6 +6,10 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-002 Empath Guild timing vs Council vote — event ID cross-check (8 November 2026)
+
+**Source/file reconciliation:** `src/base.cpp` serializes Secret Project notices with the project index, computed as facility ID - `SP_ID_First=70`. In uploaded `ui_notices(1).jsonl`, `PROJECT4` occurred on **turn 97** for processing faction 1 and maps to Empath Guild (`FAC_EMPATH_GUILD=74`). `PROJECT36` occurred on **turn 117** for faction 3 and maps to Planetary Energy Grid (`FAC_PLANETARY_ENERGY_GRID=106`). The Governor election occurred on turn 117 during `call_council(actor=5)`, **20 turns after the Empath Guild**, not at its completion. The owner/leader name mapping for this save is unavailable. This is observed correlation, not proof of Council eligibility cause. A pre-Council same-build SAV remains necessary.
+
 ## AUTO-002 patched terranx.exe inspection and native Council trace (8 November 2026)
 
 **Source artifact verified:** uploaded `terranx(4).exe` SHA-256 `01901cbf7196b0c5d0df9540a029520f5df8fd9a6b343deef8b5663872805fcf`, same as the user-reported installed game executable. Static Win32 x86 `objdump` disassembly shows `call_council` (`0x52C880`) calling `council` (`0x428350`) at `0x52D9C2`, and `council` calling `CouncWin_init` (`0x427230`) at `0x4284CA`. Window initialization populates AI votes with `council_get_vote` and can call `CouncWin_set_vote`; native resolution calculates outcomes and changes Governor state. A UI/window lifecycle is interleaved, preventing an established safe show/no-show bypass. The Council election is user-observed to often coincide with Deirdre building the Empath Guild; **the Guild as a direct trigger and exact AI selection timing have not been confirmed**.
