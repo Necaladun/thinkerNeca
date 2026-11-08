@@ -38,6 +38,13 @@ check("missing or invalid installed world/map data fails closed in launcher mode
       and 'if (mod_load_map_daemon("maps\\\\xplanetx.mp")) {' in game
       and "Could not load maps\\\\xplanet.mp." in game
       and "Could not load maps\\\\xplanetx.mp." in game)
+map_menu = game.split("int __cdecl map_menu(int flag)", 1)[1].split(
+    "int __cdecl top_menu(int flag)", 1
+)[0]
+check("automation failed setup exits instead of looping an interactive menu",
+      map_menu.count("if (autosim_auto_new_game) return 1;") >= 3
+      and "if (config_game(flag)) {" in map_menu
+      and "if (size_of_planet(flag)) {" in map_menu)
 check("generated custom dimensions bypass the interactive native edit dialog",
       "autosim_new_world_source == 0 && autosim_new_world_size == 6" in game
       and "*MapSizePlanet = 99;" in game
