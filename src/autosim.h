@@ -121,7 +121,15 @@ inline AutoUiAction autosim_xpop_policy(const char* label, bool has_callback) {
     if (std::strcmp(label, "WEKILLEDIT") == 0
         || std::strcmp(label, "THEYKILLEDIT") == 0
         || std::strcmp(label, "WEMUFFEDIT") == 0
-        || std::strcmp(label, "THEYMUFFEDIT") == 0) {
+        || std::strcmp(label, "THEYMUFFEDIT") == 0
+        // Planet Buster intercepted by ODP or Flechette defence:
+        // BUSTERSAC is a REAL Yes/No choice and is excluded.
+        || std::strcmp(label, "WEMUSTSAC") == 0
+        || std::strcmp(label, "THEYMUSTSAC") == 0
+        || std::strcmp(label, "WESHOTIT") == 0
+        || std::strcmp(label, "THEYSHOTIT") == 0
+        || std::strcmp(label, "WESHOTIT2") == 0
+        || std::strcmp(label, "THEYSHOTIT2") == 0) {
         return AUTO_UI_NOTICE;
     }
     // Intervention reports ignore the return value. Actual AI relations
