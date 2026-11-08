@@ -426,7 +426,7 @@ void __cdecl atrocity(int faction_id, int faction_id_tgt, int skip_init_check, i
     if (un_charter()) {
         if (*SunspotDuration > 0) {
             if (faction_id == *CurrentPlayerFaction) {
-                NetMsg_pop(NetMsg, "ATROCITYSPOTS", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "ATROCITYSPOTS", 5000, 0, 0);
             }
         } else if (!*ExpansionEnabled || skip_human_check || (!m_plr->is_alien() && !m_tgt->is_alien())) {
             for (int i = 1; i < MaxPlayerNum; i++) {
@@ -485,11 +485,11 @@ void __cdecl atrocity(int faction_id, int faction_id_tgt, int skip_init_check, i
                 parse_num(0, turns);
                 if (!m_plr->is_alien()) {
                     if (faction_id == *CurrentPlayerFaction) {
-                        NetMsg_pop(NetMsg, "ATROCITY2", 5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ATROCITY2", 5000, 0, 0);
                     } else if (faction_id_tgt == faction_id) {
-                        NetMsg_pop(NetMsg, "ATROCITY1", 5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ATROCITY1", 5000, 0, 0);
                     } else {
-                        NetMsg_pop(NetMsg, "ATROCITY", 5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ATROCITY", 5000, 0, 0);
                     }
                 }
                 plr->sanction_turns += turns;
@@ -530,7 +530,7 @@ void __cdecl major_atrocity(int faction_id, int faction_id_tgt) {
                     parse_says(4, get_name(faction_id), -1, -1);
                     parse_says(5, get_noun(faction_id), -1, -1);
                     snprintf(StrBuffer, StrBufLen, "MAJORATROCITY%d", faction_id != *CurrentPlayerFaction);
-                    popp(ScriptFile, StrBuffer, 0, "council_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, StrBuffer, "council_sm.pcx");
                 }
             }
         }
