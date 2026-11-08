@@ -92,6 +92,9 @@ check("single launcher owns session picker, report actions and full ZIP",
       and "Open campaign folder" in launcher
       and "Choose folder..." in launcher
       and "ZipFile]::CreateFromDirectory" in launcher
+      and "Pure PowerShell fallback:" in launcher
+      and "Report scan/generation needs Python 3" in launcher
+      and "Folder and ZIP actions remain available." in launcher
       and "Invoke-Item -LiteralPath $reportPath" in launcher
       and "campaign_report.py" in workflow
       and "Campaign Analyzer.pyw" not in launcher
