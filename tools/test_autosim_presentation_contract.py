@@ -33,8 +33,18 @@ for key, val in required.items():
 assert "AutoScopedCombatPrefs(autosim_fast_combat_active()" in header
 assert "AutoScopedAutosimFastPrefs fast_presentation;" in combat
 assert turn.count("AutoScopedAutosimFastPrefs fast_presentation;") == 3
-assert turn.index("AutoScopedAutosimFastPrefs fast_presentation;\n                    autosim_monitor_progress(\"turn_upkeep\", 0);\n                    turn_upkeep();") > 0
-assert "AutoScopedAutosimFastPrefs fast_presentation;\n                autosim_monitor_progress(\"ai_turn\", current_id);\n                mod_enemy_turn(current_id);" in turn
+# Timing instrumentation is a read-only wrapper within the existing
+# presentation scopes, not a new gameplay or animation policy.
+world = turn[turn.index('AutoScopedAutosimFastPrefs fast_presentation;\n                    autosim_monitor_progress("turn_upkeep", 0);'):]
+assert world.index('autosim_monitor_progress("turn_upkeep", 0);') < world.index(
+    'const TelemetryPhaseStamp upkeep_timing = telemetry_phase_begin();') < world.index(
+    'turn_upkeep();') < world.index(
+    'telemetry_phase_end(upkeep_timing, "world_upkeep", 0);')
+ai = turn[turn.index('AutoScopedAutosimFastPrefs fast_presentation;\n                autosim_monitor_progress("ai_turn", current_id);'):]
+assert ai.index('autosim_monitor_progress("ai_turn", current_id);') < ai.index(
+    'const TelemetryPhaseStamp turn_timing = telemetry_phase_begin();') < ai.index(
+    'mod_enemy_turn(current_id);') < ai.index(
+    'telemetry_phase_end(turn_timing, "ai_turn", current_id);')
 
 upkeep_start = turn.index("void __cdecl faction_upkeep(")
 upkeep_end = turn.index("void __cdecl repair_phase(", upkeep_start)
