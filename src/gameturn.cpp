@@ -1722,8 +1722,11 @@ void __cdecl random_events(int flag) {
             bool found = 0;
             for (int i = 1; i < MaxPlayerNum; i++) {
                 if (Factions[i].satellites_energy || Factions[i].satellites_ODP) {
+                    const int lost_energy = Factions[i].satellites_energy;
+                    const int lost_odp = Factions[i].satellites_ODP;
                     Factions[i].satellites_energy = 0;
                     Factions[i].satellites_ODP = 0;
+                    telemetry_orbit_environment_loss(i, "solar_storm", 0, lost_energy, lost_odp);
                     found = 1;
                 }
             }
@@ -1740,7 +1743,9 @@ void __cdecl random_events(int flag) {
             bool found = 0;
             for (int i = 1; i < MaxPlayerNum; i++) {
                 if (Factions[i].satellites_mineral) {
+                    const int lost_mineral = Factions[i].satellites_mineral;
                     Factions[i].satellites_mineral = 0;
+                    telemetry_orbit_environment_loss(i, "asteroid", lost_mineral, 0, 0);
                     found = 1;
                 }
             }
