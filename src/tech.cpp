@@ -672,7 +672,7 @@ int __cdecl tech_advance(int faction_id) {
                 }
             }
         }
-        if ((*MultiplayerActive || faction_id == MapWin->cOwner)
+        if ((*MultiplayerActive || (faction_id == MapWin->cOwner && is_human(faction_id)))
         && !*SkipTechScreenA && !*SkipTechScreenB && plr->tech_research_id < 0) {
             plr->tech_research_id = mod_tech_selection(faction_id);
         }
