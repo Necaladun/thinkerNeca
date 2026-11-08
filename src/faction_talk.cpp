@@ -237,13 +237,22 @@ int __cdecl pact_withdraw(int faction_id, int faction_id_2) {
 }
 
 void __cdecl pact_ends(int faction_id, int faction_id_2) {
-    Popup cur_popup;
-    Popup_ctor(&cur_popup);
-    auto guard = cleanup_handler([&] { Popup_dtor(&cur_popup); });
     *DiploSecondFaction = faction_id_2;
     treaty_off(faction_id, faction_id_2, DIPLO_PACT);
     int moved_1 = pact_withdraw(faction_id, faction_id_2);
     int moved_2 = pact_withdraw(faction_id_2, faction_id);
+    // The ENDPACT1/2/3 screens are passive reports. Keep pact status
+    // dissolution and both factions' forced unit withdrawals above.
+    // Suppress these screens even if the operator enabled other notices:
+    // they use a separate native modal path and require user input.
+    if (autosim_control_active()) {
+        telemetry_record_ui_notice("diplomacy", "ENDPACT1/2/3",
+            "pact_and_withdrawal_completed_no_modal");
+        return;
+    }
+    Popup cur_popup;
+    Popup_ctor(&cur_popup);
+    auto guard = cleanup_handler([&] { Popup_dtor(&cur_popup); });
     draw_map(1);
     int num;
     if (faction_id == MapWin->cOwner) {
