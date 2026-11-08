@@ -384,7 +384,10 @@ void __cdecl control_game() {
                 // entering the ordinary control_turn driver.
                 prefs_load(0);
                 prefs_use();
-                DefaultPrefs->map_type = 1; // use saved-custom-planet quick path
+                // 0: generated custom planet; 1/2: shipped Planet map variants.
+                // The latter use map_menu's native MP loader, not WorldBuilder.
+                DefaultPrefs->map_type = autosim_new_world_source
+                    ? autosim_new_world_source + 1 : 1;
                 DefaultPrefs->difficulty = autosim_new_difficulty;
                 DefaultPrefs->faction_id = autosim_new_observer;
                 AlphaIniPrefs->custom_world[0] = autosim_new_world_size;
@@ -394,6 +397,34 @@ void __cdecl control_game() {
                 AlphaIniPrefs->custom_world[4] = 1;
                 AlphaIniPrefs->custom_world[5] = autosim_new_world_cloud;
                 AlphaIniPrefs->custom_world[6] = autosim_new_world_life;
+                // Explicit run-specific regular rules override only the low
+                // 16 bits and two native random-leader flags. Never persist
+                // to Alpha Centauri.ini, or change scenario/high rules.
+                if (autosim_new_rules_override) {
+                    AlphaIniPrefs->rules = (AlphaIniPrefs->rules & 0xFFFF0000u)
+                        | autosim_new_rules_mask;
+                    const unsigned leader_flags =
+                        STATE_RAND_FAC_LEADER_PERSONALITIES
+                        | STATE_RAND_FAC_LEADER_SOCIAL_AGENDA;
+                    *GameState = (*GameState & ~leader_flags)
+                        | ((autosim_new_random_leaders & 1)
+                            ? STATE_RAND_FAC_LEADER_PERSONALITIES : 0)
+                        | ((autosim_new_random_leaders & 2)
+                            ? STATE_RAND_FAC_LEADER_SOCIAL_AGENDA : 0);
+                }
+                const char* builtin = autosim_new_world_source == 1
+                    ? "maps\\xplanet.mp"
+                    : (autosim_new_world_source == 2 ? "maps\\xplanetx.mp" : NULL);
+                if (builtin && !FileExists(builtin)) {
+                    char message[320];
+                    snprintf(message, sizeof(message),
+                        "Selected Planet map is missing: %s\n"
+                        "Install the game's original map files or select a generated planet.",
+                        builtin);
+                    MessageBoxA(*phWnd, message, "thinkerNeca Automation",
+                        MB_OK | MB_ICONSTOP);
+                    break;
+                }
                 *ControlTurnMove = 0;
                 if (map_menu(1)
                 || (FactionStatus[0] & 0xFEu)
@@ -580,6 +611,21 @@ int __cdecl custom_planet(int use_images, int use_defaults) {
 
 int __cdecl size_of_planet(int setup_mode) {
     debug("size_of_planet %d\n", setup_mode);
+    // Native Custom Map is selection 99 and normally shows an edit dialog.
+    // The explicit new-game launcher profile supplies those two numbers
+    // directly, using the same dimensions/map-init sequence as native.
+    // X is the native half-width: the engine stores MapAreaX = 2 * X.
+    if (setup_mode == 1 && autosim_auto_new_game
+    && autosim_new_world_source == 0 && autosim_new_world_size == 6) {
+        *dword_945820 = 1;
+        *MapSizePlanet = 99;
+        *MapAreaX = 2 * autosim_new_custom_x;
+        *MapAreaY = autosim_new_custom_y;
+        map_init();
+        Path_init(Paths);
+        *GameDrawState |= 8;
+        return 0;
+    }
     Popup cur_popup;
     SetupWin cur_setup;
     Popup_ctor(&cur_popup);
