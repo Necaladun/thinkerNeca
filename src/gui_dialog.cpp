@@ -88,9 +88,11 @@ void autosim_request_control(AutosimControlRequest request) {
 static void autosim_poll_physical_shortcuts() {
     static bool f9_was_down = false;
     static bool f10_was_down = false;
+    static bool menu_was_down = false;
     if (!autosim_control_active()) {
         f9_was_down = false;
         f10_was_down = false;
+        menu_was_down = false;
         return;
     }
     DWORD foreground_process = 0;
@@ -101,18 +103,27 @@ static void autosim_poll_physical_shortcuts() {
     if (foreground_process != GetCurrentProcessId()) {
         f9_was_down = false;
         f10_was_down = false;
+        menu_was_down = false;
         return;
     }
     const bool f9_down = (GetAsyncKeyState(VK_F9) & 0x8000) != 0;
     const bool f10_down = (GetAsyncKeyState(VK_F10) & 0x8000) != 0;
+    const bool menu_down = (GetAsyncKeyState(VK_F12) & 0x8000) != 0
+        && (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0
+        && (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0
+        && (GetAsyncKeyState(VK_MENU) & 0x8000) == 0;
     if (f9_down && !f9_was_down) {
         autosim_request_control(AUTOSIM_CTL_PAUSE);
     }
     if (f10_down && !f10_was_down) {
         autosim_request_control(AUTOSIM_CTL_STOP);
     }
+    if (menu_down && !menu_was_down) {
+        autosim_request_control(AUTOSIM_CTL_MENU);
+    }
     f9_was_down = f9_down;
     f10_was_down = f10_down;
+    menu_was_down = menu_down;
 }
 
 // During a continuous all-AI control_turn() invocation the ordinary Win32
@@ -132,6 +143,11 @@ void autosim_collect_queued_keys() {
             autosim_request_control(AUTOSIM_CTL_STOP);
         } else if (msg.wParam == VK_F9) {
             autosim_request_control(AUTOSIM_CTL_PAUSE);
+        } else if (msg.wParam == VK_F12
+        && (GetAsyncKeyState(VK_CONTROL) & 0x8000)
+        && (GetAsyncKeyState(VK_SHIFT) & 0x8000)
+        && !(GetAsyncKeyState(VK_MENU) & 0x8000)) {
+            autosim_request_control(AUTOSIM_CTL_MENU);
         }
     }
 }
