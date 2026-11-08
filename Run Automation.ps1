@@ -361,6 +361,69 @@ public static class AutoMonitorWin32 {
     }
 }
 
+# Report calculations remain in the tested Python standard-library module.
+# The PowerShell launcher owns the complete user interface; no second GUI,
+# Tkinter installation or additional Windows process window is required.
+function Resolve-CampaignReporterPython {
+    foreach ($candidate in @('python.exe', 'py.exe')) {
+        $command = Get-Command $candidate -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($command) {
+            return @{
+                FileName = [string]$command.Source
+                Prefix = if ($candidate -eq 'py.exe') {'-3'} else {''}
+            }
+        }
+    }
+    throw 'Python 3 is required for campaign reports. Install Python 3 and select Refresh.'
+}
+
+function Quote-CampaignReporterArg([string]$value) {
+    # File system names on Windows cannot contain a quote character.
+    if ($value.Contains('"') -or $value.IndexOf([char]13) -ge 0 -or
+        $value.IndexOf([char]10) -ge 0) {
+        throw 'Invalid argument to campaign reporter.'
+    }
+    # A final backslash would escape the closing quote in Windows argv.
+    if ($value.EndsWith('\')) { $value += '.' }
+    return '"' + $value + '"'
+}
+
+function Invoke-CampaignReporter([string[]]$arguments) {
+    $scriptPath = Join-Path $gameRoot 'tools\campaign_report.py'
+    if (-not [System.IO.File]::Exists($scriptPath)) {
+        throw 'Missing tools\campaign_report.py beside the installed automation launcher.'
+    }
+    $python = Resolve-CampaignReporterPython
+    $argv = New-Object 'System.Collections.Generic.List[string]'
+    if ($python['Prefix']) { $argv.Add([string]$python['Prefix']) }
+    $argv.Add($scriptPath)
+    foreach ($argument in $arguments) { $argv.Add([string]$argument) }
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = [string]$python['FileName']
+    $startInfo.WorkingDirectory = $gameRoot
+    $startInfo.Arguments = ((@($argv) | ForEach-Object {
+        Quote-CampaignReporterArg $_
+    }) -join ' ')
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.CreateNoWindow = $true
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    if (-not $process) { throw 'Could not start Python campaign reporter.' }
+    try {
+        $result = $process.StandardOutput.ReadToEnd()
+        $errors = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) {
+            throw ('Campaign reporter failed: ' + $errors.Trim())
+        }
+        return $result.Trim()
+    } finally {
+        $process.Dispose()
+    }
+}
+
 try {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
