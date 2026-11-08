@@ -34,6 +34,29 @@
 **Regression:** `tools/test_autosim_pact_intervention.py` audits the two intervention labels, all-AI guard, unchanged real diplomacy branch, third-party pact notifications and retained Council result state. Wired into feature-branch Windows CI. Static checks and compilation do not prove native game parity.
 
 **Windows acceptance pending:** after a source-matched build, compare suppression enabled/disabled on a pre-intervention save for the actual `DIPLO_VENDETTA` flags of Morgan and Miriam (as well as pact/commerce state), no `AIDSUS`/`AIDSTHEM` modal, and preserved AI turn progress. On a pre-pact-break save, trace the native `pact_ends`/`net_pact_ends` UI source; confirm pact removal and lawful unit ejection are identical. For Council, separately trace pre-init announcement, voting, Governor-win notice and vote-buying, checking Governor, ballots, treasury, Council scheduling and same-build save/reload. Normal-human and opt-out cases must retain UI.
+## AUTO-002 MY2182 Council ballot completed, operator Save & Exit — Windows evidence (8 November 2026)
+
+**Follow-up received:** user clicked OK on Protocol Director's initial "Deirdre convenes"/First Governor notification. Native CouncWindow then displayed all seven leaders, Deirdre **166 votes**, Lal **256 votes**, with a `VOTE` button and faction/candidate options; screenshot `image(8).png` confirms the panel. User reports Deirdre's *self-vote was already displayed as cast*, then clicked `VOTE` and selected Deirdre, and the native window processed the election. They requested F10, acknowledged it, and at the completed-cycle operator control selected Save & Exit. Uploads: revised `ui_notices(7).jsonl`, `turns(3).jsonl`, `status(3).json`. These are **post-dismissal observations of the same session**, not a new game.
+
+**Exact trace appended after previously blocked `call_council enter`:**
+```text
+turn=82 faction=1 council_native/CouncWin_init enter arg1=0 arg2=1 owner=1 human_mask=00000000 pending=0 governor=-1
+turn=82 faction=1 council_native/CouncWin_init exit proposal=0 candidate=7 outcome=1 vote_mask=FFFFFFFF
+    votes=-3,1,-3,-3,-3,-3,-3,7
+    weights=0,166,135,91,90,59,82,256
+    pending=0 governor=7
+turn=82 faction=1 council_trace/call_council exit actor=1 owner=1 human_mask=00000000 pending=0 governor=7
+turn=82 faction=7 autosim/OPERATOR_STOP control_dialog
+turn=82 faction=7 autosim/SETTINGS turns=400 notices=1 fast=1
+turn=82 faction=7 autosim/SAVED saves/AI-Sim--Gaia--MY0_MY2182.sav
+```
+
+**Interpretation bounded by evidence:** the **first** block is inside native `call_council` before `CouncWin_init`; the **second** block is the native CouncWindow with a manual `VOTE` action. Both block a no-human world (mask zero), although observed faction 1's vote was already visible. Native outcome elected **faction 7 (Peacekeepers/Lal)**, not Deirdre, despite the user's manual Deirdre selection; screenshot weight 166/256 matches the native counts. `-3` entries for five other factions have not been decoded as abstention vs unprocessed/native sentinel; `vote_mask=FFFFFFFF` and `outcome=1` alone do not establish that every faction evaluated an autonomous ballot. This is **not** evidence of correct seven-faction AI voting parity. Need to compare with a native reference or isolate Council per-faction processing before claiming it. The manual `VOTE` action may be a redundant vote or a state-driving UI action; we do not know. **Never simply hide the entire CouncWindow or auto-pick Deirdre.**
+
+**Operator UI positively Windows-tested on new Develop build `71e435e`:** F10 request while a Council session was finishing was consumed at the completed cycle, a normal Simulation Control appeared, Save & Exit successfully recorded the named save, `turns(3).jsonl` includes **one new full MY2182 cycle** (82 total), and `status(3).json` is `state=closed, last_committed_turn=82`. User hasn't reported a same-build reload of that named SAV, nor tested the hotkey's startup/manual setup modes; don't extend this positive result to these paths.
+
+**Next source work:** identify the exact native pre-init announcement site and any native `CouncWin_show/set_vote/make_resolution` UI callback driving phase 2. Instrument enough to distinguish AI ballot computation, UI-only rendering and optional human ballots, using validated x86 ABI and original-target checks. Acceptance must compare identical pre-election saves with/without presentation and verify Governor, actual per-faction votes and abstentions, Council pending/cooldown, diplomacy/credits, native human UI, no double-vote and save/reload. A separate Lal vote-buying offer remains unverified.
+
 ## AUTO-002 MY2182 fresh-game Council stop — uploaded native Windows evidence (8 November 2026)
 
 **Evidence received from active, undismissed modal:** screenshot of native **Protocol Director** window: "Lady Deirdre convenes the Planetary Council", agenda "First Planetary Governor", one **OK** button; exact same live session `manifest(2).json`, `status(2).json`, `ui_notices(6).jsonl`, `turns(2).jsonl`, `bases(1).jsonl`. User additionally supplied `Autosave_2181.sav` and `Autosave_2182(1).sav` from this ongoing game, but no post-dismissal Council log yet. The uploaded status is `state=recording`, `last_committed_turn=81`; turn snapshots cover 1–81 only. User confirms installed `telemetry_enabled=1`, `autosim_manual_turns=100`, `autosim_suppress_notices=1`. Startup `ui_notices` shows actual selected settings `turns=400 notices=1 fast=1` overriding the initial manifest's 100-turn INI snapshot (not a recorder failure). Session is `session-001`; recorded observed owner changed from original faction 7 at startup to Gaia faction 1 by the time of the Council. Human mask is zero.
