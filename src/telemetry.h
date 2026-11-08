@@ -73,8 +73,8 @@ void telemetry_production_facility(int base_id, int facility_id, int cost);
 void telemetry_research_acquired(int faction_id, int tech_id, int source_faction,
     bool already_owned, int is_share);
 void telemetry_research_reconcile();
-void telemetry_combat_exchange(int attacker, int defender, const char* mode,
-    int type_flags, int attack_strength, int defend_strength,
+void telemetry_combat_exchange(int attacker, int defender, int original_defender_faction,
+    const char* mode, int type_flags, int attack_strength, int defend_strength,
     int attacker_hp_before, int defender_hp_before,
     int attacker_hp_after, int defender_hp_after,
     bool retreated, bool marine_detached);
