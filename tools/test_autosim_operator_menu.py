@@ -42,7 +42,7 @@ for label in ("AUTOSIM_DIALOG_SETUP", "AUTOSIM_DIALOG_STARTUP",
     assert label in dialog_h
     assert label in dialog
 assert dialog.count("DialogBoxIndirectParamA(") == 1
-for field in ("Campaign ID:", "Session:", "Telemetry:",
+for field in ("Campaign:", "Session:", "Telemetry:",
               "Campaign display name", "Completed AI turns per segment",
               "Suppress audited, noninteractive notices",
               "Fast AI combat/presentation", "Save && Continue",
