@@ -741,6 +741,7 @@ void __cdecl control_turn() {
                                 " written. Loading it later will create a new telemetry campaign.",
                                 "thinkerNeca Campaign", MB_OK | MB_ICONWARNING);
                         }
+                        telemetry_archive_named_save(path.c_str());
                         telemetry_record_ui_notice("autosim", "SAVED",
                             path.c_str());
                         if (selection == AUTOSIM_DIALOG_SAVE_EXIT) {
