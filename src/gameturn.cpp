@@ -239,6 +239,16 @@ void __cdecl control_turn() {
         autosim_monitor_progress("turn_driver_exit", 0);
         Popup_dtor(&cur_popup);
     });
+    // A manually saved terminal victory may be loaded before the regular
+    // zero-human preflight. Offer that saved outcome's control menu again,
+    // rather than falling into a non-existent human console or auto-exiting.
+    // Reloading mid-cycle is still provisional pending native Windows tests.
+    if (autosim_session_active() && (*GameState & STATE_GAME_DONE)
+    && !(*GameState & STATE_FINAL_SCORE_DONE)) {
+        telemetry_record_ui_notice("autosim", "LOADED_VICTORY",
+            "reopen_terminal_control");
+        if (end_of_game(0)) return;
+    }
     if (!*CurrentTurn && !*ControlTurnMove && is_human(MapWin->cOwner) && !*PbemActive) {
         crash_landing(MapWin->cOwner);
     }
