@@ -49,6 +49,7 @@ static uint32_t custom_more_rules = 0;
 // The turn driver consumes this at its next full-cycle boundary, not from
 // inside a Council, production or combat hook.
 static bool autosim_post_victory_segment_pending = false;
+static bool autosim_post_victory_ignore_time_limit = false;
 bool autosim_take_post_victory_segment_reset() {
     const bool pending = autosim_post_victory_segment_pending;
     autosim_post_victory_segment_pending = false;
@@ -2130,7 +2131,8 @@ int __cdecl end_of_game(int flag) {
     }
     int winner_id = -1;
     if (!(*GameState & STATE_GAME_DONE) && flag) {
-        if (*CurrentMissionYear >= *EndingMissionYear) {
+        if (*CurrentMissionYear >= *EndingMissionYear
+        && !(autosim_session_active() && autosim_post_victory_ignore_time_limit)) {
             *GameVictoryType = VIC_TIME_LIMIT;
             *GameState |= STATE_GAME_DONE;
         }
@@ -2357,6 +2359,11 @@ int __cdecl end_of_game(int flag) {
                 *GameState &= ~(STATE_GAME_DONE | STATE_FINAL_SCORE_DONE
                     | STATE_VICTORY_CONQUER | STATE_VICTORY_ECONOMIC);
                 *GameVictoryType = VIC_NONE;
+                if (victory_type == VIC_TIME_LIMIT) {
+                    // A deliberate post-retirement sandbox should not
+                    // re-trigger the same clock victory every new year.
+                    autosim_post_victory_ignore_time_limit = true;
+                }
                 if (victory_type == VIC_ALIEN_SOLO
                 || victory_type == VIC_ALIEN_COOP
                 || victory_type == VIC_ALIEN_LOSS)
@@ -2371,6 +2378,7 @@ int __cdecl end_of_game(int flag) {
                     telemetry_record_ui_notice("autosim", "VICTORY",
                         "post_victory_ai_continue_new_segment");
                 }
+                autosim_null_render_suppress(autosim_control_active());
                 autosim_monitor_progress("victory_continued", 0);
                 return 0; // resume caller's normal, unfinished turn phases
             }
