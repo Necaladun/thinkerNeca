@@ -97,14 +97,22 @@ verify("base capture and project intelligence no longer depend on observed AI",
        and base.count("if (autosim_session_active()) {") >= 2)
 
 ending = function_chunk(game, "int __cdecl end_of_game(", "int __cdecl replay_base(")
-verify("actual terminal endgame bypasses native player-only win screens",
+verify("true victory pauses for explicit operator disposition, not auto-exit",
        "if (autosim_session_active()) {" in ending
-       and "telemetry_record_terminal_result(NULL, \"not_attempted_partial_cycle\");" in ending
-       and "autosim_monitor_progress(\"terminal\", 0);" in ending
-       and ending.index("if (autosim_session_active())") < ending.index("popp(ScriptFile, \"GAMEOVERMAN\"")
+       and 'telemetry_record_terminal_result(NULL, "operator_decision_pending");' in ending
+       and 'autosim_monitor_progress("victory_paused", 0);' in ending
+       and "AUTOSIM_DIALOG_VICTORY" in ending
+       and "autosim_show_control_dialog(&dialog)" in ending
+       and "if (choice == AUTOSIM_DIALOG_EXIT_NO_SAVE)" in ending
+       and "choice == AUTOSIM_DIALOG_SAVE_CONTINUE" in ending
+       and "choice == AUTOSIM_DIALOG_SAVE_EXIT" in ending
+       and "choice == AUTOSIM_DIALOG_TAKE_CONTROL" in ending
+       and "autosim_resume_after_victory" not in ending
+       and "telemetry_resume_after_victory();" in ending
        and "STATE_FINAL_SCORE_DONE" in ending
        and "*ControlTurnA = 1;" in ending
-       and "*ControlTurnB = 0;" in ending)
+       and "*ControlTurnB = 0;" in ending
+       and ending.index("if (autosim_session_active())") < ending.index("popp(ScriptFile, \"GAMEOVERMAN\""))
 verify("terminal results record partial cycle without synthetic completed turn",
        "telemetry_record_terminal_result(" in telemetry_h
        and "void telemetry_record_terminal_result(" in telemetry
@@ -112,12 +120,53 @@ verify("terminal results record partial cycle without synthetic completed turn",
        and "primary_winner_factions" in telemetry
        and "last_committed_turn" in telemetry
        and "terminal_result_recorded ? \"terminal\" : \"closed\"" in telemetry
-       and "if (winner) mon_winning_unify(winner, -1);" in ending
+       and "mon_winning_unify(winner, -1);" in ending
        and "!autosim_session_active()" in monuments)
 verify("independent all-AI session guard persists past owner death/game done",
        "bool autosim_session_active();" in gui_h
        and "bool autosim_session_active() {" in gui
        and "FactionStatus[0] & 0xFEu" in gui
        and "STATE_GAME_DONE" not in function_chunk(gui, "bool autosim_session_active()", "bool autosim_control_active()"))
+
+
+control = get("src/autosim_control.cpp")
+control_h = get("src/autosim_control.h")
+turn = get("src/gameturn.cpp")
+monitor = get("Run Automation.ps1")
+verify("victory-only dialog contains Save Exit/Continue/Take Control/Exit",
+       "AUTOSIM_DIALOG_VICTORY" in control_h
+       and "AUTOSIM_DIALOG_EXIT_NO_SAVE" in control_h
+       and "s.mode == AUTOSIM_DIALOG_VICTORY" in control
+       and 'captions[0] = "Save && Exit"' in control
+       and 'captions[2] = "Save && Continue"' in control
+       and 'captions[4] = "Continue AI"' in control
+       and "ctx->state->mode == AUTOSIM_DIALOG_VICTORY" in control)
+verify("victory pause offers transactional SAV with failure retry and reload warning",
+       "autosim_save_named(dialog.save_name" in ending
+       and "if (!autosim_save_named(dialog.save_name" in ending
+       and "telemetry_record_named_save(saved_path.c_str())" in ending
+       and "saved_post_victory_checkpoint_reload_unverified" in ending
+       and "experimental mid-cycle snapshot; reload is unverified" in control)
+verify("post-victory continuation resets quota at full-cycle boundary",
+       "bool autosim_take_post_victory_segment_reset()" in game
+       and "autosim_post_victory_segment_pending = true;" in ending
+       and "if (autosim_take_post_victory_segment_reset()) {" in turn
+       and "auto_driver.completed_turns = 0;" in turn
+       and "telemetry_record_completed_turn();" in turn
+       and turn.index("telemetry_record_completed_turn();") <
+           turn.index("if (autosim_take_post_victory_segment_reset())"))
+verify("victories remain in history after explicit sandbox continuation",
+       "telemetry_resume_after_victory();" in ending
+       and '"/victories.jsonl"' in telemetry
+       and "new_victory = !terminal_result_recorded" in telemetry
+       and "void telemetry_resume_after_victory()" in telemetry
+       and 'status_json("recording")' in telemetry)
+verify("monitor distinguishes N rendering from Space AI pause and respects victory modal",
+       "N: Re-enable Null Rendering (NOT AI pause)" in monitor
+       and "Space: Pause AI at next full turn" in monitor
+       and "Write-RunCommand $runProfilePath 'NULL'" in monitor
+       and "Write-RunCommand $runProfilePath 'PAUSE'" in monitor
+       and "victory_paused" in monitor
+       and "No phase/turn progress" in monitor)
 
 print("AUTO-OBS Stage 3 structural checks passed; Windows in-game and save/reload acceptance pending")
