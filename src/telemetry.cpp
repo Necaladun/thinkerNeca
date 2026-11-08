@@ -15,6 +15,8 @@ FILE* ui_notices_file = NULL;
 FILE* orbit_file = NULL;
 int orbit_event_seq = 0;
 int orbit_attack_seq = 0;
+// Once the first satellite appears, retain snapshots even after all are lost.
+bool orbit_snapshots_started = false;
 int council_meeting_seq = 0;
 int council_calling_faction = 0;
 int council_active_meeting = 0;
@@ -381,6 +383,7 @@ void telemetry_begin_session(const char* source_save) {
     last_checkpoint_turn = -1;
     orbit_event_seq = 0;
     orbit_attack_seq = 0;
+    orbit_snapshots_started = false;
     council_meeting_seq = 0;
     council_calling_faction = 0;
     council_active_meeting = 0;
@@ -615,6 +618,20 @@ static int orbit_geosync_at(int base_id) {
 
 static bool telemetry_orbit_snapshot(const char* phase) {
     if (!recording || !orbit_file) return true;
+    if (!orbit_snapshots_started) {
+        // Avoid a large per-turn all-zero ledger before orbital development.
+        // Only actual satellites activate it; ground-based GSP/Flechette
+        // defences alone do not. Resumed late-game SAVs qualify immediately.
+        for (int i = 1; i < MaxPlayerNum; ++i) {
+            const Faction& f = Factions[i];
+            if (f.satellites_nutrient > 0 || f.satellites_mineral > 0
+            || f.satellites_energy > 0 || f.satellites_ODP > 0) {
+                orbit_snapshots_started = true;
+                break;
+            }
+        }
+        if (!orbit_snapshots_started) return true;
+    }
     int geosync[MaxPlayerNum] = {};
     int flechette[MaxPlayerNum] = {};
     for (int i = 0; i < *BaseCount; ++i) {
@@ -667,7 +684,11 @@ void telemetry_orbit_launch(int faction_id, int base_id, int facility_id, int be
             << ",\"x\":" << base.x << ",\"y\":" << base.y;
     }
     out << "}";
-    orbit_append(out.str());
+    if (!orbit_append(out.str())) return;
+    // Include a baseline at the actual first launch, even when a victory or
+    // interruption occurs before the next completed-turn snapshot.
+    if (!orbit_snapshots_started)
+        telemetry_orbit_snapshot("first_launch");
 }
 
 OrbitAttackTrace telemetry_orbit_begin_attack(int attacker, int defender,
