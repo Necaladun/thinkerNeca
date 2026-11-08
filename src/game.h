@@ -50,6 +50,8 @@ int __cdecl config_game(int flag);
 void __cdecl setup_game(int flag);
 int __cdecl generators(int faction_id, int* pop_size_req);
 int __cdecl end_of_game(int flag);
+// A new post-victory AI segment begins at the next completed cycle.
+bool autosim_take_post_victory_segment_reset();
 int __cdecl replay_base(int event, int x, int y, int faction_id);
 void __cdecl mod_name_base(int faction_id, char* name, bool save_offset, bool water);
 int __cdecl load_music_strcmpi(const char* active, const char* label);
