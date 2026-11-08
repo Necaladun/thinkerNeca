@@ -1359,10 +1359,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
         parse_num(1, remaining_odp);
         if (faction_id_def == player_id) {
             parse_says(1, get_adjective(faction_id_atk), -1, -1);
-            popp(ScriptFile, label_we_shot, 0, "space_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, label_we_shot, "space_sm.pcx");
         } else if (faction_id_atk == player_id) {
             parse_says(1, get_adjective(faction_id_def), -1, -1);
-            popp(ScriptFile, label_they_shot, 0, "space_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, label_they_shot, "space_sm.pcx");
         }
     };
 
@@ -1378,10 +1378,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
                     parse_says(0, Bases[base_id].name, -1, -1);
                     if (faction_id_def == player_id) {
                         parse_says(1, get_adjective(faction_id_atk), -1, -1);
-                        popp(ScriptFile, flag ? "FWESHOTIT2" : "TWESHOTIT2", 0, "space_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, flag ? "FWESHOTIT2" : "TWESHOTIT2", "space_sm.pcx");
                     } else if (faction_id_atk == player_id) {
                         parse_says(1, get_adjective(Bases[base_id].faction_id), -1, -1);
-                        popp(ScriptFile, flag ? "FTHEYSHOTIT2" : "TTHEYSHOTIT2", 0, "space_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, flag ? "FTHEYSHOTIT2" : "TTHEYSHOTIT2", "space_sm.pcx");
                     }
                     return 1;
                 }
@@ -1391,10 +1391,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
     if (plr_def->satellites_ODP > 0) {
         if (*MultiplayerActive || !is_human(faction_id_def)) {
             if (faction_id_def == player_id) {
-                popp(ScriptFile, flag ? "FWEMUSTSAC" : "TWEMUSTSAC", 0, "space_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, flag ? "FWEMUSTSAC" : "TWEMUSTSAC", "space_sm.pcx");
             } else if (faction_id_atk == player_id) {
                 parse_says(0, get_noun(faction_id_def), -1, -1);
-                popp(ScriptFile, "THEYMUSTSAC", 0, "space_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "THEYMUSTSAC", "space_sm.pcx");
             }
             plr_def->satellites_ODP--;
             if (plr_def->satellites_ODP < plr_def->ODP_deployed) {
@@ -1422,10 +1422,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
                     if (has_flechette) {
                         if (faction_id_def == player_id) {
                             parse_says(1, get_adjective(faction_id_atk), -1, -1);
-                            popp(ScriptFile, "WEFAILEDFLECHETTE", 0, "space_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "WEFAILEDFLECHETTE", "space_sm.pcx");
                         } else if (faction_id_atk == player_id) {
                             parse_says(1, get_adjective(faction_id_def), -1, -1);
-                            popp(ScriptFile, "THEYFAILEDFLECHETTE", 0, "space_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "THEYFAILEDFLECHETTE", "space_sm.pcx");
                         }
                     }
                     return 0;
@@ -1436,10 +1436,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
     if (has_flechette) {
         if (faction_id_def == player_id) {
             parse_says(1, get_adjective(faction_id_atk), -1, -1);
-            popp(ScriptFile, "WEFAILEDFLECHETTE", 0, "space_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "WEFAILEDFLECHETTE", "space_sm.pcx");
         } else if (faction_id_atk == player_id) {
             parse_says(1, get_adjective(faction_id_def), -1, -1);
-            popp(ScriptFile, "THEYFAILEDFLECHETTE", 0, "space_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "THEYFAILEDFLECHETTE", "space_sm.pcx");
         }
     }
     return 0;
@@ -1475,7 +1475,7 @@ void  __cdecl action_tectonic(int veh_id, int tx, int ty) {
         parse_says(1, get_name(faction_id_atk), -1, -1);
         parse_says(2, get_noun(faction_id_atk), -1, -1);
         parse_says(3, Bases[tgt_base_id].name, -1, -1);
-        popp(ScriptFile, "TECTONICMISSILE", 0, "tectonic_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "TECTONICMISSILE", "tectonic_sm.pcx");
     }
     int hit_factions[MaxPlayerNum] = {};
     int shot_down = 0;
@@ -1515,7 +1515,7 @@ void  __cdecl action_tectonic(int veh_id, int tx, int ty) {
             parse_says(1, get_title(faction_id_atk), -1, -1);
             parse_says(2, get_name(faction_id_atk), -1, -1);
             parse_says(3, get_noun(faction_id_atk), -1, -1);
-            popp(ScriptFile, "TECMOFIED", 0, "tectonic_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "TECMOFIED", "tectonic_sm.pcx");
         }
         TectonicDetonationCount[faction_id_atk]++;
         *GameDrawState |= 4;
@@ -1536,7 +1536,7 @@ void  __cdecl action_fungal(int veh_id, int tx, int ty) {
         parse_says(1, get_name(faction_id_atk), -1, -1);
         parse_says(2, get_noun(faction_id_atk), -1, -1);
         parse_says(3, Bases[tgt_base_id].name, -1, -1);
-        popp(ScriptFile, "FUNGALMISSILE", 0, "fungpayld_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "FUNGALMISSILE", "fungpayld_sm.pcx");
     }
     int range = TableRange[1];
     int hit_factions[MaxPlayerNum] = {};
@@ -1621,7 +1621,7 @@ void  __cdecl action_fungal(int veh_id, int tx, int ty) {
             parse_says(1, get_title(faction_id_atk), -1, -1);
             parse_says(2, get_name(faction_id_atk), -1, -1);
             parse_says(3, get_noun(faction_id_atk), -1, -1);
-            popp(ScriptFile, "FUNGMOTIZED", 0, "fungpayld_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "FUNGMOTIZED", "fungpayld_sm.pcx");
         }
     }
 }
@@ -3282,7 +3282,11 @@ MOV_UPKEEP:
             }
         }
     }
-    if (veh_fc_id == MapWin->cOwner) {
+    // KEEPMOVING is a *human observer* 32-iteration confirmation. The
+    // observed AI must use the same autonomous path as every other AI:
+    // no human modal and no arbitrary order cancellation on its behalf.
+    // This does not change pathfinding or unit orders for non-observed AI.
+    if (veh_fc_id == MapWin->cOwner && !autosim_control_active()) {
         if (Vehs[veh_id].order == ORDER_MOVE_TO || (Vehs[veh_id].state & (VSTATE_EXPLORE|VSTATE_ON_ALERT))) {
             ++Vehs[veh_id].iter_count;
             if (Vehs[veh_id].state & VSTATE_UNK_10000 && offset == (Vehs[veh_id].rotate_angle ^ 4)) {
