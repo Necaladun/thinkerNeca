@@ -1731,6 +1731,71 @@ void telemetry_combat_exchange(int attacker, int defender, int original_defender
     tel02_append(combat_file, out.str());
 }
 
+
+void telemetry_unit_upgraded(int slot, int old_unit_id, int new_unit_id, int cost) {
+    if (!recording || !units_file || slot < 0 || slot >= *VehCount
+        || Vehs[slot].unit_id != new_unit_id) return;
+    const VEH& veh = Vehs[slot];
+    std::ostringstream out = tel02_row("upgraded");
+    tel02_add_vehicle(out, slot, "vehicle");
+    out << ",\"faction\":" << veh.faction_id
+        << ",\"old_unit_id\":" << old_unit_id
+        << ",\"unit_id\":" << new_unit_id
+        << ",\"unit_name\":" << json_string(Units[new_unit_id].name)
+        << ",\"credits_paid\":" << cost
+        << ",\"x\":" << veh.x << ",\"y\":" << veh.y
+        << ",\"source\":\"veh_upgrade\"}";
+    tel02_append(units_file, out.str());
+}
+void telemetry_production_stockpile(int base_id, int credits_gained) {
+    if (!recording || !production_file || base_id < 0 || base_id >= *BaseCount
+        || credits_gained <= 0) return;
+    const BASE& b = Bases[base_id];
+    std::ostringstream out = tel02_row("stockpile_energy");
+    out << ",\"faction\":" << b.faction_id
+        << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
+        << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
+        << ",\"credits_gained\":" << credits_gained
+        << ",\"source\":\"mod_base_production\"}";
+    tel02_append(production_file, out.str());
+}
+void telemetry_production_hurry(int base_id, int energy_before, int minerals_before) {
+    if (!recording || !production_file || base_id < 0 || base_id >= *BaseCount) return;
+    const BASE& b = Bases[base_id];
+    const int energy_after = Factions[b.faction_id].energy_credits;
+    const int minerals_after = b.minerals_accumulated;
+    if (energy_after == energy_before && minerals_after == minerals_before) return;
+    std::ostringstream out = tel02_row("upkeep_hurry_observed");
+    out << ",\"faction\":" << b.faction_id
+        << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
+        << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
+        << ",\"credits_before\":" << energy_before
+        << ",\"credits_after\":" << energy_after
+        << ",\"mineral_stock_before\":" << minerals_before
+        << ",\"mineral_stock_after\":" << minerals_after
+        << ",\"source\":\"mod_base_hurry_upkeep_return\""
+        << ",\"attribution_status\":\"observed_deltas_not_all_hurry_paths\"}";
+    tel02_append(production_file, out.str());
+}
+void telemetry_combat_base_captured(int base_id, int original_x, int original_y,
+    int old_owner, int new_owner, int is_probe) {
+    if (!recording || !combat_file || base_id < 0 || base_id >= *BaseCount
+        || old_owner == new_owner) return;
+    const BASE& b = Bases[base_id];
+    // A city may have been destroyed/compacted instead of surviving capture.
+    if (b.x != original_x || b.y != original_y || b.faction_id != new_owner) return;
+    std::ostringstream out = tel02_row("base_captured");
+    out << ",\"base_slot_at_hook\":" << base_id
+        << ",\"base_name\":" << json_string(b.name)
+        << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
+        << ",\"former_faction\":" << old_owner
+        << ",\"capturing_faction\":" << new_owner
+        << ",\"probe_capture\":" << (is_probe ? "true" : "false")
+        << ",\"source\":\"mod_capture_base_after_base_compute\""
+        << ",\"result_scope\":\"verified_owner_change_at_hook\"}";
+    tel02_append(combat_file, out.str());
+}
+
 void telemetry_end_session() {
     telemetry_run_clock_set_active(false);
     if (recording) {
