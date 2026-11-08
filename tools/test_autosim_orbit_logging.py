@@ -46,6 +46,32 @@ for token in (
     assert token.replace('"', r'\"') in telemetry, token
 assert 'std::ostringstream out = orbit_record(' in telemetry
 
+# Inventory history must not spam all-zero per-turn records before ANY
+# faction constructs a satellite. A loaded SAV with existing satellites gets
+# a session-start snapshot; the first launch emits a baseline immediately.
+# Once activated it continues even if satellites are subsequently destroyed.
+snapshot = telemetry[telemetry.index("static bool telemetry_orbit_snapshot(const char* phase) {"):
+                     telemetry.index("void telemetry_orbit_launch(")]
+launch_writer = telemetry[telemetry.index("void telemetry_orbit_launch("):
+                          telemetry.index("OrbitAttackTrace telemetry_orbit_begin_attack(")]
+start_session = telemetry[telemetry.index("void telemetry_begin_session("):
+                          telemetry.index("// Dedicated orbital event ledger.")]
+assert 'orbit_snapshots_started = false;' in start_session
+assert 'if (!orbit_snapshots_started)' in snapshot
+for counter in ("satellites_nutrient", "satellites_mineral",
+                "satellites_energy", "satellites_ODP"):
+    assert f"f.{counter} > 0" in snapshot, counter
+assert 'if (!orbit_snapshots_started) return true;' in snapshot
+assert snapshot.index('if (!orbit_snapshots_started) return true;') < snapshot.index(
+    'orbit_record("inventory_snapshot")')
+assert 'orbit_snapshots_started = true;' in snapshot
+assert 'telemetry_orbit_snapshot("first_launch");' in launch_writer
+assert launch_writer.index("if (!orbit_append(out.str())) return;") < (
+    launch_writer.index('telemetry_orbit_snapshot("first_launch");'))
+assert 'if (!orbit_snapshots_started)' not in telemetry[
+    telemetry.index("OrbitAttackTrace telemetry_orbit_begin_attack("):
+    telemetry.index("void telemetry_record_ui_notice(")]
+
 # The recorder does not call random/AI APIs for decisions or derived outcomes.
 orbit_section = telemetry.split('// Dedicated orbital event ledger.', 1)[1].split(
     'void telemetry_record_ui_notice(', 1)[0]
