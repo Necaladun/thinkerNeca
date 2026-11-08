@@ -223,6 +223,7 @@ void __cdecl control_turn() {
     int load_iter = 0;
     int skip_human_turn = 0;
     AutoTurnDriver auto_driver;
+    TelemetryPhaseStamp cycle_timing;
     int total_autosim_turns = 0;
     int segment_start_year = *CurrentMissionYear;
     int segment_start_bases = *BaseCount;
@@ -284,6 +285,7 @@ void __cdecl control_turn() {
     bool run_upkeep = true;
     while (1) {
         debug("control_turn %d %d %d\n", *CurrentTurn, current_id, MapWin->cOwner);
+        if (current_id == 0) cycle_timing = telemetry_phase_begin();
         // New/reloaded all-AI games must be explicitly confirmed before any
         // further AI processing. This is before upkeep and faction actions,
         // not inside a native UI/combat callback. A mid-cycle reload still
@@ -344,7 +346,9 @@ void __cdecl control_turn() {
                 {
                     AutoScopedAutosimFastPrefs fast_presentation;
                     autosim_monitor_progress("turn_upkeep", 0);
+                    const TelemetryPhaseStamp upkeep_timing = telemetry_phase_begin();
                     turn_upkeep();
+                    telemetry_phase_end(upkeep_timing, "world_upkeep", 0);
                 }
                 if (end_of_game(1)) {
                     return;
@@ -578,7 +582,9 @@ void __cdecl control_turn() {
             if (!*ControlTurnMove || (*PbemActive && (*GameMoreRules & MRULES_UNK_40))) {
                 *ControlTurnC = 1;
                 autosim_monitor_progress("faction_upkeep", current_id);
+                const TelemetryPhaseStamp upkeep_timing = telemetry_phase_begin();
                 faction_upkeep(current_id);
+                telemetry_phase_end(upkeep_timing, "faction_upkeep", current_id);
                 if (end_of_game(0)) {
                     return;
                 }
@@ -599,7 +605,9 @@ void __cdecl control_turn() {
             } else {
                 AutoScopedAutosimFastPrefs fast_presentation;
                 autosim_monitor_progress("ai_turn", current_id);
+                const TelemetryPhaseStamp turn_timing = telemetry_phase_begin();
                 mod_enemy_turn(current_id);
+                telemetry_phase_end(turn_timing, "ai_turn", current_id);
                 autosim_monitor_progress("ai_turn_complete", current_id);
             }
             if (!restart) {
@@ -621,8 +629,12 @@ void __cdecl control_turn() {
             }
             // All faction phases have completed for this turn. Never open
             // a modal control window or perform a manual save mid-faction.
+            telemetry_phase_end(cycle_timing, "full_faction_cycle", 0);
             telemetry_record_completed_turn();
             autosim_monitor_progress("turn_completed", 0);
+            // Optional campaign archive snapshot from the same safe full-
+            // cycle point used by the ordinary operator Save & Continue.
+            telemetry_archive_completed_turn();
             if (autosim_take_post_victory_segment_reset()) {
                 // The operator explicitly elected to keep simulating after
                 // an actual victory. Start their new turn quota at this
