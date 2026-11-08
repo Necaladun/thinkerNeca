@@ -4,7 +4,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unmerged AUTO-002 — physical F9/F10 fallback and external stop file (8 November 2026)
 
-- Adds focus-gated `GetAsyncKeyState` edge sampling alongside queued keyboard polling during all-AI simulations. Supports a one-shot `autosim-stop.txt` file beside the game executable that requests the existing Save Game → menu action at the next completed full turn, then attempts to delete the file. Native Council modals and normal human games are not changed. User reports F10 was accepted during Council popup in a prior build, and combat visuals are faster; neither new control is Windows-tested yet.
+- Adds focus-gated `GetAsyncKeyState` edge sampling alongside queued keyboard polling during all-AI simulations. Supports a one-shot `autosim-stop.txt` file beside the game executable that requests the existing Save Game → menu action at the next completed full turn, then attempts to delete the file. Native Council modals and normal human games are not changed. User reports F10 was accepted during Council popup in a prior build, and combat visuals are faster. [Develop/Release Win32 CI 42451218764 passed at `fff9fef`](https://github.com/Necaladun/thinkerNeca/actions/runs/42451218764); neither new control is Windows-tested yet.
 
 ## Unmerged AUTO-002 — defensive diplomacy guard and Council diagnostics (8 November 2026)
 
