@@ -522,6 +522,101 @@ void telemetry_record_council_event(const char* phase, int actor, const char* de
     if (!append_line(council_file, event.str())) recorder_failure();
 }
 
+TelemetryPhaseStamp telemetry_phase_begin() {
+    TelemetryPhaseStamp stamp;
+    if (!recording || !timings_file) return stamp;
+    // Tick count measures actual elapsed wall time, including any blocking
+    // UI/disk calls within the timed phase. It is not the CPU time of AI code.
+    stamp.started_ticks = (unsigned long long)GetTickCount();
+    SYSTEMTIME utc = {};
+    GetSystemTime(&utc);
+    snprintf(stamp.started_utc, sizeof(stamp.started_utc),
+        "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ",
+        (unsigned)utc.wYear, (unsigned)utc.wMonth, (unsigned)utc.wDay,
+        (unsigned)utc.wHour, (unsigned)utc.wMinute,
+        (unsigned)utc.wSecond, (unsigned)utc.wMilliseconds);
+    return stamp;
+}
+
+void telemetry_phase_end(const TelemetryPhaseStamp& stamp,
+    const char* phase, int faction) {
+    if (!recording || !timings_file || !stamp.started_utc[0]) return;
+    const DWORD elapsed = GetTickCount() - (DWORD)stamp.started_ticks;
+    std::ostringstream event;
+    event << "{\"schema\":1,\"phase\":" << json_string(phase)
+          << ",\"faction\":" << faction
+          << ",\"turn\":" << *CurrentTurn
+          << ",\"mission_year\":" << *CurrentMissionYear
+          << ",\"observer\":" << (MapWin ? MapWin->cOwner : 0)
+          << ",\"started_utc\":" << json_string(stamp.started_utc)
+          << ",\"ended_utc\":" << json_string(utc_stamp_ms().c_str())
+          << ",\"elapsed_ms\":" << (unsigned long)elapsed << "}";
+    if (!append_line(timings_file, event.str())) recorder_failure();
+}
+
+// Only called at the same full-faction-cycle checkpoint at which turn/base
+// telemetry is committed. Never enter the native SAV serializer mid-AI action,
+// diplomacy callback, or after a game-ending control transition.
+void telemetry_archive_completed_turn() {
+    if (!recording || !checkpoints_file || !autosim_session_active()
+    || conf.autosim_archive_interval <= 0 || *CurrentTurn < 1
+    || *CurrentTurn != last_committed_turn
+    || *CurrentTurn == last_checkpoint_turn
+    || *CurrentTurn % conf.autosim_archive_interval
+    || (*GameState & STATE_GAME_DONE))
+        return;
+
+    last_checkpoint_turn = *CurrentTurn;
+    const TelemetryPhaseStamp timer = telemetry_phase_begin();
+    const std::string folder = session_dir + "/saves";
+    char filename[96] = {};
+    snprintf(filename, sizeof(filename), "checkpoint-T%05d-MY%d.sav",
+        *CurrentTurn, *CurrentMissionYear);
+    const std::string target = folder + "/" + filename;
+    const std::string temp = folder + "/.pending-" + filename;
+    const char* outcome = "saved";
+    if (*GameRules & RULES_IRONMAN) {
+        // mod_save_daemon calls game_srand for Ironman: do not perturb AI RNG.
+        outcome = "skipped_ironman_rng";
+    } else if (!make_dir(folder, true)) {
+        outcome = "failed_create_directory";
+    } else if (GetFileAttributesA(target.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        outcome = "skipped_existing_checkpoint";
+    } else {
+        DeleteFileA(temp.c_str());
+        if (mod_save_daemon(temp.c_str())) {
+            outcome = "failed_serializer";
+        } else {
+            WIN32_FILE_ATTRIBUTE_DATA info = {};
+            if (!GetFileAttributesExA(temp.c_str(), GetFileExInfoStandard, &info)
+            || (info.nFileSizeHigh == 0 && info.nFileSizeLow < 4096)) {
+                outcome = "failed_small_or_missing_save";
+            } else if (!MoveFileExA(temp.c_str(), target.c_str(),
+                MOVEFILE_WRITE_THROUGH)) {
+                outcome = "failed_commit";
+            } else if (!telemetry_record_named_save(target.c_str())) {
+                // The actual SAV is valid enough for a file-level copy,
+                // but report the missing campaign-link metadata distinctly.
+                outcome = "saved_link_failed";
+            }
+        }
+        DeleteFileA(temp.c_str());
+    }
+    std::ostringstream event;
+    const bool saved = !strcmp(outcome, "saved") || !strcmp(outcome, "saved_link_failed");
+    event << "{\"schema\":1,\"utc\":" << json_string(utc_stamp_ms().c_str())
+          << ",\"turn\":" << *CurrentTurn
+          << ",\"mission_year\":" << *CurrentMissionYear
+          << ",\"kind\":\"completed_cycle\"
+          << ",\"status\":" << json_string(outcome)
+          << ",\"path\":" << (saved ? json_string(target.c_str()) : "null")
+          << ",\"fingerprint\":"
+          << (saved ? file_fingerprint(target.c_str()) : "null")
+          << "}";
+    if (!append_line(checkpoints_file, event.str())) recorder_failure();
+    telemetry_phase_end(timer, "archive_save", 0);
+}
+
 void telemetry_record_completed_turn() {
     if (!recording || *CurrentTurn <= last_committed_turn) {
         return;
