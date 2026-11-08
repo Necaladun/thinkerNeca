@@ -969,6 +969,10 @@ void __cdecl mod_capture_base(int base_id, int faction_id_atk, int is_probe) {
     if (base_id >= 0) {
         set_base(base_id);
         base_compute(1);
+        // This is a source-observed surviving base with a new owner,
+        // not an inferred result from the preceding combat HP exchange.
+        telemetry_combat_base_captured(base_id, base_x, base_y,
+            faction_id, faction_id_atk, is_probe);
         if (faction_id_atk == player_id) {
             if (autosim_session_active()) {
                 // Ownership and base_compute() already completed. Do not
@@ -3315,7 +3319,9 @@ int __cdecl mod_base_production() {
         const int queue_id = base->queue_items[0];
         if (queue_id == -FAC_STOCKPILE_ENERGY) {
             // no other production should have occurred at this point
-            plr->energy_credits += stockpile_energy(*CurrentBaseID);
+            const int stockpile_credits = stockpile_energy(*CurrentBaseID);
+            plr->energy_credits += stockpile_credits;
+            telemetry_production_stockpile(*CurrentBaseID, stockpile_credits);
             return 0;
         }
         if (queue_id >= 0) {
@@ -4082,7 +4088,10 @@ int __cdecl mod_base_upkeep(int base_id) {
         return 1; // Current base was removed
     }
     set_base(base_id); // Fix CurrentBase sometimes being reset in game functions
+    const int energy_before_hurry = f->energy_credits;
+    const int minerals_before_hurry = base->minerals_accumulated;
     mod_base_hurry();
+    telemetry_production_hurry(base_id, energy_before_hurry, minerals_before_hurry);
     base->minerals_accumulated_2 = base->minerals_accumulated;
     base->production_id_last = base->queue_items[0];
 
