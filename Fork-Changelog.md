@@ -2,6 +2,10 @@
 
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
+## Unmerged AUTO-002 — offscreen combat, movement and fungus notices (8 November 2026)
+
+- Experimental AI-only fast-presentation follow-up on `feature/auto-002-noninteractive-ui`: disable observer camera recentering, cursor/scoot animation, repeated battle window and per-defender artillery explosion rendering via existing offscreen movement/combat presentation paths. Retain actual move/AI/combat/RNG/HP/visibility/state processing; world tile updates continue. Scoped native preferences hide go-to paths, unit blink, base/production labels and edge scroll only during all-AI processing, then restore exact original values before autosave and normal human play. `FUNGUSGROWS`/`FUNGUSGROWS2` and forest/kelp growth reports use existing source-audited passive notice suppression without skipping ecology changes. **Code committed but Windows late-turn, artillery stack, ecology and RNG-equivalence tests outstanding.**
+
 ## Unmerged AUTO-002 — full-turn fast presentation (7 November 2026)
 
 - Reuses the existing `autosim_fast_combat=1` option for fast battle resolution, quick allied/enemy/all-unit/order movement, no pause after combat and no Map Animations during all-AI turn processing (upkeep, faction phase, AI unit moves, fights). Preferences are temporarily scoped and restored before autosave and manual Save Game. Native autosave implementation and filename/interval are unchanged; eligible all-AI simulations now request the native autosave even if the saved checkbox was disabled. Additional crash checkpoints are deferred by user. [Windows x86 Develop/Release compilation and source/host checks passed at `b6e8a6f` (run 42365101769)](https://github.com/Necaladun/thinkerNeca/actions/runs/42365101769); **not yet Windows-runtime verified**. Native Planetary Council modal remains a separate AUTO-002 blocker.
