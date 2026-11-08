@@ -63,25 +63,6 @@ int __cdecl autosim_council_human_vote_offer(const char* label, int flags,
     return choice;
 }
 
-// Exact native proposal identifiers (engine_enums.h). Keep the diagnostic
-// names independent of the game's localisation/script tables and never call
-// proposal_menu, council_get_vote or any RNG routine from this display helper.
-static const char* autosim_council_proposal_name(int proposal) {
-    switch (proposal) {
-    case PROP_ELECT_PLANETARY_GOVERNOR: return "planetary_governor";
-    case PROP_UNITE_SUPREME_LEADER: return "supreme_leader";
-    case PROP_SALVAGE_UNITY_CORE: return "unity_core";
-    case PROP_GLOBAL_TRADE_PACT: return "global_trade_pact";
-    case PROP_REPEAL_GLOBAL_TRADE_PACT: return "repeal_global_trade_pact";
-    case PROP_LAUNCH_SOLAR_SHADE: return "launch_solar_shade";
-    case PROP_INCREASE_SOLAR_SHADE: return "increase_solar_shade";
-    case PROP_MELT_POLAR_CAPS: return "melt_polar_caps";
-    case PROP_REPEAL_UN_CHARTER: return "repeal_un_charter";
-    case PROP_REINSTATE_UN_CHARTER: return "reinstate_un_charter";
-    default: return "unrecognised";
-    }
-}
-
 // Replace only the exact native six-byte CouncWindow virtual modal execution
 // call. Native CouncWin_init already computes all AI ballots, including the
 // observed AI, for every standard Council proposal. Reuse native
