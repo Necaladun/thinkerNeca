@@ -47,6 +47,12 @@ struct AutosimDialogState {
     std::string save_name;  // Basename without directory or .sav extension.
 };
 
+// Snapshot active campaign/session identity and operator-facing game state.
+void autosim_fill_dialog_state(AutosimDialogState* state, AutosimDialogMode mode);
+// In-memory operator settings, committed only on explicit confirmation.
+bool autosim_apply_dialog_options(const AutosimDialogState& state);
+// Safe interactive-world setup; never performs AI upkeep or a save.
+void autosim_show_manual_setup();
 AutosimDialogChoice autosim_show_control_dialog(AutosimDialogState* state);
 
 // Directly uses the same mod_save_daemon used by the patched native Save Game
