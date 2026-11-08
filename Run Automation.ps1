@@ -877,7 +877,8 @@ try {
         } else {
             $sessionDetails.Text = "Campaign: $($row.campaign_name)  /  Session: $($row.session_id)" +
                 [Environment]::NewLine + "Folder: $($row.campaign_dir)" +
-                [Environment]::NewLine + "Started: $($row.started)  |  State: $($row.status)  |  Source save: $($row.source_save)" +
+                [Environment]::NewLine + "Started: $($row.started)  |  State: $($row.status)  |  AI runtime: $($row.runtime)" +
+                [Environment]::NewLine + "Source save: $($row.source_save)" +
                 [Environment]::NewLine + "Living factions: $($row.factions)"
         }
     }
@@ -945,6 +946,7 @@ try {
                                 units = '—'
                                 status = 'Unscanned'
                                 started = 'Unknown'
+                                runtime = 'Not recorded'
                                 updated = $session.LastWriteTime.ToString('dd MMM yyyy HH:mm')
                                 source_save = 'Not scanned'
                                 factions = ''
