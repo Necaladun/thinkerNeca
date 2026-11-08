@@ -4,7 +4,7 @@ This is the **fork's change history**, separate from Induktio's upstream [Thinke
 
 ## Unmerged AUTO-002 — defensive diplomacy guard and Council diagnostics (8 November 2026)
 
-- The existing `enemy_diplomacy` source already routes AI-to-AI participants through AI trade/encounter/treaty logic, not interactive `communicate`. Added a fail-closed `autosim_control_active()` entry guard only to the human-oriented `communicate` handler; unexpected all-AI calls are logged to `ui_notices.jsonl` with `diplomacy_guard` and cause no fabricated choice. Added non-mutating `call_council` entry/exit diagnostics for telemetry-enabled AI-only sessions and source-level regression checks. **Windows validation and Lal's actual native Council/bribery caller remain outstanding; not a proven unattended Council fix.**
+- The existing `enemy_diplomacy` source already routes AI-to-AI participants through AI trade/encounter/treaty logic, not interactive `communicate`. Added a fail-closed `autosim_control_active()` entry guard only to the human-oriented `communicate` handler; unexpected all-AI calls are logged to `ui_notices.jsonl` with `diplomacy_guard` and cause no fabricated choice. Added non-mutating `call_council` entry/exit diagnostics for telemetry-enabled AI-only sessions and source-level regression checks. [Windows x86 Develop/Release compilation and source/host checks passed at `9733ed5` (run 42449885637)](https://github.com/Necaladun/thinkerNeca/actions/runs/42449885637). **Windows validation and Lal's actual native Council/bribery caller remain outstanding; not a proven unattended Council fix.**
 
 ## Unmerged AUTO-002 — offscreen combat, movement and fungus notices (8 November 2026)
 
