@@ -13,6 +13,10 @@ FILE* bases_file = NULL;
 FILE* ui_notices_file = NULL;
 std::string campaign_dir;
 std::string session_dir;
+std::string campaign_id;
+std::string campaign_display_name;
+std::string campaign_created_utc;
+std::string last_loaded_save;
 int last_committed_turn = -1;
 bool recording = false;
 
@@ -24,6 +28,45 @@ std::string utc_stamp() {
         (unsigned)time.wYear, (unsigned)time.wMonth, (unsigned)time.wDay,
         (unsigned)time.wHour, (unsigned)time.wMinute, (unsigned)time.wSecond);
     return buffer;
+}
+
+std::string readable_campaign_default() {
+    const int owner = MapWin ? MapWin->cOwner : 0;
+    const char* observed = owner > 0 && owner < MaxPlayerNum
+        ? MFactions[owner].formal_name_faction : "All-AI";
+    char value[176] = {};
+    snprintf(value, sizeof(value), "AI Sim - %s - MY%d",
+        observed ? observed : "All-AI", *CurrentMissionYear);
+    return value;
+}
+
+std::string folder_slug(const char* name) {
+    std::string result;
+    bool separator = false;
+    if (!name) name = "";
+    for (const unsigned char* p = (const unsigned char*)name; *p; ++p) {
+        const unsigned char c = *p;
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+        || (c >= '0' && c <= '9') || c == '_' || c == '-') {
+            if (separator && !result.empty() && result.back() != '-') result += '-';
+            separator = false;
+            result += (char)c;
+        } else {
+            separator = true;
+        }
+        if (result.size() >= 40) break;
+    }
+    while (!result.empty() && result.back() == '-') result.pop_back();
+    return result.empty() ? "All-AI" : result;
+}
+
+bool valid_campaign_id(const std::string& name) {
+    if (name.empty() || name.size() >= 110) return false;
+    for (unsigned char c : name) {
+        if (!(c >= 'A' && c <= 'Z') && !(c >= 'a' && c <= 'z')
+        && !(c >= '0' && c <= '9') && c != '-' && c != '_') return false;
+    }
+    return true;
 }
 
 std::string json_string(const char* text) {
@@ -72,6 +115,40 @@ bool make_dir(const std::string& path, bool allow_existing) {
     DWORD attributes = GetFileAttributesA(path.c_str());
     return attributes != INVALID_FILE_ATTRIBUTES
         && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
+
+// An explicit link is written ONLY by Simulation Control named saves.
+// No map-seed, year, filename or faction matching is used to infer identity.
+bool read_named_save_link(const std::string& save_path, std::string* id,
+    std::string* created, std::string* display) {
+    FILE* fp = fopen((save_path + ".autosim-campaign").c_str(), "rb");
+    if (!fp) return false;
+    char version[64] = {}, linked_id[128] = {}, stamp[64] = {}, label[160] = {};
+    const bool ok = fgets(version, sizeof(version), fp)
+        && fgets(linked_id, sizeof(linked_id), fp)
+        && fgets(stamp, sizeof(stamp), fp)
+        && fgets(label, sizeof(label), fp);
+    fclose(fp);
+    if (!ok) return false;
+    auto remove_newline = [](char* value) {
+        size_t n = strlen(value);
+        while (n && (value[n - 1] == '\n' || value[n - 1] == '\r'))
+            value[--n] = '\0';
+    };
+    remove_newline(version); remove_newline(linked_id);
+    remove_newline(stamp); remove_newline(label);
+    if (strcmp(version, "thinkerNeca-campaign-v1")
+    || !valid_campaign_id(linked_id) || strlen(stamp) != 16
+    || !label[0]) return false;
+    const std::string root = std::string("campaigns/") + linked_id;
+    DWORD attrs = GetFileAttributesA((root + "/campaign.json").c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY))
+        return false;
+    attrs = GetFileAttributesA((root + "/sessions").c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+        return false;
+    *id = linked_id; *created = stamp; *display = label;
+    return true;
 }
 
 bool atomic_write(const std::string& path, const std::string& contents) {
@@ -136,6 +213,17 @@ std::string status_json(const char* state) {
     return out.str();
 }
 
+bool write_campaign_metadata() {
+    if (campaign_dir.empty()) return true;
+    std::ostringstream out;
+    out << "{\"schema\":1,\"campaign_id\":"
+        << json_string(campaign_id.c_str())
+        << ",\"display_name\":" << json_string(campaign_display_name.c_str())
+        << ",\"created_utc\":" << json_string(campaign_created_utc.c_str())
+        << ",\"lineage\":\"explicit_or_new\"}\n";
+    return atomic_write(campaign_dir + "/campaign.json", out.str());
+}
+
 void close_files() {
     if (turns_file) {
         fclose(turns_file);
@@ -163,57 +251,90 @@ void recorder_failure() {
 } // namespace
 
 void telemetry_begin_session(const char* source_save) {
-    if (!conf.telemetry_enabled || *MultiplayerActive || *PbemActive) {
-        return;
-    }
     telemetry_end_session();
     last_committed_turn = -1;
     campaign_dir.clear();
     session_dir.clear();
-
+    campaign_id.clear();
+    campaign_created_utc.clear();
+    campaign_display_name = readable_campaign_default();
+    if (!conf.telemetry_enabled || *MultiplayerActive || *PbemActive) {
+        return;
+    }
     if (!make_dir("campaigns", true)) {
         recorder_failure();
         return;
     }
 
     const std::string stamp = utc_stamp();
-    std::ostringstream base_name;
-    base_name << "campaigns/campaign-" << stamp
-              << "-p" << GetCurrentProcessId();
-    for (int attempt = 0; attempt < 1000; ++attempt) {
-        campaign_dir = base_name.str() + "-" + std::to_string(attempt);
-        if (make_dir(campaign_dir, false)) {
-            break;
+    const std::string source = (source_save && source_save[0])
+        ? source_save : last_loaded_save;
+    bool joined = false;
+    std::string linked_id, linked_stamp, linked_name;
+    if (!source.empty()
+    && read_named_save_link(source, &linked_id, &linked_stamp, &linked_name)) {
+        const std::string prompt = "Resume telemetry in existing campaign?\n\n"
+            + linked_name + "\n\nSave: " + source
+            + "\n\nNo: record as a new campaign.";
+        if (MessageBoxA(*phWnd, prompt.c_str(), "thinkerNeca Campaign",
+            MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON1) == IDYES) {
+            campaign_id = linked_id;
+            campaign_created_utc = linked_stamp;
+            campaign_display_name = linked_name;
+            campaign_dir = "campaigns/" + campaign_id;
+            joined = true;
         }
-        campaign_dir.clear();
     }
-    if (campaign_dir.empty() || !make_dir(campaign_dir + "/sessions", false)) {
+    if (!joined) {
+        SYSTEMTIME local = {};
+        GetLocalTime(&local);
+        char day[16] = {};
+        snprintf(day, sizeof(day), "%04u%02u%02u", (unsigned)local.wYear,
+            (unsigned)local.wMonth, (unsigned)local.wDay);
+        std::ostringstream prefix;
+        prefix << "AI-Sim-" << folder_slug(MFactions[MapWin->cOwner].formal_name_faction)
+               << "-MY" << *CurrentMissionYear << "-" << day;
+        for (int attempt = 0; attempt < 1000; ++attempt) {
+            campaign_id = prefix.str() + (attempt ? "-" + std::to_string(attempt + 1) : "");
+            campaign_dir = "campaigns/" + campaign_id;
+            if (make_dir(campaign_dir, false)) break;
+            campaign_dir.clear();
+        }
+        campaign_created_utc = stamp;
+    }
+    if (campaign_dir.empty() || !make_dir(campaign_dir + "/sessions", joined)) {
         recorder_failure();
         return;
     }
-    session_dir = campaign_dir + "/sessions/session-001";
-    if (!make_dir(session_dir, false)) {
+    if (!joined && !write_campaign_metadata()) {
         recorder_failure();
         return;
     }
-
-    std::ostringstream campaign;
-    campaign << "{\"schema\":1,\"campaign_id\":"
-             << json_string(campaign_dir.substr(10).c_str())
-             << ",\"created_utc\":" << json_string(stamp.c_str())
-             << ",\"lineage\":\"new_or_unresolved_save\"}\n";
-    if (!atomic_write(campaign_dir + "/campaign.json", campaign.str())) {
+    // Existing sessions stay immutable. After a save/reload, create the
+    // next available session-NNN; Save & Continue within one process remains
+    // in the SAME session with explicit segment markers.
+    std::string session_id;
+    for (int candidate = 1; candidate <= 999; ++candidate) {
+        char number[32] = {};
+        snprintf(number, sizeof(number), "session-%03d", candidate);
+        session_id = number;
+        session_dir = campaign_dir + "/sessions/" + session_id;
+        if (make_dir(session_dir, false)) break;
+        session_dir.clear();
+    }
+    if (session_dir.empty()) {
         recorder_failure();
         return;
     }
 
     std::ostringstream manifest;
-    manifest << "{\"schema\":1,\"session_id\":\"session-001\""
+    manifest << "{\"schema\":1,\"session_id\":" << json_string(session_id.c_str())
+             << ",\"campaign_id\":" << json_string(campaign_id.c_str())
              << ",\"started_utc\":" << json_string(stamp.c_str())
              << ",\"starting_turn\":" << *CurrentTurn
              << ",\"source_save\":";
-    if (source_save && source_save[0]) {
-        manifest << json_string(source_save);
+    if (!source.empty()) {
+        manifest << json_string(source.c_str());
     } else {
         manifest << "null";
     }
@@ -402,4 +523,41 @@ void telemetry_end_session() {
     }
     recording = false;
     close_files();
+}
+
+
+const char* telemetry_get_campaign_name() {
+    if (campaign_display_name.empty())
+        campaign_display_name = readable_campaign_default();
+    return campaign_display_name.c_str();
+}
+
+bool telemetry_set_campaign_name(const char* name) {
+    if (!name || !name[0] || strlen(name) > 88) return false;
+    for (const unsigned char* p = (const unsigned char*)name; *p; ++p)
+        if (*p < 32 || *p == 127) return false;
+    const std::string previous = campaign_display_name;
+    campaign_display_name = name;
+    if (!write_campaign_metadata()) {
+        campaign_display_name = previous;
+        return false;
+    }
+    return true;
+}
+
+bool telemetry_record_named_save(const char* save_path) {
+    if (!save_path || !save_path[0] || campaign_id.empty())
+        return true;  // Telemetry was explicitly disabled.
+    const std::string path = std::string(save_path) + ".autosim-campaign";
+    const std::string contents = "thinkerNeca-campaign-v1\n" + campaign_id
+        + "\n" + campaign_created_utc + "\n" + campaign_display_name + "\n";
+    if (!atomic_write(path, contents)) {
+        OutputDebugStringA("thinkerNeca TEL-001: failed to write named-save campaign link\n");
+        return false;
+    }
+    return true;
+}
+
+void telemetry_note_loaded_save(const char* source_path) {
+    last_loaded_save = source_path ? source_path : "";
 }
