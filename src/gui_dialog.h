@@ -44,6 +44,7 @@ int autosim_notice_diplomacy(NetMessage* msg, const char* label, int delay,
 enum AutosimControlRequest { AUTOSIM_CTL_NONE, AUTOSIM_CTL_PAUSE, AUTOSIM_CTL_STOP };
 void autosim_request_control(AutosimControlRequest request);
 void autosim_collect_queued_keys();
+void autosim_collect_stop_file();
 bool autosim_fast_combat_active();
 
 // AUTO-002: fast native presentation throughout all-AI turn phases, not
