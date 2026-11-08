@@ -49,7 +49,7 @@ for field in ("Campaign:", "Session:", "Telemetry:",
               "Save && Exit", "Take Control", "Start Simulation",
               "Arm Simulation", "Continue", "Resume Unchanged"):
     assert field in dialog
-assert "if (id == ID_SAVE_CONTINUE || id == ID_START" in dialog
+assert "if (id == ID_SAVE_CONTINUE || id == ID_SAVE_EXIT" in dialog
 assert "parsed < 1 || parsed > 100000" in dialog
 assert "if ((id == ID_SAVE_CONTINUE || id == ID_SAVE_EXIT)" in dialog
 assert 'SendDlgItemMessageA(dialog, ID_SUPPRESS, BM_GETCHECK' in dialog
@@ -57,6 +57,7 @@ assert 'SendDlgItemMessageA(dialog, ID_FAST_COMBAT, BM_GETCHECK' in dialog
 assert "conf.autosim_manual_turns = state.additional_turns;" in dialog
 assert "conf.autosim_suppress_notices = state.suppress_notices ? 1 : 0;" in dialog
 assert "conf.autosim_fast_combat = state.fast_combat ? 1 : 0;" in dialog
+assert 'telemetry_record_ui_notice("autosim", "SETTINGS", action);' in dialog
 assert "void autosim_show_manual_setup()" in dialog
 assert "if (autosim_show_control_dialog(&state) != AUTOSIM_DIALOG_ARM)" in dialog
 
