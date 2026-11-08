@@ -8,7 +8,7 @@
 // reported vote/offer modal might otherwise suspend this thread.
 // Do not call game_random(), vote evaluators or any Council UI from here.
 static void autosim_trace_council_call(const char* phase, int faction_id) {
-    if (!autosim_control_active() || !conf.telemetry_enabled) {
+    if (!conf.telemetry_enabled) {
         return;
     }
     const int owner = MapWin->cOwner;
@@ -28,7 +28,7 @@ static void autosim_trace_council_call(const char* phase, int faction_id) {
 // flush immediately before a native modal can block.
 void __thiscall autosim_trace_CouncWin_init(CouncWindow* win,
     int faction_id, int faction_id_2) {
-    const bool trace = autosim_control_active() && conf.telemetry_enabled;
+    const bool trace = conf.telemetry_enabled;
     if (trace) {
         char action[192];
         snprintf(action, sizeof(action),
@@ -68,6 +68,8 @@ int __cdecl autosim_council_announcement(const char* filename, const char* label
         telemetry_record_council_event("notice_suppressed", MapWin->cOwner, label);
         return 0;
     }
+    if (conf.telemetry_enabled)
+        telemetry_record_council_event("notice_native", MapWin->cOwner, label);
     return popp(filename, label, a3, pcx, callback);
 }
 
@@ -82,7 +84,15 @@ int __cdecl autosim_council_human_vote_offer(const char* label, int flags,
             MapWin->cOwner, label);
         return 0;
     }
-    return X_pops_11(label, flags, portrait, callback);
+    if (conf.telemetry_enabled)
+        telemetry_record_council_event("vote_offer_native_enter", MapWin->cOwner, label);
+    const int choice = X_pops_11(label, flags, portrait, callback);
+    if (conf.telemetry_enabled) {
+        char response[96];
+        snprintf(response, sizeof(response), "%s response=%d", label ? label : "", choice);
+        telemetry_record_council_event("vote_offer_native_exit", MapWin->cOwner, response);
+    }
+    return choice;
 }
 
 // Replace only the exact native six-byte CouncWindow virtual modal execution

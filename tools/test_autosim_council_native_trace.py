@@ -15,7 +15,7 @@ assert "void __thiscall autosim_trace_CouncWin_init(CouncWindow* win," in turn
 assert "void __thiscall autosim_trace_CouncWin_init(CouncWindow* win," in hdr
 trace = turn[turn.index("void __thiscall autosim_trace_CouncWin_init("):
              turn.index("int __cdecl autosim_council_announcement(")]
-assert 'const bool trace = autosim_control_active() && conf.telemetry_enabled;' in trace
+assert 'const bool trace = conf.telemetry_enabled;' in trace
 assert trace.count('telemetry_record_council_event("CouncWin_init", faction_id, action);') == 2
 assert trace.index("CouncWin_init(win, faction_id, faction_id_2);") > trace.index('"enter arg1=')
 assert trace.index("CouncWin_init(win, faction_id, faction_id_2);") < trace.index('"exit proposal=')

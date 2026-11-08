@@ -276,3 +276,11 @@ proposals, incomplete ballots and unsupported modes log `modal_fallback`
 and use the original native window. This is an **experimental native hook**,
 not a claimed fully working headless Council. Existing UI-coupled effects
 and Council-action popups require actual Windows tests before merge.
+
+
+**Normal-game baseline coverage:** When `telemetry_enabled=1`, the same
+Council trace now also records native human-election `CouncWin_init`
+entry/exit and Council announcement/vote-offer response events; ordinary
+native UI and its chosen response are forwarded unchanged. This provides
+a comparison dataset for later all-AI investigations without relying on
+`debug.txt`. The new file is still raw JSONL (not yet an Analyzer graph).
