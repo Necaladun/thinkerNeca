@@ -1029,7 +1029,8 @@ int __cdecl want_monolith(int veh_id) {
 void __cdecl monolith(int veh_id) {
     VEH* veh = &Vehs[veh_id];
     MAP* sq = mapsq(veh->x, veh->y);
-    const bool is_player = veh->faction_id == *CurrentPlayerFaction;
+    const bool is_player = veh->faction_id == *CurrentPlayerFaction
+        && is_human(veh->faction_id);
     if (!can_monolith(veh->unit_id)) {
         return;
     }
