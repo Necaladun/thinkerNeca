@@ -758,9 +758,44 @@ try {
             & $displayCampaignRows
             $reportStatus.Text = "$(@($sessionList.Tag).Count) session(s) found. Select, filter, generate or export."
         } catch {
-            $sessionList.Tag = [object[]]@()
+            # Pure PowerShell fallback: keep folder/ZIP actions functional
+            # without Python or when a reporter dependency cannot be loaded.
+            # Metadata/report generation remains explicitly unavailable.
+            $scanFailure = $_.Exception.Message
+            $fallbackRows = New-Object 'System.Collections.Generic.List[object]'
+            try {
+                if ([System.IO.Directory]::Exists($rootBox.Text)) {
+                    foreach ($folder in @(Get-ChildItem -LiteralPath $rootBox.Text -Directory)) {
+                        $sessionsPath = Join-Path $folder.FullName 'sessions'
+                        if (-not [System.IO.Directory]::Exists($sessionsPath)) { continue }
+                        foreach ($session in @(Get-ChildItem -LiteralPath $sessionsPath -Directory)) {
+                            $fallbackRows.Add([pscustomobject]@{
+                                campaign_dir = $folder.FullName
+                                session_id = $session.Name
+                                folder = $folder.Name
+                                campaign_name = $folder.Name
+                                player = 'Python unavailable'
+                                years = '—'
+                                turns = '—'
+                                bases = '—'
+                                units = '—'
+                                status = 'Unscanned'
+                                started = 'Unknown'
+                                updated = $session.LastWriteTime.ToString('dd MMM yyyy HH:mm')
+                                source_save = 'Not scanned'
+                                factions = ''
+                                error = 'Report scan/generation needs Python 3'
+                            })
+                        }
+                    }
+                }
+            } catch {
+                $scanFailure += '; fallback directory scan also failed: ' + $_.Exception.Message
+            }
+            $sessionList.Tag = [object[]]$fallbackRows.ToArray()
             & $displayCampaignRows
-            $reportStatus.Text = 'Campaign scan failed: ' + $_.Exception.Message
+            $reportStatus.Text = 'Report scan unavailable: ' + $scanFailure +
+                '. Folder and ZIP actions remain available.'
         }
     }
     $refreshCampaigns.Add_Click({ & $refreshAction })
