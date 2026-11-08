@@ -2482,6 +2482,8 @@ static void veh_upgrade(VEH* veh, int new_unit_id, int old_unit_id, int cost) {
     int morale_diff = (has_abil(new_unit_id, ABL_TRAINED) != 0)
         - (has_abil(old_unit_id, ABL_TRAINED) != 0);
     veh->morale = clamp(veh->morale + morale_diff, 0, 6);
+    // Preserve the same session-scoped vehicle identity across upgrades.
+    telemetry_unit_upgraded((int)(veh - Vehs), old_unit_id, new_unit_id, cost);
     assert(f->energy_credits >= 0);
     assert(new_unit_id / MaxProtoFactionNum == veh->faction_id);
     debug("upgrade_unit %d %d %2d %2d cost: %d %s / %s\n",
