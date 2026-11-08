@@ -2145,12 +2145,12 @@ int __cdecl mod_setup_player(int faction_id, int setup_id, int is_probe) {
             if (!is_player) {
                 if (num_active - num_allied < 2) {
                     if (num_allied) {
-                        popp(ScriptFile, "CONQCOOP", 0, "conq_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "CONQCOOP", "conq_sm.pcx");
                         if (*GameVictoryType == VIC_NONE) {
                             *GameVictoryType = VIC_UNIFY_COOP;
                         }
                     } else if (other_id == *CurrentPlayerFaction) {
-                        popp(ScriptFile, "CONQSING", 0, "conq_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "CONQSING", "conq_sm.pcx");
                         if (*GameVictoryType == VIC_NONE) {
                             *GameVictoryType = VIC_UNIFY_SOLO;
                         }
