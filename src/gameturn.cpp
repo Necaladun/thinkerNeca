@@ -85,6 +85,7 @@ void __cdecl control_turn() {
     int segment_start_bases = *BaseCount;
     int segment_start_units = *VehCount;
     bool segment_started = false;
+    bool startup_confirmed = false;
     // A game loaded mid-cycle resumes remaining factions first.
     bool first_cycle_partial = (*ControlTurnMove != 0);
     RECT rc;
@@ -113,6 +114,40 @@ void __cdecl control_turn() {
     bool run_upkeep = true;
     while (1) {
         debug("control_turn %d %d %d\n", *CurrentTurn, current_id, MapWin->cOwner);
+        // New/reloaded all-AI games must be explicitly confirmed before any
+        // further AI processing. This is before upkeep and faction actions,
+        // not inside a native UI/combat callback. A mid-cycle reload still
+        // excludes its first partial cycle from the requested turn count.
+        if (autosim_ready() && !startup_confirmed) {
+            AutosimDialogState preflight;
+            autosim_fill_dialog_state(&preflight, AUTOSIM_DIALOG_STARTUP);
+            telemetry_record_ui_notice("autosim", "STARTUP", "preflight");
+            for (;;) {
+                const AutosimDialogChoice answer = autosim_show_control_dialog(&preflight);
+                if (answer == AUTOSIM_DIALOG_START) {
+                    if (!autosim_apply_dialog_options(preflight)) {
+                        MessageBoxA(*phWnd,
+                            "Could not update campaign metadata. Check campaigns/ permissions.",
+                            "thinkerNeca Simulation Control", MB_OK | MB_ICONWARNING);
+                        continue;
+                    }
+                    startup_confirmed = true;
+                    telemetry_record_ui_notice("autosim", "STARTUP", "confirmed");
+                    break;
+                }
+                if (answer == AUTOSIM_DIALOG_TAKE_CONTROL
+                || answer == AUTOSIM_DIALOG_FAILED) {
+                    // Fail closed: restore ordinary human control rather than
+                    // silently advancing all-AI turns with no consent.
+                    set_human(MapWin->cOwner, true);
+                    telemetry_record_ui_notice("autosim", "STARTUP",
+                        answer == AUTOSIM_DIALOG_FAILED
+                        ? "dialog_failed_human_control" : "declined_human_control");
+                    break;
+                }
+            }
+        }
+        if (!autosim_ready()) startup_confirmed = false;
         // Capture a baseline as soon as the user has handed the last human
         // faction to AI. An initially partial loaded cycle is not counted.
         if (autosim_ready()) {
