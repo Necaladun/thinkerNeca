@@ -1255,8 +1255,17 @@ bool patch_setup(Config* cf) {
         write_call(0x428542, (int)autosim_council_announcement);
         write_call(0x428115, (int)autosim_council_human_vote_offer);
         write_call(0x42828A, (int)autosim_council_human_vote_offer);
-        write_call(0x4282F2, (int)autosim_council_modal_or_resolve);
-        write_byte(0x4282F7, 0x00, 0x90);
+        // 0x4282F2 is an *indirect six-byte virtual call*
+        // (FF 90 E4 00 00 00), not a direct E8 call. write_call()
+        // explicitly rejects FF 90 and causes the "incorrect game version"
+        // fatal startup error. Replace all six verified bytes atomically
+        // with E8 rel32 / 90, preserving the call's stack/thiscall ABI.
+        const byte old_modal[6] = {0xFF, 0x90, 0xE4, 0, 0, 0};
+        byte new_modal[6] = {0xE8, 0, 0, 0, 0, 0x90};
+        const int32_t modal_disp =
+            (int32_t)autosim_council_modal_or_resolve - 0x4282F2 - 5;
+        memcpy(new_modal + 1, &modal_disp, sizeof(modal_disp));
+        write_bytes(0x4282F2, old_modal, new_modal, sizeof(old_modal));
     } else {
         OutputDebugStringA("thinkerNeca AUTO-002: Council hooks skipped (native preflight mismatch)\n");
     }

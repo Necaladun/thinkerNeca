@@ -105,3 +105,20 @@ Council UI. A line-flushed `council.jsonl` stream records context, ballots,
 Governor and energy snapshots. Source/CI checks and Windows game acceptance
 are **separate**; until Windows-tested, the path is experimental and the
 Council issue remains open.
+
+
+**AUTO-002 Council startup regression and corrective patch (8 Nov; user Windows report):**
+The first headless trial at commit `d539c7d1` failed while patching
+native instruction `0x004282F2` (generic “requires Alien Crossfire v2.0”
+error). Static reproduction on the user's actual `terranx.exe` established
+original bytes `FF 90 E4 00 00 00` (six-byte vtable call); existing
+`write_call` accepts only direct E8 or FF15 and cannot patch FF90.
+The corrective branch replaces **all six original bytes** with verified
+`E8 rel32 / NOP` via `write_bytes`. The native `CouncWin_init`
+has already sometimes called `CouncWin_set_vote` via the vote-purchase
+branch, so the correction also refuses to replay an existing/resolved
+vote. For an unvoted Governor election it calls native `council_get_vote`
+for the observed AI faction exactly once and delegates to native
+`CouncWin_set_vote`. Any inconsistent or unresolved state falls back to
+the native modal, with separate `council.jsonl` diagnostics. Windows
+in-game acceptance is still **pending**; the prior build is known bad.

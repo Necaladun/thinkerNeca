@@ -267,13 +267,15 @@ The omitted notices have unused popup results. `VOTEFORME`/
 not fabricate a response. This is a **trial AI-parity assumption**, not
 proof that all native AI-vs-AI vote-buy interactions are represented.
 
-The virtual modal replacement only attempts Governor elections if every
-living participant already has a nonzero native ballot. It feeds the observed
-AI's **existing** ballot into native `CouncWin_set_vote`, which can invoke
-the native `CouncWin_make_resolution` and `council_action`.
-It neither guesses ballots nor calls `council_get_vote` again. All other
-proposals, incomplete ballots and unsupported modes log `modal_fallback`
-and use the original native window. This is an **experimental native hook**,
+The virtual modal replacement only attempts Governor elections. When
+native Council state is **already resolved**, it does not replay voting.
+When the observed faction already has an unresolved ballot, it leaves the
+window native rather than guessing whether processing is safe. Otherwise it
+calls native `council_get_vote` once for the observed AI and passes that
+result through native `CouncWin_set_vote`, allowing normal AI ballots,
+`CouncWin_make_resolution` and `council_action` to run. If the
+returned outcome is still unresolved, it falls back to the native modal.
+All other proposals/unsupported modes retain native UI. This is an **experimental native hook**,
 not a claimed fully working headless Council. Existing UI-coupled effects
 and Council-action popups require actual Windows tests before merge.
 
@@ -284,3 +286,11 @@ entry/exit and Council announcement/vote-offer response events; ordinary
 native UI and its chosen response are forwarded unchanged. This provides
 a comparison dataset for later all-AI investigations without relying on
 `debug.txt`. The new file is still raw JSONL (not yet an Analyzer graph).
+
+
+**Patch-format fix (8 November):** the first trial failed during install
+because `write_call` cannot handle the original `FF 90 E4 00 00 00`
+virtual call at `0x4282F2`. An exact-six-byte `write_bytes` patch to
+`E8 rel32 90` is now used. The additional native vote-state guard
+prevents the earlier possible duplicate `CouncWin_set_vote` call.
+Both changes require a new Windows smoke before any runtime claims.

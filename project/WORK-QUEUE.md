@@ -68,3 +68,9 @@ See [technical design](technical/telemetry-automation.md) for schemas, constrain
 ## Updating this file
 
 When an item is verified, mark `Done` with a brief link to its PR/commit or [TESTING](TESTING.md). Periodically move closed items to a short completed section or remove them once the [fork changelog](../Fork-Changelog.md) records the durable result. New ideas go first to [IDEAS](IDEAS.md); don't put hypothetical changes into WIP.
+
+**AUTO-002C startup regression, 8 Nov 2026:** first `d539c7d1`
+Council build failed to install `0x4282F2` (`write_call` vs indirect
+FF90 call). Corrected with verified six-byte rewrite and native
+vote-resubmission guard; source/CI and in-game start/Council validation
+remain separate and must be recorded before merge.

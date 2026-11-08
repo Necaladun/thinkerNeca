@@ -644,3 +644,28 @@ settings, other Council proposals, veto, Supreme Leader and repeat elections.
 The headless path currently only attempts Governor elections and **may still
 encounter presentation inside native resolution**. A passing CI build is
 not sufficient to claim correctness, parity or absence of future blockers.
+
+
+### AUTO-002 Council patch-startup regression (8 November 2026)
+
+**Actual user Windows result:** CI-green trial `d539c7d1` aborted at
+game startup with a generic EXE-version patch error near
+`0x004282F2`. No Council runtime evidence was gathered from that DLL.
+The attached `terranx(5).exe` was inspected using PE32 objdump: the
+native virtual call at `0x4282F2` is `FF 90 E4 00 00 00` (indirect
+call via vtable), not a direct or FF15 call supported by `write_call`.
+The new patch uses a byte-verified six-byte `write_bytes` replacement
+(`E8 rel32 90`) and structural regression explicitly forbids
+`write_call(0x4282F2)`.
+
+Static disassembly also shows `CouncWin_init` can call
+`CouncWin_set_vote` at `0x4282DD` *before* the modal call following
+an accepted native vote-buy offer. The former headless wrapper might replay
+the vote. The corrected wrapper distinguishes already-resolved outcome,
+existing unresolved observed ballot (native fallback), and missing observed
+ballot. In the latter case only, it computes the observed faction's
+`council_get_vote` result and passes it once to native
+`CouncWin_set_vote`, then checks whether native resolution completed.
+Test actual Windows **startup first**, then MY2181 no-click Council,
+Governor/ballots/credits, ordinary player voting, unexpected modal fallback,
+longer AI continuation and same-build save/reload. CI cannot prove these.
