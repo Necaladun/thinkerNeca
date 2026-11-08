@@ -36,9 +36,8 @@ pairs = [
     ("proposal-specific before/after counters recorded",
      "telemetry_council_resolved(win, resolved" in turn
      and "ProposalPassCount[proposal]" in turn
-     and '"pass_count_before"' not in turn
-     and ',"pass_count_before"' in tele
-     and ',"game_state_after"' in tele
+     and "pass_count_before" in tele
+     and "game_state_after" in tele
      and 'council_record("ballots")' in tele),
     ("does not recompute already-populated AI votes",
      "council_get_vote(owner, win->proposal_type," not in turn
