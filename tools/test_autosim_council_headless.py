@@ -19,16 +19,19 @@ pairs = [
     ("all-or-nothing hook install", "if (council_known)" in patch),
     ("all-AI suppression guard", "autosim_ui_active()" in turn),
     ("native modal preserved for unsupported cases", "return original(win, a2, a3, a4);" in turn),
-    ("Governor-only native AI ballot pass",
+    ("Governor-only native resolution of initialized ballots",
      "win->proposal_type != PROP_ELECT_PLANETARY_GOVERNOR" in turn
-     and "council_get_vote(owner, win->proposal_type," in turn
-     and "CouncWin_set_vote(win, owner, vote);" in turn),
-    ("prevents duplicate ballot execution",
+     and "CouncWin_make_resolution(win, 1);" in turn),
+    ("does not recompute already-populated AI votes",
+     "council_get_vote(owner, win->proposal_type," not in turn
+     and "CouncWin_set_vote(win, owner," not in turn
+     and 'win->faction_vote[owner] != 0' not in turn),
+    ("prevents duplicate native resolution",
      "win->proposal_outcome != 0" in turn
-     and "win->faction_vote[owner] != 0" in turn
      and "headless_already_resolved" in turn),
-    ("unresolved native outcome fails to ordinary UI",
-     '"native_set_vote_did_not_resolve"' in turn
+    ("incomplete native ballots use ordinary window",
+     '"native_resolution_incomplete"' in turn
+     and "if (!resolved || win->proposal_outcome == 0)" in turn
      and "return original(win, a2, a3, a4);" in turn),
     ("independent flushed Council file", "council.jsonl" in tele and "append_line(council_file, event.str())" in tele),
 ]

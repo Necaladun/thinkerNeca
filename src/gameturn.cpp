@@ -96,9 +96,9 @@ int __cdecl autosim_council_human_vote_offer(const char* label, int flags,
 }
 
 // Replace only the exact native six-byte CouncWindow virtual modal execution
-// call. The constructor and native Council resolution stay intact. The native
-// AI vote routine supplies the observed faction's missing ballot, once.
-// Any unknown voting state falls back to the original interactive window.
+// call. The constructor already computes every AI ballot, including the
+// observed AI. We reuse native make_resolution without recasting ballots.
+// Any incomplete voting state falls back to the original interactive window.
 int __thiscall autosim_council_modal_or_resolve(CouncWindow* win,
     int a2, void* a3, void* a4) {
     typedef int(__thiscall *NativeModal)(CouncWindow*, int, void*, void*);
@@ -112,66 +112,52 @@ int __thiscall autosim_council_modal_or_resolve(CouncWindow* win,
             "proposal_or_mode_not_eligible");
         return original(win, a2, a3, a4);
     }
-    // A native vote-selling branch in CouncWin_init can already have called
-    // CouncWin_set_vote before this virtual modal call. Never replay it.
+    // Native CouncWin_init has ALREADY precomputed AI ballots for every
+    // nonhuman faction (up to three passes, 0x4278E6..0x427974).
+    // This includes the observed AI. A nonzero observed ballot is normal,
+    // NOT proof that the Council has resolved. Do not rerun
+    // council_get_vote or CouncWin_set_vote: they can recalculate ballots.
+    //
+    // In the normal single-player vote-button path, set_vote ultimately
+    // calls make_resolution(win, 1). This native routine checks every
+    // living faction's ballot and returns 0 without applying a resolution
+    // when a ballot remains 0. Reuse it directly, with no synthetic choice.
     if (win->proposal_outcome != 0) {
         telemetry_record_council_event("headless_already_resolved", owner,
             "native_resolution_preceded_modal");
         return 0;
     }
-    if (win->faction_vote[owner] != 0) {
-        // Existing observed ballot, but no resolved result: we cannot prove
-        // whether re-entering set_vote is harmless. Keep native handling.
-        telemetry_record_council_event("modal_fallback", owner,
-            "observed_vote_recorded_but_unresolved");
-        return original(win, a2, a3, a4);
-    }
 
-    // Original CouncWin_set_vote evaluates nonhuman factions through this
-    // same native council_get_vote routine, then invokes native resolution.
-    // With no human left, calculate the observed faction's *AI* vote once
-    // and submit it through the original native entry point. No invented
-    // candidate, random tie-breaking, or direct Governor field assignment.
-    const int vote = council_get_vote(owner, win->proposal_type,
-        win->candidate_faction_id);
-    if (vote == 0 || vote < -3 || vote >= MaxPlayerNum) {
-        char reason[128];
-        snprintf(reason, sizeof(reason),
-            "native_ai_ballot_unusable vote=%d candidate=%d", vote,
-            win->candidate_faction_id);
-        telemetry_record_council_event("modal_fallback", owner, reason);
-        return original(win, a2, a3, a4);
-    }
-
-    char before[256];
+    char before[288];
     snprintf(before, sizeof(before),
-        "proposal=%d candidate=%d computed_native_ai_vote=%d mask=%08X "
+        "proposal=%d candidate=%d outcome=%d mask=%08X "
         "votes=%d,%d,%d,%d,%d,%d,%d,%d",
-        win->proposal_type, win->candidate_faction_id, vote,
-        (unsigned)win->vote_faction_mask,
+        win->proposal_type, win->candidate_faction_id,
+        win->proposal_outcome, (unsigned)win->vote_faction_mask,
         win->faction_vote[0], win->faction_vote[1],
         win->faction_vote[2], win->faction_vote[3],
         win->faction_vote[4], win->faction_vote[5],
         win->faction_vote[6], win->faction_vote[7]);
-    telemetry_record_council_event("headless_native_ai_vote", owner, before);
-    CouncWin_set_vote(win, owner, vote);
+    telemetry_record_council_event("headless_native_ballots", owner, before);
 
-    char after[384];
+    const int resolved = CouncWin_make_resolution(win, 1);
+    char after[320];
     snprintf(after, sizeof(after),
-        "set_vote_returned outcome=%d governor=%d pending=%d mask=%08X "
-        "votes=%d,%d,%d,%d,%d,%d,%d,%d",
-        win->proposal_outcome, *GovernorFaction, *CouncilSessionPending,
+        "native_make_resolution=%d outcome=%d candidate=%d "
+        "governor=%d pending=%d mask=%08X votes=%d,%d,%d,%d,%d,%d,%d,%d",
+        resolved, win->proposal_outcome, win->candidate_faction_id,
+        *GovernorFaction, *CouncilSessionPending,
         (unsigned)win->vote_faction_mask,
         win->faction_vote[0], win->faction_vote[1],
         win->faction_vote[2], win->faction_vote[3],
         win->faction_vote[4], win->faction_vote[5],
         win->faction_vote[6], win->faction_vote[7]);
     telemetry_record_council_event("headless_native_resolution", owner, after);
-
-    // If native resolution did not finish, do not silently lose the session.
-    if (win->proposal_outcome == 0) {
+    if (!resolved || win->proposal_outcome == 0) {
+        // Native implementation reports missing ballots; retain the UI
+        // rather than forcing an election or leaving it pending.
         telemetry_record_council_event("modal_fallback", owner,
-            "native_set_vote_did_not_resolve");
+            "native_resolution_incomplete");
         return original(win, a2, a3, a4);
     }
     return 0;

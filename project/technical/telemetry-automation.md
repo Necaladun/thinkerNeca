@@ -294,3 +294,16 @@ virtual call at `0x4282F2`. An exact-six-byte `write_bytes` patch to
 `E8 rel32 90` is now used. The additional native vote-state guard
 prevents the earlier possible duplicate `CouncWin_set_vote` call.
 Both changes require a new Windows smoke before any runtime claims.
+
+
+**MY2195 Council replay (8 Nov, AUTO-002C):** live `council.jsonl`
+shows all-AI observer 1 entering `CouncWin_init`, followed by
+`modal_fallback=observed_vote_recorded_but_unresolved` and a blocked
+Governor voting screen. Native disassembly proves that `CouncWin_init`
+already fills all nonhuman ballots, including the observed AI, before
+the modal call. The former nonzero-ballot guard was invalid. The headless
+Governor path now invokes **native `CouncWin_make_resolution(win,1)`**
+once, with already-populated ballots and no `council_get_vote` reroll or
+`CouncWin_set_vote` resubmission. A zero return or zero outcome logs
+`native_resolution_incomplete` and uses the original window.
+Non-Governor motions remain native. Actual game verification is pending.

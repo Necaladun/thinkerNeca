@@ -669,3 +669,34 @@ ballot. In the latter case only, it computes the observed faction's
 Test actual Windows **startup first**, then MY2181 no-click Council,
 Governor/ballots/credits, ordinary player voting, unexpected modal fallback,
 longer AI continuation and same-build save/reload. CI cannot prove these.
+
+
+### AUTO-002C MY 2195 all-AI Governor election reproduction — 8 Nov
+
+**Observed in-game with Council build bba52299:** first Council election
+triggered after Gaia's Stepdaughters completed the Empath Guild in MY2195,
+during faction 1's upkeep. The uploaded `council.jsonl` contains 1,508
+events for MY2101–2195: 1,505 routine call_council records and
+`notice_suppressed: CALLSCOUNCIL`, `CouncWin_init: enter arg1=0 arg2=1`,
+`modal_fallback: observed_vote_recorded_but_unresolved` at MY2195;
+there is no CouncWin_init exit event before the user copied logs.
+All-AI mask 0, observer=1, Governor=-1. `ui_notices` confirms
+`empathGuild` movie/help and `COUNCILOPEN` were suppressed on the
+same turn. Uploaded `Autosave_2194.sav` and `Autosave_2195.sav` are
+pre/during-turn replay assets; do not infer Council outcomes from them.
+
+**Native source/binary finding:** `CouncWin_init` at
+`0x4278E6..0x427974` precomputes `faction_vote[8]` for
+all nonhuman factions using native `council_get_vote`, three passes.
+The prior wrapper incorrectly interpreted nonzero observed ballot as an
+unresolved anomaly. The single-player `CouncWin_set_vote` path calls
+`CouncWin_make_resolution(win,1)`; this returns 0 without processing if
+any living faction's ballot is 0, or completes/tallies the vote and sets
+nonzero outcome. The revised experimental hook calls
+`CouncWin_make_resolution(win,1)` once on Governor-only all-AI
+elections and falls back to the native modal on incomplete state.
+It does NOT call `council_get_vote` or `CouncWin_set_vote` again.
+Test startup, no-click MY2195 resolution, ballot totals, final Governor,
+subsequent AI turns, same-build reload, ordinary human Councils, repeat
+elections, vote-buying offers and other Council proposals. CI success is
+not gameplay acceptance.

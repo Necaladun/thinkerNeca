@@ -122,3 +122,16 @@ for the observed AI faction exactly once and delegates to native
 `CouncWin_set_vote`. Any inconsistent or unresolved state falls back to
 the native modal, with separate `council.jsonl` diagnostics. Windows
 in-game acceptance is still **pending**; the prior build is known bad.
+
+
+**AUTO-002C MY2195 Council failure (user Windows reproduction, 8 Nov):**
+Gaian faction 1 completed Empath Guild and initiated its first Governor
+election in an all-AI game. `CALLSCOUNCIL` suppression worked. The
+experimental modal hook then logged `observed_vote_recorded_but_unresolved`
+and deliberately opened the voting UI. The native `CouncWin_init`
+already populates **all AI ballots**, including the observed faction's,
+at `0x4278E6..0x427974`. Nonzero observed vote is therefore normal.
+The revised test path invokes native `CouncWin_make_resolution(win,1)`
+directly (rather than recasting any vote); its native early return on a
+missing ballot triggers a logged modal fallback. **Windows runtime validation
+of the revised path remains pending.**
