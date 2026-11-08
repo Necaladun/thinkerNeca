@@ -113,7 +113,9 @@ inline AutoUiAction autosim_xpop_policy(const char* label, bool has_callback) {
     if (!label || has_callback) {
         return AUTO_UI_NATIVE;
     }
-    if (std::strcmp(label, "REACTORUPGRADE") == 0
+    if (std::strcmp(label, "GOTUNITDEFEND") == 0
+        || std::strcmp(label, "GOTUNITOFFEND") == 0
+        || std::strcmp(label, "REACTORUPGRADE") == 0
         || std::strcmp(label, "THESECRET0") == 0
         || std::strcmp(label, "THESECRET1") == 0
         || std::strcmp(label, "TREETIME") == 0) {
