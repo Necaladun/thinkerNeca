@@ -347,3 +347,37 @@ end-of-game presentation/save lifecycle; terminal saving, winner attribution,
 and automatic camera reassignment if the observed faction is eliminated are
 **deferred** and not implemented in this change. Test all categories of
 vote and ordinary human Council separately before merge.
+
+
+### AUTO-LAUNCH Stage A — isolated pre-game workflow (8 November 2026)
+
+Install the CI Develop artifact's `thinker.dll`, `thinker.exe`,
+`Run Automation.bat` and `Run Automation.ps1` together in the SMAC/X
+folder. Double-click `Run Automation.bat`. Windows PowerShell opens a
+native pre-game WinForms dialog with **New Game** (the regular native game
+setup, manual Scenario Editor AI handover still required) or **Load SAV**
+(start a chosen existing file directly). Choose campaign display name,
+full AI turn budget, telemetry, notice suppression, fast presentation.
+Use the existing F9/F10 control menu after handing all factions to AI.
+Cancelling the launcher does not start the game. No extra executable or
+Python installation is required.
+
+The GUI persists editable defaults to `automation.ini`, *not* either
+`thinker.ini` or `thinker_user.ini`. Each Start operation also writes
+a unique, immutable `automation/profiles/<timestamp>-<id>.ini` snapshot,
+passed via `THINKERNECA_AUTOSIM_PROFILE` in the environment of the same
+`thinker.exe`; it is inherited by `terranx.exe` because the Thinker
+launcher uses CreateProcess with inherited environment. The DLL reads only
+this explicit profile, validates `[automation]` section and schema and
+fails closed on invalid profiles or invalid selected SAV. Old automation
+keys in normal `thinker.ini` settings are deliberately reset to 0 when
+no such profile is provided; **all other normal game settings remain**.
+The run-profile fingerprint is recorded in session manifest metadata.
+On rejoining a named campaign, the selected launch budget/checkboxes
+supersede older options stored in the save's lineage sidecar.
+
+**No changes yet to saves or automation lifecycle:** native autosaves and
+manual saves still write their former shared paths; sessions/campaign
+folders retain existing naming; no ZIP/archive/checkpoints. New-game map
+setup/handover is still manual. No batch controller, victory final SAV,
+terminal reporting or observer replacement is part of Stage A.

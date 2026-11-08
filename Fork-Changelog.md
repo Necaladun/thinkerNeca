@@ -1,5 +1,9 @@
 # thinkerNeca — fork changelog
 
+## Unmerged AUTO-LAUNCH Stage A — isolated automation launcher (8 November 2026)
+
+- Adds a separate `Run Automation.bat` + PowerShell WinForms pre-game setup for new/native setup or loading an existing SAV, campaign naming and turn/telemetry/notice/fast settings. GUI defaults go to a separate `automation.ini`; an immutable run-profile INI is passed through the original `thinker.exe` to `terranx.exe` via inherited process environment. Normal game launches now ignore legacy automation toggles in the Thinker INIs. Profile provenance is fingerprinted in session manifests. Stage B campaign-owned saves/ZIP, Stage C automatic new games/batching, victory finalisation and observer replacement remain deferred. Windows game validation pending.
+
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
 ## Unmerged AUTO-002 — editable simulation control and campaign naming (8 November 2026)

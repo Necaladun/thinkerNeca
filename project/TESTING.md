@@ -754,3 +754,31 @@ stop at existing endgame UI; this is **not a voting failure** and victory
 handler changes are expressly postponed. Verify normal-human/opt-out and
 unknown-state fallback. Passing x86 CI establishes compilation and source
 contracts only, not Council correctness.
+
+
+## AUTO-LAUNCH Stage A — Windows pre-game launcher (8 November 2026)
+
+**Source on draft PR #11; WinForms/gameplay Windows acceptance pending.**
+`Run Automation.bat` launches built-in Windows PowerShell WinForms,
+not another game executable. It offers native New Game or direct load of
+an existing .sav, 1–100000 AI turns, campaign display name, telemetry,
+audited notice suppression and fast presentation. Defaults are in
+`automation.ini`; a separately created immutable per-launch profile lives
+in `automation/profiles/`. The same thinker.exe/terranx.exe pair inherits
+only the run-profile environment variable; the DLL validates the profile,
+rejects unknown keys, and disables legacy automation INI flags in an
+ordinary thinker.exe launch. The profile file is fingerprinted in the
+session manifest. A bad automation SAV exits without silently generating
+a different game. Explicit launcher options override saved-campaign
+sidecar options after a user approves rejoining telemetry.
+
+**Windows acceptance still required:** pre-game GUI display and input;
+paths with spaces, new and existing save, all-AI startup confirmation,
+manual handover from a human save, F9/F10/stop-file controls, ordinary
+human thinker.exe startup and its save/preferences, inaccessible/corrupt
+SAV fail-closed behaviour, name/INI profile persistence, and session
+manifest/profile fingerprint. The CI PowerShell `-SelfTest` checks INI
+roundtrip/unique snapshot without opening GUI, not WinForms display or
+actual game environment propagation. Stage B save routing/ZIP, Stage C
+automatic new world and multi-run scheduling, terminal victory processing
+and observed-faction handover on elimination are **not implemented**.

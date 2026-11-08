@@ -161,3 +161,12 @@ preserved; proposal-specific before/after snapshots go to
 `council.jsonl`. Non-Governor resolutions have **no Windows gameplay
 acceptance yet**. Victory termination, final save/report and changing the
 observed faction after elimination are **not implemented** in this pass.
+
+
+**AUTO-LAUNCH Stage A (8 Nov, PR #11 unmerged; Windows test pending):**
+`Run Automation.bat` opens a PowerShell pre-game GUI, saving defaults to
+`automation.ini` and passing an immutable run profile to the existing
+`thinker.exe`. A normal launch ignores legacy automation INI toggles;
+only the explicit run profile enables telemetry/unattended play. Start from
+an existing SAV or enter native new-game setup and manually hand all factions
+to AI. Campaign save redirection/ZIP and automated game generation are later stages.
