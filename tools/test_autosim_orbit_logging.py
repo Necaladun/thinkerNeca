@@ -9,7 +9,7 @@ root = Path(__file__).resolve().parents[1]
 src = {name: (root / name).read_text(encoding="utf-8") for name in (
     "src/telemetry.h", "src/telemetry.cpp", "src/base.cpp",
     "src/faction_event.cpp", "src/gameturn.cpp", "src/gui_dialog.cpp",
-    "src/patch.cpp",
+    "src/basewin.cpp", "src/patch.cpp",
 )}
 telemetry = src["src/telemetry.cpp"]
 header = src["src/telemetry.h"]
@@ -17,6 +17,7 @@ base = src["src/base.cpp"]
 enemy = src["src/faction_event.cpp"]
 turn = src["src/gameturn.cpp"]
 ui = src["src/gui_dialog.cpp"]
+basewin = src["src/basewin.cpp"]
 patch = src["src/patch.cpp"]
 
 # Every session creates and closes the stream, and recorder failures close it.
@@ -81,10 +82,16 @@ assert turn.index('Factions[i].satellites_mineral = 0;') < turn.index(
 assert 'autosim_notice_pop2("SOLARSTORM"' in turn
 assert 'autosim_notice_pop2("ASTEROID"' in turn
 
-# Exact guarded native result callsite, callback-preserving normal-mode path.
-assert 'write_call(0x4CF70F, (int)autosim_orbital_result_popp);' in patch
-assert 'if (!memcmp((const void*)0x4CF70F, orbital_result_expected,' in patch
-assert 'if (autosim_ui_active() && !fn && label' in ui
-assert 'return popp(filename, label, a3, image, fn);' in ui
+# Actual C++ orbital combat is the reachable callback. No native EXE
+# callsite instrumentation: patch.cpp redirects the entire entrypoint.
+assert 'write_jump(0x4CF480, (int)action_sat_attack);' in patch
+assert 'write_call(0x4CF70F,' not in patch
+assert 'autosim_orbital_result_popp' not in ui
+active = basewin.split('void __cdecl action_sat_attack(', 1)[1].split(
+    'void __cdecl sat_attack(', 1)[0]
+for label in ("WEMUFFEDIT", "THEYMUFFEDIT", "WEKILLEDIT", "THEYKILLEDIT"):
+    assert f'autosim_notice_popp(ScriptFile, "{label}", "satbat_sm.pcx");' in active
+assert active.count('autosim_notice_popp(') == 4
+assert 'return popp(filename, label, 0, image, 0);' in ui
 
-print("TEL-ORBIT event stream and native-result source contracts passed")
+print("TEL-ORBIT event stream and reachable C++ result suppression source contracts passed")
