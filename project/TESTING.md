@@ -916,3 +916,41 @@ with console focused and verify status transitions, press Save & Exit
 and ensure the game exits with no automatic new map, inspect named SAV
 and session closure, reload using the same build. Then recheck ordinary
 human `thinker.exe` and loaded SAV, and inspect data parity when available.
+
+
+### AUTO-NULL: new-game Null setting and console controls confirmed (9 Nov 2026)
+
+User-provided 100-turn `launcher-20261109-003711-5794f310.log`:
+new game progressed MY2102–MY2200 with `configured=2`;
+`R` queued at turn 20 changed live status to `restored` by turn 23;
+`N` queued at turn 40 changed it back to `null` by turn 42;
+more R/N changes were reflected again through turn 80. Thus actual
+control-file propagation and native toggles worked despite the user
+seeing **no apparent graphical difference** and continued complete map
+rendering. The monitor's 45-second warning occurred at the known
+operator-dialog boundary because the user deliberately took a break;
+this was genuine lack of progress and should **not** be silenced.
+
+Source examination: the existing seven detours gate map/tile draws but
+`Win_update_screen` at 0x5F7320 is another native presentation path
+that walks Windows and copies backing buffers. Raw uploaded stock
+`terranx.exe` binary: 0x5F7320 begins exactly
+`A1 30 7B 9B 00` (mov eax, [0x9B7B30]), a complete five-byte
+instruction suitable for trampoline preservation. Draft PR #11 now
+preflights and detours that entry as an eighth gate and records
+cumulative actual `draw_skipped/draw_forwarded` and
+`screen_skipped/screen_forwarded` counts into the live run-profile
+`.status` and external console. `do_all_draws` and message processing
+remain native. This is **source/binary analysis, not Windows acceptance**
+of the eighth detour or AI-state parity. A screen-present pass may
+perform GUI-specific bookkeeping, so test stalls/UI restoration/menus
+as well as visual suppression, not just turn throughput.
+
+Next Windows acceptance: new game and existing SAV with Null enabled,
+five completed turns, verify nonzero skipped counts, determine whether
+the screen actually stops refreshing, R to resume and N to suppress
+again, operator dialog still renders and idle warning remains, Save &
+Exit does not silently launch a new game, AI state/visibility and
+same-build save/reload. If skipped counts remain zero or the display
+still animates, inspect native callers and alternative present paths
+rather than altering fog-of-war or AI view.

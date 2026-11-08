@@ -209,3 +209,15 @@ monitor keys required Alt+Tab. Source follow-up closes a launcher game
 after control_turn returns, restores Null Rendering after native
 modal returns, adds per-phase renderer diagnostics and tries to foreground
 the console on initial AI processing. Windows retest pending.
+
+
+**AUTO-NULL Windows feedback (9 Nov, PR #11 draft):** A fresh all-AI New Game
+ran through MY2200. Console output proves `configured=2` and actual
+`null/restored/null` transitions when N/R are issued, but the user reports
+substantial/complete graphics still appearing. This is incomplete native
+presentation interception, **not a launcher/input bug**. Source now gates
+the separate native `Win_update_screen` screen presentation entry at
+`0x5F7320` and records skipped/forwarded map draw and screen update
+counts; source/CI only, Windows runtime test pending. The 45-second idle
+warning during the operator menu was expected—the user deliberately
+left it paused—and remains enabled.

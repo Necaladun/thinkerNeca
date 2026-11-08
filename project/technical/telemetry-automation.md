@@ -475,3 +475,22 @@ unhooked paths and may show partial draw artefacts. The live `.status`
 adds configured and effective rendering state for diagnosis.
 The console requests initial foreground focus after receiving the first
 `ai_turn` event; this is best effort under Windows focus-stealing rules.
+
+
+### AUTO-NULL screen-present gate and instrumentation (9 November)
+
+The initial Windows Null test reaches 100 turns with `configured=2`,
+and R/N change the engine's live `restored/null` state, but map graphics
+remain visible; no evidence of input-command failure. Seven high-level
+map/tile hooks are insufficient. A new, native-prologue-verified
+`Win_update_screen` hook at 0x5F7320 skips the on-screen update pass
+only during all-AI Null phases, while native `do_all_draws`, messages
+and AI visibility data remain untouched. The supported on-disk EXE's
+original entry begins with one complete 5-byte
+`mov eax,[0x9B7B30]`; all eight sites are preflighted before detours.
+The hook's return value and any GUI bookkeeping still require Windows
+runtime validation. Run status now includes cumulative actual skipped
+and forwarded high-level draws and screen passes. R/N must affect
+*actual* counts/visible updates before Null is considered accepted.
+A 45s no-progress warning remains active for the operator dialog too,
+as deliberate pauses also satisfy the user's desired inactivity alert.
