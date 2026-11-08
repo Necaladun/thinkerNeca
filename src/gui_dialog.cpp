@@ -338,8 +338,26 @@ void autosim_interlude(int event_id, const char* text, int a3, int a4) {
     telemetry_record_ui_notice("interlude", label, action);
 }
 
+// Native orbital hit/miss result screens are passive even when a portrait
+// popup carries the standard wait/expiry callback. Never suppress a genuine
+// decision callback or any other label.
+static bool autosim_orbital_result_popup(const char* label, fp_none fn) {
+    if (!autosim_ui_active() || !label
+    || (fn && fn != pop_wait && fn != pop_expire)) {
+        return false;
+    }
+    return !strcmp(label, "WEKILLEDIT")
+        || !strcmp(label, "THEYKILLEDIT")
+        || !strcmp(label, "WEMUFFEDIT")
+        || !strcmp(label, "THEYMUFFEDIT");
+}
+
 int __cdecl X_pop(const char* label, fp_none fn)
 {
+    if (autosim_orbital_result_popup(label, fn)) {
+        telemetry_record_ui_notice("x_pop", label, "suppressed_orbital_result");
+        return 0;
+    }
     if (autosim_ui_active()) {
         const AutoUiAction action = autosim_xpop_policy(label, fn != 0);
         if (action != AUTO_UI_NATIVE) {
@@ -357,6 +375,10 @@ int __cdecl X_pop(const char* label, fp_none fn)
 
 int __cdecl X_pop_2(const char* filename, const char* label, fp_none fn)
 {
+    if (autosim_orbital_result_popup(label, fn)) {
+        telemetry_record_ui_notice("x_pop_2", label, "suppressed_orbital_result");
+        return 0;
+    }
     if (autosim_ui_active()) {
         const AutoUiAction action = autosim_xpop_policy(label, fn != 0);
         if (action != AUTO_UI_NATIVE) {
@@ -377,12 +399,20 @@ int __cdecl X_pop_6(const char* label, int a2, fp_none fn)
 
 int __cdecl X_pops(const char* label, Sprite* a2, fp_none fn)
 {
+    if (autosim_orbital_result_popup(label, fn)) {
+        telemetry_record_ui_notice("x_pops", label, "suppressed_orbital_result");
+        return 0;
+    }
     AutosimNativePopupRenderScope native_popup(label);
     return X_pops_18(ScriptFile, label, -1, 0, 0, a2, 1, 1, fn);
 }
 
 int __cdecl X_pops_11(const char* label, int a2, Sprite* a3, fp_none fn)
 {
+    if (autosim_orbital_result_popup(label, fn)) {
+        telemetry_record_ui_notice("x_pops_11", label, "suppressed_orbital_result");
+        return 0;
+    }
     AutosimNativePopupRenderScope native_popup(label);
     return X_pops_18(ScriptFile, label, -1, 0, a2, a3, 1, 1, fn);
 }
