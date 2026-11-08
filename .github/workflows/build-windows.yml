@@ -111,8 +111,11 @@ jobs:
         run: python tools/test_project_docs.py
       - name: Check independent minor-terrain SAV decoder
         run: python tools/test_minor_save.py
-      - name: Stage automation launcher beside the Windows binaries
-        run: cp "Run Automation.bat" "Run Automation.ps1" build/ci/
+      - name: Stage unified automation launcher and Python report tools
+        run: |
+          cp "Run Automation.bat" "Run Automation.ps1" build/ci/
+          mkdir -p build/ci/tools
+          cp "tools/Campaign Analyzer.pyw" "tools/campaign_report.py" build/ci/tools/
       - name: Upload Windows Develop binaries and Stage A launcher
         uses: actions/upload-artifact@v4
         with:
@@ -122,6 +125,8 @@ jobs:
             build/ci/thinker.exe
             build/ci/Run Automation.bat
             build/ci/Run Automation.ps1
+            build/ci/tools/Campaign Analyzer.pyw
+            build/ci/tools/campaign_report.py
           if-no-files-found: error
 
   # Compile-only parity check. Custom Titanium/Inspector native hooks remain
