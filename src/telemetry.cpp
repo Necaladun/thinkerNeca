@@ -764,7 +764,7 @@ static std::ostringstream council_record(const char* type) {
         << ",\"mission_year\":" << *CurrentMissionYear
         << ",\"processing_faction\":" << *CurrentFaction
         << ",\"meeting_id\":" << json_string(
-            (session_id + "-council-" + std::to_string(council_active_meeting)).c_str());
+            (std::string(telemetry_get_session_id()) + "-council-" + std::to_string(council_active_meeting)).c_str());
     return row;
 }
 static void council_append(const std::string& value) {
