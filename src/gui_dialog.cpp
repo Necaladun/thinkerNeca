@@ -80,14 +80,50 @@ void autosim_request_control(AutosimControlRequest request) {
     if (request == AUTOSIM_CTL_STOP || autosim_control_request != AUTOSIM_CTL_STOP)
         autosim_control_request = request;
 }
+// Native popup/engine dispatch can consume WM_KEYDOWN before our polling
+// loop sees it. Sample the physical key state as an independent, focus-gated
+// input path; no game message pumping or asynchronous state mutation occurs.
+// The key must be held until sampled during AI processing. A stop-file
+// request (below) works without any key or window focus.
+static void autosim_poll_physical_shortcuts() {
+    static bool f9_was_down = false;
+    static bool f10_was_down = false;
+    if (!autosim_control_active()) {
+        f9_was_down = false;
+        f10_was_down = false;
+        return;
+    }
+    DWORD foreground_process = 0;
+    HWND foreground = GetForegroundWindow();
+    if (foreground) {
+        GetWindowThreadProcessId(foreground, &foreground_process);
+    }
+    if (foreground_process != GetCurrentProcessId()) {
+        f9_was_down = false;
+        f10_was_down = false;
+        return;
+    }
+    const bool f9_down = (GetAsyncKeyState(VK_F9) & 0x8000) != 0;
+    const bool f10_down = (GetAsyncKeyState(VK_F10) & 0x8000) != 0;
+    if (f9_down && !f9_was_down) {
+        autosim_request_control(AUTOSIM_CTL_PAUSE);
+    }
+    if (f10_down && !f10_was_down) {
+        autosim_request_control(AUTOSIM_CTL_STOP);
+    }
+    f9_was_down = f9_down;
+    f10_was_down = f10_down;
+}
+
 // During a continuous all-AI control_turn() invocation the ordinary Win32
 // message loop may not dispatch keyboard events. Read only queued keyboard
-// messages (never dispatch them into native gameplay) so F9/F10 still latch.
+// messages (never dispatch them into native gameplay) so F9/F10 can latch.
 // Key-up, repeats, printable keys and legacy gameplay shortcuts are ignored
 // while no human faction is under control. This does NOT pump arbitrary game
 // messages or create a reentrant modal/AI action.
 void autosim_collect_queued_keys() {
     if (!autosim_control_active()) return;
+    autosim_poll_physical_shortcuts();
     MSG msg = {};
     while (PeekMessageA(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE)) {
         if (msg.message != WM_KEYDOWN || (msg.lParam & (1u << 30)))
@@ -98,6 +134,31 @@ void autosim_collect_queued_keys() {
             autosim_request_control(AUTOSIM_CTL_PAUSE);
         }
     }
+}
+
+// Independent external stop mechanism: creating autosim-stop.txt beside
+// thinker.exe/terranx.exe requests the existing Save Game -> menu path at the
+// NEXT completed AI cycle. This never enters a native dialog from an incomplete
+// AI faction/combat/upkeep action. It does NOT interrupt an already blocking
+// Council modal: the caller must regain control before the file is checked.
+// Remove the file on receipt so the next simulation is not stopped by stale
+// requests. Resolve relative to the executable, not the launcher's CWD.
+void autosim_collect_stop_file() {
+    if (!autosim_control_active()) return;
+    char executable[MAX_PATH] = {};
+    const DWORD length = GetModuleFileNameA(NULL, executable, MAX_PATH);
+    if (!length || length >= MAX_PATH) return;
+    std::string path(executable, length);
+    const size_t slash = path.find_last_of("\\/");
+    if (slash == std::string::npos) return;
+    path.replace(slash + 1, std::string::npos, "autosim-stop.txt");
+    const DWORD attributes = GetFileAttributesA(path.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES
+    || (attributes & FILE_ATTRIBUTE_DIRECTORY)) return;
+    const bool removed = DeleteFileA(path.c_str()) != 0;
+    autosim_request_control(AUTOSIM_CTL_STOP);
+    telemetry_record_ui_notice("autosim", "EXTERNAL_STOP",
+        removed ? "queued_file_consumed" : "queued_file_could_not_be_removed");
 }
 
 bool autosim_fast_combat_active() {
