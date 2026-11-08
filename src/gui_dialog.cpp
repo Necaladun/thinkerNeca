@@ -200,9 +200,11 @@ void autosim_null_render_popup(const char* label) {
     if (!autosim_null_render_active()) return;
     // Unexpected decision dialogs must remain inspectable. Do not auto-click.
     autosim_null_phase = false;
+    // Do NOT force draw_map from inside a native modal callback: the game
+    // might be in the middle of mutating a map/unit/combat structure.
+    // The dialog itself remains able to draw; the map may be stale.
     telemetry_record_ui_notice("null_render", label ? label : "(null)",
         "native_popup_restore_rendering");
-    draw_map(1);
 }
 void autosim_monitor_commands() {
     if (!autosim_launcher_active || autosim_launch_profile_path.empty()) return;
@@ -342,27 +344,32 @@ int __cdecl X_pop_2(const char* filename, const char* label, fp_none fn)
 
 int __cdecl X_pop_6(const char* label, int a2, fp_none fn)
 {
+    autosim_null_render_popup(label);
     return X_pop_9(ScriptFile, label, -1, 0, a2, fn);
 }
 
 int __cdecl X_pops(const char* label, Sprite* a2, fp_none fn)
 {
+    autosim_null_render_popup(label);
     return X_pops_18(ScriptFile, label, -1, 0, 0, a2, 1, 1, fn);
 }
 
 int __cdecl X_pops_11(const char* label, int a2, Sprite* a3, fp_none fn)
 {
+    autosim_null_render_popup(label);
     return X_pops_18(ScriptFile, label, -1, 0, a2, a3, 1, 1, fn);
 }
 
 int __cdecl X_dialog(const char* label, int faction_id)
 {
+    autosim_null_render_popup(label);
     return X_pops_18(ScriptFile, label, -1, 0, POPUP_UNK_100000,
         FactionPortraits[faction_id], 1, 1, pop_wait);
 }
 
 int __cdecl X_dialog_alt(const char* filename, const char* label, int faction_id)
 {
+    autosim_null_render_popup(label);
     return X_pops_18(filename, label, -1, 0, POPUP_UNK_100000,
         FactionPortraits[faction_id], 1, 1, pop_wait);
 }

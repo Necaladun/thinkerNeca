@@ -70,7 +70,8 @@ verify("native quick start bypasses top menu",
            game.index('else if (top_menu(0))'))
 verify("AI is set before setup_game, native AI starts and no planetfall",
        'FactionStatus[0] = autosim_auto_new_game ? 0 : 1 << plr_id;' in game and
-       '!autosim_auto_new_game' in game[game.index('planetfall(MapWin->cOwner);')-120:game.index('planetfall(MapWin->cOwner);')+40] and
+       'if (!*MultiplayerActive && !(flag & 2) && !autosim_auto_new_game)' in
+            game[game.index('int __cdecl config_game('):] and
        'if (map_menu(1)' in game and
        '|| !is_alive(MapWin->cOwner)' in game)
 verify("native quick setup does not persist modified player preferences",
