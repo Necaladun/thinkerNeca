@@ -644,9 +644,12 @@ try {
                     $campaignFolder, $temporary,
                     [System.IO.Compression.CompressionLevel]::Optimal, $true)
                 if ([System.IO.File]::Exists($destination)) {
-                    [System.IO.File]::Delete($destination)
+                    # Atomic replacement keeps the previous archive intact if
+                    # final commit fails. Temporary and target share a volume.
+                    [System.IO.File]::Replace($temporary, $destination, $null)
+                } else {
+                    [System.IO.File]::Move($temporary, $destination)
                 }
-                [System.IO.File]::Move($temporary, $destination)
             } finally {
                 if ([System.IO.File]::Exists($temporary)) {
                     [System.IO.File]::Delete($temporary)
