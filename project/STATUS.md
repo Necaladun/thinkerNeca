@@ -2,6 +2,10 @@
 
 **Updated:** 2026-11-07. **Authority:** [PR #4](https://github.com/Necaladun/thinkerNeca/pull/4) merged to `master` at [`0f05fdb`](https://github.com/Necaladun/thinkerNeca/commit/0f05fdbd5509616cb5fea598a68ab74d3fd13d8b), followed by [PR #5](https://github.com/Necaladun/thinkerNeca/pull/5) (native manual Empire Report) at [`0b2e77a`](https://github.com/Necaladun/thinkerNeca/commit/0b2e77a00655d332a9b50578691b56a0c595a861). The existing Report and terrain features are now in `master`; deferred tests are not closed.
 
+## AUTO-002/TEL-ORBIT orbital popup and event pass (9 November 2026; unmerged)
+
+Draft [PR #11](https://github.com/Necaladun/thinkerNeca/pull/11) now has a guarded redirect of native orbital hit/miss `popp` callsite `0x4CF70F` (the prior `X_pop` policy missed it), plus standalone `orbit.jsonl` launch, AI attack/result, environmental loss and snapshot records. Source contracts and Windows x86 Develop/Release builds passed at `d13c734`; **no installed Windows runtime check or same-build SAV regression yet**. Logging is independent of UI suppression; detailed AI-production/rejected-target reasons and defensive interception analysis remain deferred. See [TEL-ORBIT](WORK-QUEUE.md) and [testing](TESTING.md).
+
 ## PR #4 — current Develop scope
 
 - Independent Jungle **+1 nutrient**, Uranium **+1 energy**, Titanium **+1 mineral**, with no natural independent-type overlap; geological Uranium/Titanium artwork underneath ordinary resource icons. Current independent-terrain storage uses ordered `THMIN001` **v3**, retaining native `LM_*` identities. Distinct blue-grey Titanium art requires the user's local `neca_sprites.pcx`.
