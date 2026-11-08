@@ -3033,7 +3033,7 @@ MOV_NAVAL:
         veh_id = *CurrentVehID;
     }
     if (base_id >= 0 && veh_cargo(veh_id)) {
-        if (veh_fc_id == MapWin->cOwner || (*MultiplayerActive && is_human(veh_fc_id))) {
+        if (is_human(veh_fc_id) && (veh_fc_id == MapWin->cOwner || *MultiplayerActive)) {
             if (Vehs[veh_id].order != ORDER_MOVE_TO
             || (Vehs[veh_id].waypoint_x[0] == tgt_x && Vehs[veh_id].waypoint_y[0] == tgt_y)) {
                 for (int cur_id = veh_top(veh_id); cur_id >= 0; cur_id = Vehs[cur_id].next_veh_id_stack) {
@@ -3046,7 +3046,8 @@ MOV_NAVAL:
             }
         }
     }
-    if (veh_fc_id == MapWin->cOwner && *GamePreferences & PREF_AUTO_WAKE_VEH_TRANS_REACH_LAND) {
+    if (is_human(veh_fc_id) && veh_fc_id == MapWin->cOwner
+    && *GamePreferences & PREF_AUTO_WAKE_VEH_TRANS_REACH_LAND) {
         if (Vehs[veh_id].triad() == TRIAD_SEA && veh_cargo(veh_id) && tgt_at_sea) {
             if ((veh_speed(veh_id, 0) - Vehs[veh_id].moves_spent <= 0)
             && (Vehs[veh_id].order != ORDER_MOVE_TO
