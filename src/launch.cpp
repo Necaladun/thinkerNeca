@@ -1,5 +1,6 @@
 
 #include "launch.h"
+#include <string>
 
 FILE* debug_log = NULL;
 
