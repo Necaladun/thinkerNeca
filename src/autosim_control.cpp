@@ -257,7 +257,8 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         }
     }
     const std::string save = read_field(dialog, ID_SAVE_NAME);
-    if (id != ID_TAKE_CONTROL && !is_safe_save_name(save)) {
+    if ((id == ID_SAVE_CONTINUE || id == ID_SAVE_EXIT)
+    && !is_safe_save_name(save)) {
         MessageBoxA(dialog,
             "Save name must be 1-72 characters using letters, digits,"
             " spaces, hyphens, underscores or dots. No paths/device names.",
@@ -369,7 +370,8 @@ AutosimDialogChoice autosim_show_control_dialog(AutosimDialogState* state) {
     tpl->dwExtendedStyle = 0;
     tpl->cdit = 0;
     tpl->x = 0; tpl->y = 0;
-    tpl->cx = 520; tpl->cy = 465;
+    // Fit an 800x600 game viewport at standard Windows dialog font metrics.
+    tpl->cx = 440; tpl->cy = 330;
     // The trailing six bytes are zero (no menu, default dialog class,
     // zero-length title); set caption after creation in WM_INITDIALOG.
     DialogContext ctx = {};
