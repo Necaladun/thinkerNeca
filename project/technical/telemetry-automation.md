@@ -455,3 +455,23 @@ image is writable, *before* restoring `PAGE_EXECUTE_READ`. Previously
 were read/execute; this is a likely cause of the game disappearing before
 any recorder heartbeat on both New and Load routes. The static regression
 checks order; runtime is still unverified.
+
+
+### AUTO-002 9 Nov: one-run exit and scoped Null drawing
+
+In the first Windows zero-input New Game test, Save & Exit returned to
+`control_game()` with native `ControlTurnB=1`. The launcher-specific
+`autosim_auto_new_game` flag was still set, so the next loop generated
+another map. An automation launcher invocation now terminates cleanly
+after `control_turn()` returns; future multi-game batching must be
+orchestrated by the external launcher, not by reentering the native loop.
+
+`X_pop`, `X_pop_2`, `X_pop_6`, `X_pops`, `X_pops_11`,
+`X_dialog`, and `X_dialog_alt` previously deactivated null drawing
+for a native modal and left it off after that modal returned. They now
+use a scope guard to restore the prior suppression state after completion,
+keeping the modal visible while blocked. Null's display still has
+unhooked paths and may show partial draw artefacts. The live `.status`
+adds configured and effective rendering state for diagnosis.
+The console requests initial foreground focus after receiving the first
+`ai_turn` event; this is best effort under Windows focus-stealing rules.

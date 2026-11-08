@@ -883,3 +883,36 @@ binary disassembly, **not yet a Windows runtime correction**. Require
 new user test for loading a SAV in Null and Fast modes, New Game,
 status/telemetry, monitor and normal human startup. Do not merge pending
 actual Windows confirmation and all other native acceptance.
+
+
+### AUTO-002 initial automatic New Game Windows acceptance and follow-up (9 Nov)
+
+**User-reported Windows passes:** the explicit automation launcher creates a
+new game and enters all-AI progression without in-game setup or human action.
+A late-game loaded SAV also progressed MY2341–2354 with the external monitor
+reporting `null`, and with a substantial subjective speed improvement. The
+loaded game's partial visual output is not a claim of complete rendering
+elimination. No deterministic state or AI visibility comparison yet.
+
+**User-reported failures:** the new game displayed full graphics, console
+R/N/Q commands were inaccessible until switching focus away from SMAC,
+and Save & Exit started *another* new game instead of stopping. Source
+shows `ControlTurnB=1` returns to the outer game loop, which still had
+`autosim_auto_new_game=true`; a fix now exits launcher-origin game
+execution after `control_turn()`. The X_pop/X_pops wrappers were setting
+`autosim_null_phase=false` to show an actual native popup but never
+restored it after the popup returned; seven wrappers now scope restoration
+using RAII, without altering native choices or suppression policy.
+Per-run status exposes `configured_render`, `null_phase`,
+`null_override` and effective `render`. The external monitor attempts
+to foreground its console once on first live AI processing, but Windows
+foreground policy can deny this and manual Alt+Tab remains the fallback.
+All corrective changes are **source/CI only until next Windows run**.
+
+**Next native checks:** create new game with Presentation explicitly Null,
+verify status `configured_render=2 render=null` across turns, trigger
+known and unexpected popups and check the phase is restored, test R/N
+with console focused and verify status transitions, press Save & Exit
+and ensure the game exits with no automatic new map, inspect named SAV
+and session closure, reload using the same build. Then recheck ordinary
+human `thinker.exe` and loaded SAV, and inspect data parity when available.

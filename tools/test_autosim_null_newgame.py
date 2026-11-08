@@ -99,3 +99,29 @@ verify("null render hooks installed before game image returns to read/execute",
 verify("game executable was first made writable for verified patch setup",
        patch_src.index("VirtualProtect(AC_IMAGE_BASE, AC_IMAGE_LEN, PAGE_EXECUTE_READWRITE, &attrs)") <
        patch_src.index("autosim_install_null_render_hooks()"))
+
+# New Game Windows test follow-up, 9 November 2026: Save & Exit reused
+# the persistent automatic-new-game branch and native X_pop left rendering
+# re-enabled until the following cycle. Operator console initially had no focus.
+game_src=files["src/game.cpp"]
+gui_src=files["src/gui_dialog.cpp"]
+verify("one automation launch = one game, never loop back into automatic new world",
+       "if (autosim_launcher_active) {" in
+       game_src[game_src.index("desktop_close();"):game_src.index("desktop_close();")+550]
+       and "*ControlTurnB = 0;" in
+       game_src[game_src.index("desktop_close();"):game_src.index("desktop_close();")+550]
+       and "return cleanup_close();" in
+       game_src[game_src.index("desktop_close();"):game_src.index("desktop_close();")+550])
+verify("seven native X_pop/X_pops wrappers restore null after modal returns",
+       gui_src.count("AutosimNativePopupRenderScope native_popup(label);") == 7
+       and "if (had_null && autosim_control_active())" in gui_src
+       and "autosim_null_render_suppress(true);" in gui_src
+       and "~AutosimNativePopupRenderScope()" in gui_src)
+verify("NULL command immediately reenables null while all-AI eligible",
+       "if (autosim_control_active()) autosim_null_phase = true;" in gui_src)
+verify("monitor exposes actual render selection and phase state",
+       all(x in gui_src for x in ("configured_render=%d",
+                                 "null_phase=%d", "null_override=%d")))
+verify("monitor attempts foreground console on first AI processing phase",
+       "GetConsoleWindow" in launcher and "consoleFocusAttempted" in launcher
+       and "SetForegroundWindow($consoleWindow)" in launcher)

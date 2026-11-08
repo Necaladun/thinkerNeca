@@ -200,3 +200,12 @@ first simulation heartbeat or campaign recorder. The renderer detours
 were installed after executable pages had been restored to read/execute;
 source patch now installs them while pages are writable. Awaiting
 Windows user confirmation and actual crash-code evidence.
+
+
+**AUTO-002 Windows New Game integration (9 Nov, PR #11 draft):** user
+confirmed no-click fresh-map creation and AI progression; Save & Exit
+unexpectedly began another game, graphics remained fully enabled and
+monitor keys required Alt+Tab. Source follow-up closes a launcher game
+after control_turn returns, restores Null Rendering after native
+modal returns, adds per-phase renderer diagnostics and tries to foreground
+the console on initial AI processing. Windows retest pending.
