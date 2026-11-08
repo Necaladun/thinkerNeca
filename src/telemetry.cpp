@@ -118,37 +118,49 @@ bool make_dir(const std::string& path, bool allow_existing) {
 }
 
 // An explicit link is written ONLY by Simulation Control named saves.
-// No map-seed, year, filename or faction matching is used to infer identity.
+// FNV-1a+length binds it to the exact save bytes (noncryptographic); a later
+// native Save Game overwrite cannot silently inherit stale campaign identity.
+std::string file_fingerprint(const char* path);
+
 bool read_named_save_link(const std::string& save_path, std::string* id,
     std::string* created, std::string* display) {
-    FILE* fp = fopen((save_path + ".autosim-campaign").c_str(), "rb");
-    if (!fp) return false;
-    char version[64] = {}, linked_id[128] = {}, stamp[64] = {}, label[160] = {};
-    const bool ok = fgets(version, sizeof(version), fp)
-        && fgets(linked_id, sizeof(linked_id), fp)
-        && fgets(stamp, sizeof(stamp), fp)
-        && fgets(label, sizeof(label), fp);
-    fclose(fp);
-    if (!ok) return false;
-    auto remove_newline = [](char* value) {
-        size_t n = strlen(value);
-        while (n && (value[n - 1] == '\n' || value[n - 1] == '\r'))
-            value[--n] = '\0';
-    };
-    remove_newline(version); remove_newline(linked_id);
-    remove_newline(stamp); remove_newline(label);
-    if (strcmp(version, "thinkerNeca-campaign-v1")
-    || !valid_campaign_id(linked_id) || strlen(stamp) != 16
-    || !label[0]) return false;
-    const std::string root = std::string("campaigns/") + linked_id;
-    DWORD attrs = GetFileAttributesA((root + "/campaign.json").c_str());
-    if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY))
-        return false;
-    attrs = GetFileAttributesA((root + "/sessions").c_str());
-    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
-        return false;
-    *id = linked_id; *created = stamp; *display = label;
-    return true;
+    std::vector<std::string> candidates(1, save_path);
+    if (save_path.find_first_of("\\/") == std::string::npos)
+        candidates.push_back("saves/" + save_path);
+    for (const std::string& candidate : candidates) {
+        FILE* fp = fopen((candidate + ".autosim-campaign").c_str(), "rb");
+        if (!fp) continue;
+        char version[64] = {}, linked_id[128] = {}, stamp[64] = {},
+            label[160] = {}, fingerprint[180] = {};
+        const bool ok = fgets(version, sizeof(version), fp)
+            && fgets(linked_id, sizeof(linked_id), fp)
+            && fgets(stamp, sizeof(stamp), fp)
+            && fgets(label, sizeof(label), fp)
+            && fgets(fingerprint, sizeof(fingerprint), fp);
+        fclose(fp);
+        if (!ok) continue;
+        auto remove_newline = [](char* value) {
+            size_t n = strlen(value);
+            while (n && (value[n - 1] == '\n' || value[n - 1] == '\r'))
+                value[--n] = '\0';
+        };
+        remove_newline(version); remove_newline(linked_id);
+        remove_newline(stamp); remove_newline(label); remove_newline(fingerprint);
+        if (strcmp(version, "thinkerNeca-campaign-v2")
+        || !valid_campaign_id(linked_id) || strlen(stamp) != 16
+        || !label[0] || strncmp(fingerprint, "{\"present\":true,", 16)
+        || file_fingerprint(candidate.c_str()) != fingerprint) continue;
+        const std::string root = std::string("campaigns/") + linked_id;
+        DWORD attrs = GetFileAttributesA((root + "/campaign.json").c_str());
+        if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY))
+            continue;
+        attrs = GetFileAttributesA((root + "/sessions").c_str());
+        if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+            continue;
+        *id = linked_id; *created = stamp; *display = label;
+        return true;
+    }
+    return false;
 }
 
 bool atomic_write(const std::string& path, const std::string& contents) {
@@ -546,12 +558,25 @@ bool telemetry_set_campaign_name(const char* name) {
 }
 
 bool telemetry_record_named_save(const char* save_path) {
-    if (!save_path || !save_path[0] || campaign_id.empty())
-        return true;  // Telemetry was explicitly disabled.
+    if (!save_path || !save_path[0]) return false;
     const std::string path = std::string(save_path) + ".autosim-campaign";
-    const std::string contents = "thinkerNeca-campaign-v1\n" + campaign_id
-        + "\n" + campaign_created_utc + "\n" + campaign_display_name + "\n";
+    if (campaign_id.empty()) {
+        // Telemetry disabled: do not leave a prior save's stale campaign link
+        // attached after the native serializer has overwritten its bytes.
+        DeleteFileA(path.c_str());
+        return true;
+    }
+    const std::string fingerprint = file_fingerprint(save_path);
+    if (fingerprint.find("{\"present\":true,") != 0
+    || fingerprint.find("read_error") != std::string::npos) {
+        DeleteFileA(path.c_str());
+        return false;
+    }
+    const std::string contents = "thinkerNeca-campaign-v2\n" + campaign_id
+        + "\n" + campaign_created_utc + "\n" + campaign_display_name
+        + "\n" + fingerprint + "\n";
     if (!atomic_write(path, contents)) {
+        DeleteFileA(path.c_str());
         OutputDebugStringA("thinkerNeca TEL-001: failed to write named-save campaign link\n");
         return false;
     }
