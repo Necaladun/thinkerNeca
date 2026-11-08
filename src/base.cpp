@@ -1037,6 +1037,9 @@ void __cdecl mod_base_change(int base_id, int item_id) {
     if (item_id == old_item) {
         return;
     }
+    // Read-only Secret Project transition; does not affect AI build choices,
+    // project announcements or resource/retool calculations.
+    telemetry_project_queue_changed(base_id, old_item, item_id);
     if (old_item >= 0 && old_item < MaxProtoNum) { // added bounds checking
         plr->units_queue[old_item]--;
     }
@@ -3695,6 +3698,9 @@ int __cdecl mod_base_production() {
     } else {
         assert(project_id <= SP_ID_Last - SP_ID_First);
         SecretProjects[project_id] = *CurrentBaseID;
+        // Actual project ownership is committed here, before optional
+        // cinematics/popups. Log the game event independently of the UI.
+        telemetry_project_completed(*CurrentBaseID, facility_id);
     }
     if (facility_id == FAC_NETWORK_NODE) {
         base->state_flags &= ~(BSTATE_ARTIFACT_ALREADY_LINKED|BSTATE_ARTIFACT_LINKED);
