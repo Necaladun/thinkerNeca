@@ -2,7 +2,7 @@
 """AUTO-002 satellite lifecycle and native orbital-strike trace source contract.
 
 A structural test, not proof that native action_sat_attack routes its popup
-through X_pop/X_pop_2. Windows x86 validation remains required.
+through any of the covered X_pop/X_pops variants. Windows x86 validation remains required.
 """
 from pathlib import Path
 
@@ -29,6 +29,23 @@ assert "return conf.autosim_suppress_notices && autosim_control_active();" in ui
 assert "const AutoUiAction action = autosim_xpop_policy(label, fn != 0);" in ui
 assert "return X_pop_9(ScriptFile, label, -1, 0, 0, fn);" in ui
 assert "return X_pop_9(filename, label, -1, 0, 0, fn);" in ui
+# Alternate native entrypoints and portrait/wait callbacks are filtered only
+# for the four orbital hit/miss results, never for Council, diplomacy or
+# other user-input choices. The core X_pops_18 remains untouched.
+for addr, wrapper in (("0x5BF330", "X_pop_2"),
+                      ("0x5BF5D0", "X_pops"),
+                      ("0x5BF7D0", "X_pops_11")):
+    assert f"write_jump({addr}, (int){wrapper});" in patch
+for label in ("WEKILLEDIT", "THEYKILLEDIT", "WEMUFFEDIT", "THEYMUFFEDIT"):
+    assert f'!strcmp(label, "{label}")' in ui
+assert "static bool autosim_orbital_result_popup(const char* label, fp_none fn)" in ui
+assert "if (!autosim_ui_active() || !label" in ui
+assert "(fn && fn != pop_wait && fn != pop_expire)" in ui
+for entry in ('"x_pop"', '"x_pop_2"', '"x_pops"', '"x_pops_11"'):
+    assert f'telemetry_record_ui_notice({entry}, label, "suppressed_orbital_result");' in ui
+assert 'return X_pops_18(ScriptFile, label, -1, 0, 0, a2, 1, 1, fn);' in ui
+assert 'return X_pops_18(ScriptFile, label, -1, 0, a2, a3, 1, 1, fn);' in ui
+assert "write_jump(0x5BF930," not in patch
 
 # Source-owned satellite construction already preserves counts and visibility.
 for counter in ("satellites_nutrient++", "satellites_mineral++",
@@ -80,4 +97,4 @@ assert "write_jump(0x4CF480, (int)action_sat_attack);" in patch
 assert "write_jump(0x4A0260, (int)sat_attack);" in patch
 assert "Faction_sat_attack action_sat_attack = (Faction_sat_attack)0x4CF480;" in engine
 
-print("AUTO-002 orbital lifecycle and AI attack trace source contract passed (native popup path unverified)")
+print("AUTO-002 orbital lifecycle/native popup routing contract passed (Windows test pending)")
