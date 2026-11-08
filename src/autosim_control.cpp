@@ -122,13 +122,22 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         add_child(dialog, "STATIC", intro,
             SS_LEFT, 0, 0, left, 13, inner, 23);
         char summary[384] = {};
-        snprintf(summary, sizeof(summary),
-            "Observed faction: %d    Humans mask: %02X    Living factions: %d\r\n"
-            "Turns: %d segment / %d this run.  Mission years: %d -> %d\r\n"
-            "Colonies: %d -> %d    Units: %d -> %d",
-            s.viewed_faction, (unsigned)(s.human_mask & 0xFF), s.alive_factions,
-            s.completed_segment, s.completed_total, s.start_year, s.end_year,
-            s.start_bases, s.end_bases, s.start_units, s.end_units);
+        if (s.mode == AUTOSIM_DIALOG_VICTORY) {
+            snprintf(summary, sizeof(summary),
+                "MY%d. Observed faction: %d    Humans mask: %02X    Living factions: %d\r\n"
+                "Colonies: %d    Units: %d\r\n"
+                "Post-victory continuation creates an experimental extra segment.",
+                s.end_year, s.viewed_faction, (unsigned)(s.human_mask & 0xFF),
+                s.alive_factions, s.end_bases, s.end_units);
+        } else {
+            snprintf(summary, sizeof(summary),
+                "Observed faction: %d    Humans mask: %02X    Living factions: %d\r\n"
+                "Turns: %d segment / %d this run.  Mission years: %d -> %d\r\n"
+                "Colonies: %d -> %d    Units: %d -> %d",
+                s.viewed_faction, (unsigned)(s.human_mask & 0xFF), s.alive_factions,
+                s.completed_segment, s.completed_total, s.start_year, s.end_year,
+                s.start_bases, s.end_bases, s.start_units, s.end_units);
+        }
         add_child(dialog, "STATIC", summary, SS_LEFT, 0, 0, left, 43, inner, 66);
 
         char session[256] = {};
