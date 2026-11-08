@@ -2,6 +2,10 @@
 
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
+## Unmerged AUTO-002 — defensive diplomacy guard and Council diagnostics (8 November 2026)
+
+- The existing `enemy_diplomacy` source already routes AI-to-AI participants through AI trade/encounter/treaty logic, not interactive `communicate`. Added a fail-closed `autosim_control_active()` entry guard only to the human-oriented `communicate` handler; unexpected all-AI calls are logged to `ui_notices.jsonl` with `diplomacy_guard` and cause no fabricated choice. Added non-mutating `call_council` entry/exit diagnostics for telemetry-enabled AI-only sessions and source-level regression checks. **Windows validation and Lal's actual native Council/bribery caller remain outstanding; not a proven unattended Council fix.**
+
 ## Unmerged AUTO-002 — offscreen combat, movement and fungus notices (8 November 2026)
 
 - Experimental AI-only fast-presentation follow-up on `feature/auto-002-noninteractive-ui`: disable observer camera recentering, cursor/scoot animation, repeated battle window and per-defender artillery explosion rendering via existing offscreen movement/combat presentation paths. Retain actual move/AI/combat/RNG/HP/visibility/state processing; world tile updates continue. Scoped native preferences hide go-to paths, unit blink, base/production labels and edge scroll only during all-AI processing, then restore exact original values before autosave and normal human play. `FUNGUSGROWS`/`FUNGUSGROWS2` and forest/kelp growth reports use existing source-audited passive notice suppression without skipping ecology changes. [Windows x86 Develop/Release compilation and host/source checks passed at `d651cff` (run 42447573120)](https://github.com/Necaladun/thinkerNeca/actions/runs/42447573120). **Windows late-turn, artillery-stack, ecology and RNG-equivalence tests outstanding.**
