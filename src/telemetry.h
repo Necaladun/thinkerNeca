@@ -15,6 +15,8 @@ void telemetry_phase_end(const TelemetryPhaseStamp& stamp, const char* phase, in
 // Optional full-cycle game-state checkpoint stored in the active campaign archive.
 // Does not replace native autosaves or run during Ironman RNG-mutating saves.
 void telemetry_archive_completed_turn();
+// Preserve operator-created native SAVs beside telemetry without replacing them.
+void telemetry_archive_named_save(const char* saved_game_path);
 // Terminal result is recorded once at the exact faction/phase boundary,
 // without pretending an incomplete turn was a completed cycle.
 void telemetry_record_terminal_result(const char* save_path, const char* save_status);
