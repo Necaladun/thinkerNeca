@@ -51,7 +51,7 @@ pairs = [
      and "if (!resolved || win->proposal_outcome == 0)" in turn
      and "const int result = original(win, a2, a3, a4);" in turn),
     ("independent flushed Council file", "council.jsonl" in tele and "append_line(council_file, value)" in tele),
-    ("all proposal names included", all(x in turn for x in (
+    ("all proposal names included", all(x in tele for x in (
         '"planetary_governor"', '"supreme_leader"', '"unity_core"',
         '"global_trade_pact"', '"repeal_global_trade_pact"',
         '"launch_solar_shade"', '"increase_solar_shade"',
