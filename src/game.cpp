@@ -1571,6 +1571,31 @@ CONF_PICK:
     if (!flag) {
         prefs_save(1);
     }
+    // Launcher-only explicit seven-slot roster. Use the same native faction
+    // reader and flag/art loaders as the ordinary randomized faction picker.
+    // This runs before normal game setup; it does not touch saved-game rosters.
+    if (autosim_auto_new_game && !autosim_new_roster[0].empty()) {
+        for (int i = 1; i < MaxPlayerNum; ++i) {
+            const std::string& identity = autosim_new_roster[i - 1];
+            const bool needs_expansion = identity == "CYBORG"
+                || identity == "PIRATES" || identity == "DRONE"
+                || identity == "ANGELS" || identity == "FUNGBOY"
+                || identity == "CARETAKE" || identity == "USURPER";
+            if (needs_expansion && !*ExpansionEnabled) {
+                MessageBoxA(*phWnd,
+                    "The selected faction roster includes Alien Crossfire factions, "
+                    "but the expansion is not enabled. The game was not started.",
+                    "thinkerNeca Automation Roster", MB_OK | MB_ICONSTOP);
+                return 1;
+            }
+            MFaction* fac = &MFactions[i];
+            strcpy_n(fac->filename, 24, identity.c_str());
+            strcpy_n(fac->search_key, 24, identity.c_str());
+            read_faction(fac, 0);
+            load_faction_art(i);
+            debug("autosim faction slot %d %s\n", i, identity.c_str());
+        }
+    }
     for (int i = 1; i < MaxPlayerNum; ++i) {
         MFaction* fac = &MFactions[i];
         if (strcmp(fac->filename, "JENN282")) {
