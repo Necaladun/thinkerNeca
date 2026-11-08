@@ -76,6 +76,20 @@ int main(int argc, char* argv[]) {
     if (!createValue) {
         ExitFail();
     }
+    // Thinker exits shortly after injection. Tell the opt-in external
+    // monitor the actual child PID *before* the first game-status update,
+    // so startup failures and early native modals remain inspectable.
+    char autosim_profile[4096] = {};
+    const DWORD profile_len = GetEnvironmentVariableA(
+        "THINKERNECA_AUTOSIM_PROFILE", autosim_profile, sizeof(autosim_profile));
+    if (profile_len > 0 && profile_len < sizeof(autosim_profile)) {
+        std::string pid_path = std::string(autosim_profile) + ".pid";
+        FILE* pid_file = fopen(pid_path.c_str(), "wb");
+        if (pid_file) {
+            fprintf(pid_file, "%lu\n", (unsigned long)pi.dwProcessId);
+            fclose(pid_file);
+        }
+    }
     LPVOID loadAddr = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
     if (loadAddr == NULL) {
         ExitFail(pi);

@@ -40,6 +40,10 @@ verify("phase-scoped null, operator dialogue restored",
        'autosim_monitor_progress("turn_completed", 0);' in turn and
        'autosim_monitor_progress("operator_dialog", 0);' in turn and
        'autosim_null_render_suppress(false);' in turn)
+verify("native launcher advertises game PID before its first status",
+       "THINKERNECA_AUTOSIM_PROFILE" in (r/"src/launch.cpp").read_text()
+       and '".pid"' in (r/"src/launch.cpp").read_text()
+       and "$pidFile = $profile + '.pid'" in launcher)
 verify("stalls have independently polled status, with no auto kill",
        'autosim_launch_profile_path + ".status"' in dialog and
        'autosim_launch_profile_path + ".command"' in dialog and

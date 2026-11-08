@@ -174,6 +174,7 @@ public static class AutoMonitorWin32 {
 }
 '@
     $statusFile = $profile + '.status'
+    $pidFile = $profile + '.pid'
     $lastRecord = ''
     $lastProgress = [DateTime]::UtcNow
     $gamePid = 0
@@ -186,6 +187,14 @@ public static class AutoMonitorWin32 {
     Write-Host 'Q: Leave monitor open? No - Q closes this console WITHOUT killing the game.'
     Write-Host ('No-progress warning: ' + $warningSeconds + ' seconds. Never auto-kills the game.')
     while ($true) {
+        if ($gamePid -eq 0 -and [System.IO.File]::Exists($pidFile)) {
+            $foundPid = 0
+            if ([int]::TryParse([System.IO.File]::ReadAllText($pidFile).Trim(),
+                    [ref]$foundPid) -and $foundPid -gt 0) {
+                $gamePid = $foundPid
+                Write-Host ('Game process detected: PID ' + $gamePid)
+            }
+        }
         if ([System.IO.File]::Exists($statusFile)) {
             try {
                 $record = @{}
