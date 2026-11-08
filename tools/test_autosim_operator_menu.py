@@ -113,7 +113,8 @@ assert '"autosim-v1 %d %d %d\\n"' in tele
 begin = tele[tele.index("void telemetry_begin_session("):
              tele.index("void telemetry_record_ui_notice(")]
 assert begin.index("== IDYES") < begin.index("resumed_linked_campaign = true;")
-assert begin.index("resumed_linked_campaign = true;") < begin.index("if (linked_turns > 0)")
+assert begin.index("resumed_linked_campaign = true;") < begin.index("if (linked_turns > 0 && !autosim_launcher_active)")
+assert "if (linked_turns > 0 && !autosim_launcher_active)" in begin
 assert "conf.autosim_manual_turns = linked_turns;" in begin
 assert "conf.autosim_suppress_notices = linked_notices;" in begin
 assert "conf.autosim_fast_combat = linked_fast;" in begin

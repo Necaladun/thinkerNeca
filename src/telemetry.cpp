@@ -325,7 +325,9 @@ void telemetry_begin_session(const char* source_save) {
             resumed_linked_campaign = true;
             // Only apply an explicit operator profile after the campaign
             // relink has been accepted. Session identity stays unchanged.
-            if (linked_turns > 0) {
+            // Explicit pre-game launcher settings override older settings
+            // saved in the sidecar of a resumed campaign.
+            if (linked_turns > 0 && !autosim_launcher_active) {
                 conf.autosim_manual_turns = linked_turns;
                 conf.autosim_suppress_notices = linked_notices;
                 conf.autosim_fast_combat = linked_fast;
@@ -407,7 +409,13 @@ void telemetry_begin_session(const char* source_save) {
              << ",\"alphax.txt\":" << file_fingerprint("alphax.txt")
              << ",\"terranx.exe\":" << file_fingerprint("terranx.exe")
              << ",\"thinker.dll\":" << file_fingerprint("thinker.dll")
-             << "},\"factions\":[";
+              << "},\"automation_launch\":"
+              << (autosim_launcher_active ? "true" : "false")
+              << ",\"automation_profile\":"
+              << (autosim_launch_profile_path.empty()
+                  ? "{\"present\":false}"
+                  : file_fingerprint(autosim_launch_profile_path.c_str()))
+              << ",\"factions\":[";
     for (int fc = 1; fc < MaxPlayerNum; ++fc) {
         if (fc > 1) manifest << ',';
         manifest << "{\"id\":" << fc << ",\"name\":"

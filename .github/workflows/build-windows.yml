@@ -79,6 +79,10 @@ jobs:
         run: python tools/test_autosim_session_control.py
       - name: Test AUTO-002 unified startup/menu and linked-save operator settings
         run: python tools/test_autosim_operator_menu.py
+      - name: Test AUTO-LAUNCH Stage A profile isolation and script writer
+        run: |
+          python tools/test_autosim_launch_profile.py
+          pwsh -NoProfile -File './Run Automation.ps1' -SelfTest
       - name: Check AUTO-002 full-turn presentation and autosave source contract
         run: python tools/test_autosim_presentation_contract.py
       - name: Check AUTO-002 satellite, wipeout and late-game notices
@@ -110,6 +114,8 @@ jobs:
           path: |
             build/ci/thinker.dll
             build/ci/thinker.exe
+            Run Automation.bat
+            Run Automation.ps1
           if-no-files-found: error
 
   # Compile-only parity check. Custom Titanium/Inspector native hooks remain
