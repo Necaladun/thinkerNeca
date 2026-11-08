@@ -15,6 +15,15 @@ function New-Defaults {
         telemetry_enabled = '1'
         suppress_notices = '1'
         fast_combat = '1'
+        render_mode = '2'
+        world_size = '3'
+        world_ocean = '1'
+        world_erosion = '1'
+        world_cloud = '1'
+        world_life = '1'
+        difficulty = '3'
+        observer = '1'
+        monitor_seconds = '45'
     }
 }
 
@@ -43,7 +52,10 @@ function New-OptionLines($options, [bool]$includeSchema) {
     $lines.Add('[automation]')
     if ($includeSchema) { $lines.Add('schema=1') }
     foreach ($key in @('mode', 'source_save', 'campaign_name',
-                      'turns', 'telemetry_enabled', 'suppress_notices', 'fast_combat')) {
+                      'turns', 'telemetry_enabled', 'suppress_notices', 'fast_combat',
+                      'render_mode', 'world_size', 'world_ocean', 'world_erosion',
+                      'world_cloud', 'world_life', 'difficulty', 'observer',
+                      'monitor_seconds')) {
         $lines.Add($key + '=' + [string]$options[$key])
     }
     return $lines.ToArray()
@@ -98,192 +110,407 @@ if ($SelfTest) {
     exit 0
 }
 
+
+# Workstation monitor: warning only, never automatically kill the game.
+# The DLL writes <profile>.status atomically at faction/phase boundaries and
+# reads <profile>.command on those same boundaries.
+function Write-RunCommand([string]$profile, [string]$command) {
+    $destination = $profile + '.command'
+    [System.IO.File]::WriteAllText($destination, $command + [Environment]::NewLine,
+                                  [System.Text.Encoding]::ASCII)
+}
+function Show-GameWindow([int]$pidToShow) {
+    try {
+        $process = [System.Diagnostics.Process]::GetProcessById($pidToShow)
+        $process.Refresh()
+        $handle = $process.MainWindowHandle
+        if ($handle -eq [IntPtr]::Zero) { Write-Host 'No game window available yet.'; return $null }
+        [AutoMonitorWin32]::ShowWindow($handle, 9) | Out-Null
+        [AutoMonitorWin32]::SetForegroundWindow($handle) | Out-Null
+        return $handle
+    } catch {
+        Write-Host ('Show Game failed: ' + $_.Exception.Message)
+        return $null
+    }
+}
+function Save-GameScreenshot([int]$pidToCapture, [string]$root) {
+    $window = Show-GameWindow $pidToCapture
+    if ($null -eq $window) { return }
+    $rect = New-Object AutoMonitorRect
+    if (-not [AutoMonitorWin32]::GetWindowRect($window, [ref]$rect)) {
+        Write-Host 'Could not determine game window bounds.'; return
+    }
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+    if ($width -lt 20 -or $height -lt 20) { Write-Host 'Invalid window bounds.'; return }
+    $dir = Join-Path $root 'automation\screenshots'
+    [void][System.IO.Directory]::CreateDirectory($dir)
+    $filename = Join-Path $dir ((Get-Date -Format 'yyyyMMdd_HHmmss') + '_game.png')
+    $bitmap = New-Object System.Drawing.Bitmap $width,$height
+    try {
+        $drawing = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $drawing.CopyFromScreen($rect.Left, $rect.Top, 0, 0,
+                (New-Object System.Drawing.Size($width,$height)))
+        } finally { $drawing.Dispose() }
+        $bitmap.Save($filename,[System.Drawing.Imaging.ImageFormat]::Png)
+        Write-Host ('Screenshot saved: ' + $filename)
+        Write-Host 'If Null Rendering was active, only previously drawn content may be visible.'
+    } finally { $bitmap.Dispose() }
+}
+function Run-Monitor([string]$profile, [int]$warningSeconds) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+[StructLayout(LayoutKind.Sequential)]
+public struct AutoMonitorRect { public int Left, Top, Right, Bottom; }
+public static class AutoMonitorWin32 {
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hwnd, int show);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, ref AutoMonitorRect rect);
+}
+'@
+    $statusFile = $profile + '.status'
+    $lastRecord = ''
+    $lastProgress = [DateTime]::UtcNow
+    $gamePid = 0
+    $reportedStall = $false
+    $monitorStart = [DateTime]::UtcNow
+    Write-Host ''
+    Write-Host 'thinkerNeca Automation Monitor'
+    Write-Host 'G: Show game  |  R: Restore rendering  |  N: Null rendering'
+    Write-Host 'P: Screenshot  |  S: Stop at next full turn  |  Space: Pause at next full turn'
+    Write-Host 'Q: Leave monitor open? No - Q closes this console WITHOUT killing the game.'
+    Write-Host ('No-progress warning: ' + $warningSeconds + ' seconds. Never auto-kills the game.')
+    while ($true) {
+        if ([System.IO.File]::Exists($statusFile)) {
+            try {
+                $record = @{}
+                foreach ($line in [System.IO.File]::ReadAllLines($statusFile)) {
+                    $split = $line.IndexOf('=')
+                    if ($split -gt 0) {
+                        $record[$line.Substring(0,$split)] = $line.Substring($split+1)
+                    }
+                }
+                if ($record.ContainsKey('pid') -and
+                    [int]::TryParse($record['pid'], [ref]$gamePid)) {
+                    # The process is intentionally discovered from the game DLL,
+                    # not from thinker.exe, which exits immediately after launch.
+                }
+                $signature = @($record['turn'],$record['year'],
+                               $record['faction'],$record['phase'],$record['render']) -join '/'
+                if ($signature -ne $lastRecord) {
+                    Write-Host ('MY ' + $record['year'] +
+                        ' | turn ' + $record['turn'] +
+                        ' | faction ' + $record['faction'] +
+                        ' | ' + $record['phase'] +
+                        ' | ' + $record['render'])
+                    $lastRecord = $signature
+                    $lastProgress = [DateTime]::UtcNow
+                    $reportedStall = $false
+                }
+                if ($record['phase'] -eq 'turn_driver_exit') {
+                    Write-Host 'Simulation driver exited. Check game and campaign logs.'
+                    return
+                }
+            } catch {
+                Write-Host ('Monitor read error: ' + $_.Exception.Message)
+            }
+        }
+        if ($gamePid -gt 0) {
+            try {
+                $game = [System.Diagnostics.Process]::GetProcessById($gamePid)
+                if ($game.HasExited) {
+                    Write-Host ('Game process exited with code ' + $game.ExitCode)
+                    return
+                }
+            } catch {
+                Write-Host 'Game process has exited or is no longer accessible.'
+                return
+            }
+        }
+        $now = [DateTime]::UtcNow
+        $elapsed = ($now - $lastProgress).TotalSeconds
+        if ($elapsed -ge $warningSeconds -and -not $reportedStall) {
+            Write-Warning ('No phase/turn progress for ' + [int]$elapsed +
+                ' seconds. Possible lengthy AI turn, modal, or hang; game not terminated.')
+            try { [Console]::Beep(900,200) } catch {}
+            $reportedStall = $true
+        }
+        if ([Console]::KeyAvailable) {
+            $key = [Console]::ReadKey($true)
+            switch ($key.Key) {
+                'G' { if ($gamePid -gt 0) { Show-GameWindow $gamePid | Out-Null } }
+                'R' {
+                    Write-RunCommand $profile 'SHOW'
+                    Write-Host 'Restore rendering queued; applied at next live game phase.'
+                    if ($gamePid -gt 0) { Show-GameWindow $gamePid | Out-Null }
+                }
+                'N' {
+                    Write-RunCommand $profile 'NULL'
+                    Write-Host 'Null Rendering queued for next live phase.'
+                }
+                'P' { if ($gamePid -gt 0) { Save-GameScreenshot $gamePid $gameRoot } }
+                'S' {
+                    Write-RunCommand $profile 'STOP'
+                    Write-Host 'Stop queued for next completed full turn.'
+                }
+                'Spacebar' {
+                    Write-RunCommand $profile 'PAUSE'
+                    Write-Host 'Pause queued for next completed full turn.'
+                }
+                'Q' { Write-Host 'Monitor closed; game continues.'; return }
+            }
+        }
+        Start-Sleep -Milliseconds 350
+    }
+}
+
 try {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
     [System.Windows.Forms.Application]::EnableVisualStyles()
-    foreach ($filename in @('thinker.exe', 'thinker.dll', 'terranx.exe')) {
+    foreach ($filename in @('thinker.exe','thinker.dll','terranx.exe')) {
         if (-not [System.IO.File]::Exists((Join-Path $gameRoot $filename))) {
             throw ('Missing ' + $filename + ' beside Run Automation.bat')
         }
     }
     $options = Read-Options $prefsPath
-
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'thinkerNeca - Automation Launcher'
-    $form.Size = New-Object System.Drawing.Size(690, 595)
+    $form.Size = New-Object System.Drawing.Size(1035,890)
     $form.MinimumSize = $form.MaximumSize = $form.Size
     $form.StartPosition = 'CenterScreen'
     $form.FormBorderStyle = 'FixedDialog'
     $form.MaximizeBox = $false
-    $form.MinimizeBox = $false
     $form.AutoScaleMode = 'Font'
 
-    function Add-Label([string]$text, [int]$x, [int]$y, [int]$w, [int]$h) {
+    $tabs = New-Object System.Windows.Forms.TabControl
+    $tabs.SetBounds(22,22,975,737)
+    $form.Controls.Add($tabs)
+    function New-Tab([string]$name) {
+        $tab = New-Object System.Windows.Forms.TabPage
+        $tab.Text = $name
+        $tab.AutoScroll = $true
+        $tabs.TabPages.Add($tab)
+        return $tab
+    }
+    $runTab = New-Tab 'Game & campaign'
+    $worldTab = New-Tab 'World generation'
+    $presentationTab = New-Tab 'Presentation & logs'
+    $monitorTab = New-Tab 'Monitor & recovery'
+    function Add-Label($tab, [string]$text, [int]$x, [int]$y, [int]$w, [int]$h) {
         $label = New-Object System.Windows.Forms.Label
         $label.Text = $text
-        $label.SetBounds($x, $y, $w, $h)
-        $form.Controls.Add($label)
+        $label.SetBounds($x,$y,$w,$h)
+        $tab.Controls.Add($label)
         return $label
     }
-    function Add-Text([string]$initial, [int]$x, [int]$y, [int]$w) {
+    function Add-Text($tab,[string]$initial,[int]$x,[int]$y,[int]$w) {
         $control = New-Object System.Windows.Forms.TextBox
         $control.Text = $initial
-        $control.SetBounds($x, $y, $w, 25)
-        $form.Controls.Add($control)
+        $control.SetBounds($x,$y,$w,28)
+        $tab.Controls.Add($control)
         return $control
     }
-    function Add-Check([string]$text, [int]$y, [bool]$checked) {
+    function Add-Check($tab,[string]$text,[int]$y,[bool]$checked) {
         $control = New-Object System.Windows.Forms.CheckBox
         $control.Text = $text
-        $control.SetBounds(26, $y, 615, 25)
+        $control.SetBounds(25,$y,865,32)
         $control.Checked = $checked
-        $form.Controls.Add($control)
+        $tab.Controls.Add($control)
         return $control
     }
+    function Add-Combo($tab,[string]$label,[int]$y,[string[]]$values,[int]$selected) {
+        [void](Add-Label $tab $label 28 $y 880 24)
+        $control = New-Object System.Windows.Forms.ComboBox
+        $control.DropDownStyle = 'DropDownList'
+        $control.SetBounds(28,($y+30),420,30)
+        [void]$control.Items.AddRange([object[]]$values)
+        $control.SelectedIndex = [Math]::Max(0,[Math]::Min($values.Length-1,$selected))
+        $tab.Controls.Add($control)
+        return $control
+    }
+    function Get-Selected([string]$name,[int]$maximum) {
+        $value = 0
+        if ([int]::TryParse([string]$options[$name],[ref]$value)) {
+            return [Math]::Max(0,[Math]::Min($maximum,$value))
+        }
+        return 0
+    }
 
-    $heading = Add-Label 'Automation run setup' 26 16 610 31
-    $heading.Font = New-Object System.Drawing.Font('Segoe UI', 15, [System.Drawing.FontStyle]::Bold)
+    [void](Add-Label $runTab 'Run source' 27 20 850 28)
     $newGame = New-Object System.Windows.Forms.RadioButton
-    $newGame.Text = 'New game (native setup; manual AI handover)'
-    $newGame.SetBounds(26, 56, 610, 25)
-    $form.Controls.Add($newGame)
+    $newGame.Text = 'New game - setup from automation profile'
+    $newGame.SetBounds(28,62,800,32)
+    $runTab.Controls.Add($newGame)
     $loadGame = New-Object System.Windows.Forms.RadioButton
-    $loadGame.Text = 'Load existing .sav'
-    $loadGame.SetBounds(26, 84, 610, 25)
-    $form.Controls.Add($loadGame)
-
-    [void](Add-Label 'Save file (only used when loading)' 26 118 580 21)
-    $source = Add-Text ([string]$options['source_save']) 26 141 546
+    $loadGame.Text = 'Load an existing SAV'
+    $loadGame.SetBounds(28,103,800,32)
+    $runTab.Controls.Add($loadGame)
+    [void](Add-Label $runTab 'Existing .sav file' 28 151 850 25)
+    $source = Add-Text $runTab ([string]$options['source_save']) 28 180 750
     $browse = New-Object System.Windows.Forms.Button
     $browse.Text = 'Browse...'
-    $browse.SetBounds(580, 140, 80, 29)
-    $form.Controls.Add($browse)
-
-    [void](Add-Label 'Campaign display name' 26 187 590 21)
-    $campaign = Add-Text ([string]$options['campaign_name']) 26 210 634
+    $browse.SetBounds(795,179,120,32)
+    $runTab.Controls.Add($browse)
+    [void](Add-Label $runTab 'Campaign display name' 28 247 850 25)
+    $campaign = Add-Text $runTab ([string]$options['campaign_name']) 28 278 880
     $campaign.MaxLength = 88
-    [void](Add-Label 'Complete all-AI turns to run before next operator menu' 26 254 600 21)
+    [void](Add-Label $runTab 'Completed AI turns before operator menu' 28 350 850 25)
     $turns = New-Object System.Windows.Forms.NumericUpDown
-    $turns.Minimum = [decimal]1
-    $turns.Maximum = [decimal]100000
-    $turns.SetBounds(26, 277, 140, 29)
-    $number = 100
-    if ([int]::TryParse([string]$options['turns'], [ref]$number)) {
-        if ($number -ge 1 -and $number -le 100000) { $turns.Value = [decimal]$number }
+    $turns.Minimum = 1; $turns.Maximum = 100000
+    $turns.SetBounds(28,382,180,32)
+    $n=100
+    if ([int]::TryParse([string]$options['turns'],[ref]$n) -and $n -ge 1 -and $n -le 100000) {
+        $turns.Value = [decimal]$n
     }
-    $form.Controls.Add($turns)
+    $runTab.Controls.Add($turns)
+    [void](Add-Label $runTab 'No regular INI files are edited. SAVs still use existing folders (Stage B later).' 28 480 880 50)
+    [void](Add-Label $runTab 'New-game engine automation is experimental; normal thinker.exe remains unchanged.' 28 535 880 50)
 
-    $telemetry = Add-Check 'Record campaign telemetry and Council events' 323 ([string]$options['telemetry_enabled'] -eq '1')
-    $notices = Add-Check 'Suppress audited noninteractive popups' 356 ([string]$options['suppress_notices'] -eq '1')
-    $fast = Add-Check 'Fast AI combat / presentation' 389 ([string]$options['fast_combat'] -eq '1')
+    [void](Add-Label $worldTab 'These options apply only to New Game.' 28 21 870 30)
+    $difficulty = Add-Combo $worldTab 'Difficulty' 75 @('Citizen','Specialist','Talent','Librarian','Thinker','Transcend') (Get-Selected 'difficulty' 5)
+    $worldSize = Add-Combo $worldTab 'World size' 159 @('Tiny','Small','Standard','Large','Huge') (Get-Selected 'world_size' 4)
+    $worldOcean = Add-Combo $worldTab 'Ocean coverage' 243 @('Low','Average','High') (Get-Selected 'world_ocean' 2)
+    $worldErosion = Add-Combo $worldTab 'Erosion' 327 @('Low','Average','High') (Get-Selected 'world_erosion' 2)
+    $worldCloud = Add-Combo $worldTab 'Cloud cover' 411 @('Low','Average','High') (Get-Selected 'world_cloud' 2)
+    $worldLife = Add-Combo $worldTab 'Native life' 495 @('Low','Average','High') (Get-Selected 'world_life' 2)
+    $observer = Add-Combo $worldTab 'Initial observer (not a human faction)' 579 @('Faction slot 1','Faction slot 2','Faction slot 3','Faction slot 4','Faction slot 5','Faction slot 6','Faction slot 7') ([Math]::Max(0,(Get-Selected 'observer' 7)-1))
 
-    $info = Add-Label ('Campaign logs: ' + (Join-Path $gameRoot 'campaigns')) 26 429 630 25
-    $info.AutoEllipsis = $true
-    [void](Add-Label 'Stage A: existing game saves/autosaves are unchanged. No ZIP/checkpoint routing yet.' 26 457 630 30)
-    [void](Add-Label 'New games still require native setup and Scenario Editor handover to AI.' 26 479 630 30)
+    [void](Add-Label $presentationTab 'Presentation mode' 30 30 860 26)
+    $presentation = Add-Combo $presentationTab 'Select how much graphics to process' 74 @(
+        'Normal - original presentation',
+        'Fast - reduced animation and popup presentation',
+        'Null Rendering - suppress routine map/tile drawing') (Get-Selected 'render_mode' 2)
+    $telemetry = Add-Check $presentationTab 'Record campaign telemetry, including Council events' 181 ([string]$options['telemetry_enabled'] -eq '1')
+    $notices = Add-Check $presentationTab 'Suppress audited noninteractive popups' 223 ([string]$options['suppress_notices'] -eq '1')
+    [void](Add-Label $presentationTab 'Null Rendering only operates during eligible AI turns. AI visibility and fog-of-war state are unchanged.' 30 300 870 60)
+    [void](Add-Label $presentationTab 'An unknown modal can still stop the engine. The external monitor warns but does not click it.' 30 360 870 60)
+
+    [void](Add-Label $monitorTab 'Monitor runs in this batch console after launching the game.' 30 35 880 35)
+    [void](Add-Label $monitorTab 'No-progress warning threshold (seconds)' 30 104 860 25)
+    $warning = New-Object System.Windows.Forms.NumericUpDown
+    $warning.Minimum = 30; $warning.Maximum = 60
+    $warning.SetBounds(30,140,175,32)
+    $threshold = 45
+    if ([int]::TryParse([string]$options['monitor_seconds'],[ref]$threshold)) {
+        $threshold=[Math]::Max(30,[Math]::Min(60,$threshold))
+    }
+    $warning.Value = [decimal]$threshold
+    $monitorTab.Controls.Add($warning)
+    [void](Add-Label $monitorTab 'Console commands:' 30 235 860 25)
+    [void](Add-Label $monitorTab 'G = show game window     R = restore rendering     N = return to Null Rendering' 30 280 860 35)
+    [void](Add-Label $monitorTab 'P = screenshot             S = stop at boundary       Space = pause at boundary' 30 325 860 35)
+    [void](Add-Label $monitorTab 'Q = stop monitoring only (game remains running)' 30 370 860 35)
+    [void](Add-Label $monitorTab 'A warning means no observed progress, not proof of a deadlock. No automatic termination.' 30 455 860 55)
+    [void](Add-Label $monitorTab 'Restoring rendering cannot make an already-blocked game thread draw a fresh frame.' 30 520 860 55)
 
     $start = New-Object System.Windows.Forms.Button
     $start.Text = 'Launch Simulation'
-    $start.SetBounds(477, 517, 183, 32)
+    $start.SetBounds(783,784,215,44)
     $form.Controls.Add($start)
     $cancel = New-Object System.Windows.Forms.Button
     $cancel.Text = 'Cancel'
-    $cancel.SetBounds(366, 517, 103, 32)
+    $cancel.SetBounds(649,784,125,44)
     $form.Controls.Add($cancel)
     $form.CancelButton = $cancel
-    $cancel.Add_Click({ $form.DialogResult = [System.Windows.Forms.DialogResult]::Cancel; $form.Close() })
-
-    if ([string]$options['mode'] -eq 'load') { $loadGame.Checked = $true }
-    else { $newGame.Checked = $true }
+    $cancel.Add_Click({
+        $form.DialogResult=[System.Windows.Forms.DialogResult]::Cancel
+        $form.Close()
+    })
+    if ([string]$options['mode'] -eq 'load') { $loadGame.Checked=$true }
+    else { $newGame.Checked=$true }
     $updateMode = {
-        $source.Enabled = $loadGame.Checked
-        $browse.Enabled = $loadGame.Checked
+        $source.Enabled=$loadGame.Checked
+        $browse.Enabled=$loadGame.Checked
+        $worldTab.Enabled=$newGame.Checked
     }
     $newGame.Add_CheckedChanged($updateMode)
     $loadGame.Add_CheckedChanged($updateMode)
     & $updateMode
-
     $browse.Add_Click({
         $picker = New-Object System.Windows.Forms.OpenFileDialog
-        $picker.Title = 'Select SMAC/X save to simulate'
-        $picker.Filter = 'Alpha Centauri saved games (*.sav)|*.sav'
-        $picker.CheckFileExists = $true
-        $picker.Multiselect = $false
-        $picker.InitialDirectory = $gameRoot
-        if ([System.IO.Directory]::Exists((Join-Path $gameRoot 'saves'))) {
-            $picker.InitialDirectory = Join-Path $gameRoot 'saves'
+        $picker.Filter = 'SMAC/X saves (*.sav)|*.sav'
+        $picker.CheckFileExists=$true
+        $picker.InitialDirectory = Join-Path $gameRoot 'saves'
+        if (-not [System.IO.Directory]::Exists($picker.InitialDirectory)) {
+            $picker.InitialDirectory=$gameRoot
         }
         if ($picker.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-            $source.Text = $picker.FileName
+            $source.Text=$picker.FileName
         }
         $picker.Dispose()
     })
-
-    $script:selectedProfile = $null
+    $script:selectedProfile=$null
+    $script:warningSeconds=45
     $start.Add_Click({
         try {
-            $name = $campaign.Text.Trim()
+            $name=$campaign.Text.Trim()
             if ($name.Length -lt 1 -or $name.Length -gt 88 -or
                 $name -match '[\r\n;#]') {
-                throw 'Campaign name must be 1-88 characters without newlines, ; or #.'
+                throw 'Campaign name must be 1-88 characters, without newlines, ; or #.'
             }
-            $mode = if ($loadGame.Checked) { 'load' } else { 'new' }
-            $save = ''
+            $mode = if ($loadGame.Checked) {'load'} else {'new'}
+            $save=''
             if ($mode -eq 'load') {
-                $save = [System.IO.Path]::GetFullPath($source.Text.Trim())
-                if (-not $save.EndsWith('.sav', [System.StringComparison]::OrdinalIgnoreCase) -or
+                $save=[System.IO.Path]::GetFullPath($source.Text.Trim())
+                if (-not $save.EndsWith('.sav',[StringComparison]::OrdinalIgnoreCase) -or
                     -not [System.IO.File]::Exists($save) -or
-                    $save -match '[\r\n]') {
-                    throw 'Select an existing .sav file.'
-                }
+                    $save -match '[\r\n]') { throw 'Select an existing SAV.' }
             }
+            $render=[int]$presentation.SelectedIndex
             $updated = @{
-                mode = $mode
-                source_save = $save
-                campaign_name = $name
-                turns = [string][int]$turns.Value
-                telemetry_enabled = if ($telemetry.Checked) { '1' } else { '0' }
-                suppress_notices = if ($notices.Checked) { '1' } else { '0' }
-                fast_combat = if ($fast.Checked) { '1' } else { '0' }
+                mode=$mode
+                source_save=$save
+                campaign_name=$name
+                turns=[string][int]$turns.Value
+                telemetry_enabled=if ($telemetry.Checked) {'1'} else {'0'}
+                suppress_notices=if ($notices.Checked) {'1'} else {'0'}
+                fast_combat=if ($render -ge 1) {'1'} else {'0'}
+                render_mode=[string]$render
+                world_size=[string][int]$worldSize.SelectedIndex
+                world_ocean=[string][int]$worldOcean.SelectedIndex
+                world_erosion=[string][int]$worldErosion.SelectedIndex
+                world_cloud=[string][int]$worldCloud.SelectedIndex
+                world_life=[string][int]$worldLife.SelectedIndex
+                difficulty=[string][int]$difficulty.SelectedIndex
+                observer=[string]($observer.SelectedIndex + 1)
+                monitor_seconds=[string][int]$warning.Value
             }
             Save-Options $prefsPath $updated $false
-            $script:selectedProfile = New-RunProfile $gameRoot $updated
-            $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $script:selectedProfile=New-RunProfile $gameRoot $updated
+            $script:warningSeconds=[int]$warning.Value
+            $form.DialogResult=[System.Windows.Forms.DialogResult]::OK
             $form.Close()
         } catch {
             [void][System.Windows.Forms.MessageBox]::Show(
-                $_.Exception.Message, 'Automation launcher',
+                $_.Exception.Message,'Automation launcher',
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Warning)
         }
     })
-
-    $result = $form.ShowDialog()
+    $result=$form.ShowDialog()
     $form.Dispose()
     if ($result -ne [System.Windows.Forms.DialogResult]::OK -or
         -not $script:selectedProfile) { exit 0 }
 
-    # thinker.exe creates terranx.exe with lpEnvironment=NULL, so the
-    # child inherits this same run-specific profile. No second EXE and
-    # no edits to game INIs or global/user environment variables.
-    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = Join-Path $gameRoot 'thinker.exe'
-    $startInfo.WorkingDirectory = $gameRoot
-    $startInfo.UseShellExecute = $false
+    $startInfo=New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName=Join-Path $gameRoot 'thinker.exe'
+    $startInfo.WorkingDirectory=$gameRoot
+    $startInfo.UseShellExecute=$false
     $startInfo.EnvironmentVariables['THINKERNECA_AUTOSIM_PROFILE'] =
         [string]$script:selectedProfile
-    $child = [System.Diagnostics.Process]::Start($startInfo)
-    if (-not $child) { throw 'Could not start thinker.exe' }
-    $child.Dispose()
+    $launcher=[System.Diagnostics.Process]::Start($startInfo)
+    if (-not $launcher) {throw 'Could not start thinker.exe'}
+    $launcher.Dispose()
+    Run-Monitor ([string]$script:selectedProfile) $script:warningSeconds
 } catch {
     try {
         [void][System.Windows.Forms.MessageBox]::Show(
-            $_.Exception.Message, 'thinkerNeca Automation Launcher',
+            $_.Exception.Message,'thinkerNeca Automation Launcher',
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error)
-    } catch {
-        Write-Error $_.Exception.Message
-    }
+    } catch { Write-Error $_.Exception.Message }
     exit 1
 }
