@@ -1786,7 +1786,13 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                         combat_type = CT_CAN_ARTY;
                     }
                 }
+                const int defender_hp_before = veh_def->cur_hitpoints();
                 veh_def->damage_taken += damage_value;
+                telemetry_combat_exchange(veh_id_atk, veh_id_def, "artillery",
+                    combat_type, offense_out, defense_out,
+                    veh_atk->cur_hitpoints(), defender_hp_before,
+                    veh_atk->cur_hitpoints(), veh_def->cur_hitpoints(),
+                    false, false);
                 veh_def->state |= VSTATE_HAS_MOVED;
                 if (veh_def->is_former()) {
                     veh_def->movement_turns = 0;
@@ -1957,6 +1963,8 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                             VEH* veh = &Vehs[iter_veh_id];
                             parse_says(0, veh->name(), -1, -1);
                             veh->faction_id = veh_atk->faction_id;
+                            telemetry_unit_owner_changed(iter_veh_id, capture_id,
+                                veh_atk->faction_id, "marine_detachment");
                             if (iter_base_id < 0
                             || Bases[iter_base_id].faction_id != veh_atk->faction_id
                             || Bases[iter_base_id].pop_size < 3) {
@@ -2042,6 +2050,12 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
     int veh_def_last_hp = veh_def->cur_hitpoints();
     bool atk_alive = veh_atk_last_hp > 0;
     bool def_alive = veh_def_last_hp > 0;
+    // Log the resolved HP exchange BEFORE stack/base cleanup reindexes units.
+    // Victories and captures remain separately authoritative native events.
+    telemetry_combat_exchange(veh_id_atk, veh_id_def, "direct_or_duel",
+        combat_type, offense_out, defense_out,
+        veh_atk_hp, veh_def_hp, veh_atk_last_hp, veh_def_last_hp,
+        def_has_moved != 0, marine_detach != 0);
 
     if (render_battle || render_tile) {
         draw_tile_fixup_2(x, y, tx, ty, 2, 2);

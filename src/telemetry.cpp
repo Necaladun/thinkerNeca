@@ -35,6 +35,15 @@ FILE* council_file = NULL;
 FILE* projects_file = NULL;
 FILE* timings_file = NULL;
 FILE* checkpoints_file = NULL;
+// TEL-LOG-02 streams are standalone; none are presentation diagnostics.
+FILE* production_file = NULL;
+FILE* units_file = NULL;
+FILE* combat_file = NULL;
+FILE* research_file = NULL;
+int tel02_event_seq = 0;
+int tel02_vehicle_next = 0;
+std::vector<int> tel02_vehicle_ids;
+std::vector<int> tel02_research_targets;
 std::string campaign_dir;
 std::string session_dir;
 std::string campaign_id;
@@ -334,6 +343,10 @@ void close_files() {
         fclose(checkpoints_file);
         checkpoints_file = NULL;
     }
+    if (production_file) { fclose(production_file); production_file = NULL; }
+    if (units_file) { fclose(units_file); units_file = NULL; }
+    if (combat_file) { fclose(combat_file); combat_file = NULL; }
+    if (research_file) { fclose(research_file); research_file = NULL; }
 }
 
 void recorder_failure() {
@@ -384,6 +397,10 @@ void telemetry_begin_session(const char* source_save) {
     orbit_event_seq = 0;
     orbit_attack_seq = 0;
     orbit_snapshots_started = false;
+    tel02_event_seq = 0;
+    tel02_vehicle_next = 0;
+    tel02_vehicle_ids.clear();
+    tel02_research_targets.clear();
     council_meeting_seq = 0;
     council_calling_faction = 0;
     council_active_meeting = 0;
@@ -550,12 +567,22 @@ void telemetry_begin_session(const char* source_save) {
     projects_file = fopen((session_dir + "/projects.jsonl").c_str(), "wb");
     timings_file = fopen((session_dir + "/timings.jsonl").c_str(), "wb");
     checkpoints_file = fopen((session_dir + "/checkpoints.jsonl").c_str(), "wb");
+    production_file = fopen((session_dir + "/production.jsonl").c_str(), "wb");
+    units_file = fopen((session_dir + "/units.jsonl").c_str(), "wb");
+    combat_file = fopen((session_dir + "/combat.jsonl").c_str(), "wb");
+    research_file = fopen((session_dir + "/research.jsonl").c_str(), "wb");
     if (!turns_file || !bases_file || !ui_notices_file || !orbit_file
-    || !council_file || !projects_file || !timings_file || !checkpoints_file) {
+    || !council_file || !projects_file || !timings_file || !checkpoints_file
+    || !production_file || !units_file || !combat_file || !research_file) {
         recorder_failure();
         return;
     }
     recording = true;
+    telemetry_unit_baseline();
+    if (!recording) return;
+    tel02_research_targets.resize(MaxPlayerNum, -1);
+    for (int fc = 1; fc < MaxPlayerNum; ++fc)
+        tel02_research_targets[fc] = Factions[fc].tech_research_id;
     // Existing queues are a baseline, not falsely dated project starts.
     for (int i = 0; i < *BaseCount; ++i) {
         const BASE& b = Bases[i];
@@ -1320,6 +1347,8 @@ void telemetry_record_completed_turn() {
     if (!telemetry_orbit_snapshot("completed_turn")) return;
     telemetry_project_reconcile_completed_turn();
     if (!recording) return;
+    telemetry_research_reconcile();
+    if (!recording) return;
     last_committed_turn = turn;
     if (!atomic_write(session_dir + "/status.json", status_json("recording"))) {
         recorder_failure();
@@ -1497,6 +1526,208 @@ void telemetry_resume_after_victory() {
     if (!atomic_write(session_dir + "/status.json", status_json("recording"))) {
         recorder_failure();
     }
+}
+
+
+// TEL-LOG-02. Emit only source-observed mutations; no RNG, AI recalculation,
+// native UI or game-state writes. All four streams share a session event order.
+static std::ostringstream tel02_row(const char* event) {
+    std::ostringstream out;
+    out << "{\"schema\":1,\"event\":" << json_string(event)
+        << ",\"event_id\":" << json_string(
+            (session_dir.empty() ? std::string("unknown") :
+                std::string(telemetry_get_session_id()) + "-evt-"
+                + std::to_string(++tel02_event_seq)).c_str())
+        << ",\"utc\":" << json_string(utc_stamp_ms().c_str())
+        << ",\"turn\":" << *CurrentTurn
+        << ",\"mission_year\":" << *CurrentMissionYear
+        << ",\"processing_faction\":" << *CurrentFaction;
+    return out;
+}
+static void tel02_append(FILE* stream, const std::string& row) {
+    if (recording && stream && !append_line(stream, row)) recorder_failure();
+}
+static int tel02_vehicle_serial(int slot) {
+    return slot >= 0 && (size_t)slot < tel02_vehicle_ids.size()
+        ? tel02_vehicle_ids[(size_t)slot] : 0;
+}
+static void tel02_add_vehicle(std::ostringstream& out, int slot, const char* prefix) {
+    out << ",\"" << prefix << "_slot\":" << slot
+        << ",\"" << prefix << "_instance\":";
+    const int serial = tel02_vehicle_serial(slot);
+    if (!serial) out << "null";
+    else out << json_string(
+        (std::string(telemetry_get_session_id()) + "-vehicle-"
+            + std::to_string(serial)).c_str());
+}
+static void tel02_vehicle_event(const char* event, int slot, const char* cause,
+    int old_owner = -1) {
+    if (!recording || !units_file || slot < 0 || slot >= *VehCount) return;
+    const VEH& veh = Vehs[slot];
+    const int uid = veh.unit_id;
+    std::ostringstream out = tel02_row(event);
+    tel02_add_vehicle(out, slot, "vehicle");
+    out << ",\"faction\":" << veh.faction_id
+        << ",\"unit_id\":" << uid
+        << ",\"unit_name\":" << json_string(
+            uid >= 0 && uid < MaxProtoNum ? Units[uid].name : "")
+        << ",\"x\":" << veh.x << ",\"y\":" << veh.y
+        << ",\"morale\":" << veh.morale
+        << ",\"damage_taken\":" << veh.damage_taken
+        << ",\"home_base_slot\":" << veh.home_base_id
+        << ",\"cause\":" << json_string(cause);
+    if (old_owner >= 0) out << ",\"previous_faction\":" << old_owner;
+    out << ",\"cause_status\":\"source_observed_or_unspecified\"}";
+    tel02_append(units_file, out.str());
+}
+void telemetry_unit_baseline() {
+    if (!recording || !units_file) return;
+    tel02_vehicle_ids.clear();
+    tel02_vehicle_next = 0;
+    for (int i = 0; i < *VehCount && recording; ++i) {
+        tel02_vehicle_ids.push_back(++tel02_vehicle_next);
+        tel02_vehicle_event("session_baseline", i, "existing_at_session_start");
+    }
+}
+void telemetry_unit_created(int slot) {
+    if (!recording || slot < 0 || slot >= *VehCount) return;
+    if ((size_t)slot > tel02_vehicle_ids.size())
+        tel02_vehicle_ids.resize((size_t)slot, 0);
+    if ((size_t)slot == tel02_vehicle_ids.size())
+        tel02_vehicle_ids.push_back(++tel02_vehicle_next);
+    else tel02_vehicle_ids[(size_t)slot] = ++tel02_vehicle_next;
+    tel02_vehicle_event("created", slot, "veh_init");
+}
+void telemetry_unit_destroyed(int slot) {
+    if (!recording || slot < 0 || slot >= *VehCount) return;
+    tel02_vehicle_event("removed", slot, "veh_kill_reason_unknown");
+    if ((size_t)slot < tel02_vehicle_ids.size())
+        tel02_vehicle_ids.erase(tel02_vehicle_ids.begin() + slot);
+}
+void telemetry_unit_owner_changed(int slot, int old_owner, int new_owner, const char* cause) {
+    if (!recording || slot < 0 || slot >= *VehCount) return;
+    // At the hook, the native owner has already been assigned.
+    if (Vehs[slot].faction_id != new_owner || old_owner == new_owner) return;
+    tel02_vehicle_event("owner_changed", slot, cause, old_owner);
+}
+void telemetry_production_queue_changed(int base_id, int old_item, int new_item,
+    int minerals_after) {
+    if (!recording || !production_file || base_id < 0 || base_id >= *BaseCount
+        || old_item == new_item) return;
+    const BASE& b = Bases[base_id];
+    std::ostringstream out = tel02_row("queue_changed");
+    out << ",\"faction\":" << b.faction_id
+        << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
+        << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
+        << ",\"previous_item\":" << old_item << ",\"new_item\":" << new_item
+        << ",\"minerals_after\":" << minerals_after
+        << ",\"source\":\"mod_base_change\",\"ai_reason\":null"
+        << ",\"reason_status\":\"not_instrumented\"}";
+    tel02_append(production_file, out.str());
+}
+void telemetry_production_unit(int base_id, int unit_id, int slot, int cost) {
+    if (!recording || !production_file || base_id < 0 || base_id >= *BaseCount
+        || slot < 0 || slot >= *VehCount) return;
+    const BASE& b = Bases[base_id];
+    std::ostringstream out = tel02_row("unit_completed");
+    out << ",\"faction\":" << b.faction_id
+        << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
+        << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
+        << ",\"unit_id\":" << unit_id
+        << ",\"unit_name\":" << json_string(Units[unit_id].name)
+        << ",\"mineral_cost\":" << cost
+        << ",\"minerals_after\":" << b.minerals_accumulated
+        << ",\"actual_morale\":" << Vehs[slot].morale;
+    tel02_add_vehicle(out, slot, "vehicle");
+    out << ",\"source\":\"mod_base_production\"}";
+    tel02_append(production_file, out.str());
+}
+void telemetry_production_facility(int base_id, int facility_id, int cost) {
+    if (!recording || !production_file || base_id < 0 || base_id >= *BaseCount
+        || facility_id <= 0 || facility_id > FAC_EMPTY_SP_64) return;
+    const BASE& b = Bases[base_id];
+    const bool satellite = facility_id >= FAC_SKY_HYDRO_LAB
+        && facility_id <= FAC_ORBITAL_DEFENSE_POD;
+    const char* event = facility_id >= SP_ID_First ? "project_completed"
+        : satellite ? "satellite_completed" : "facility_completed";
+    std::ostringstream out = tel02_row(event);
+    out << ",\"faction\":" << b.faction_id
+        << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
+        << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
+        << ",\"facility_id\":" << facility_id
+        << ",\"facility_name\":" << json_string(Facility[facility_id].name)
+        << ",\"mineral_cost\":" << cost
+        << ",\"minerals_after\":" << b.minerals_accumulated
+        << ",\"source\":\"mod_base_production\"}";
+    tel02_append(production_file, out.str());
+}
+void telemetry_research_acquired(int faction, int tech_id, int source,
+    bool already_owned, int is_share) {
+    if (!recording || !research_file || faction <= 0 || faction >= MaxPlayerNum
+        || tech_id < 0 || tech_id >= Tech_ID_Commlink) return;
+    std::ostringstream out = tel02_row("tech_acquired");
+    out << ",\"faction\":" << faction
+        << ",\"tech_id\":" << tech_id
+        << ",\"tech_name\":" << json_string(Tech[tech_id].name)
+        << ",\"source_faction\":" << source
+        << ",\"source_status\":\"native_tech_achieved_argument\""
+        << ",\"shared\":" << (is_share ? "true" : "false")
+        << ",\"previously_owned\":" << (already_owned ? "true" : "false")
+        << ",\"acquisition_kind\":" << json_string(
+            source > 0 ? "other_faction" : source == 0 ? "research_or_free"
+            : source == -1 ? "planetary_datalinks" : source == -2
+            ? "techshare" : "native_internal")
+        << "}";
+    tel02_append(research_file, out.str());
+}
+void telemetry_research_reconcile() {
+    if (!recording || !research_file
+        || tel02_research_targets.size() != MaxPlayerNum) return;
+    for (int faction = 1; faction < MaxPlayerNum && recording; ++faction) {
+        const int current = Factions[faction].tech_research_id;
+        if (current == tel02_research_targets[faction]) continue;
+        std::ostringstream out = tel02_row("target_observed");
+        out << ",\"faction\":" << faction
+            << ",\"previous_target\":" << tel02_research_targets[faction]
+            << ",\"new_target\":" << current
+            << ",\"timing_basis\":\"completed_faction_cycle\""
+            << ",\"ai_reason\":null,\"reason_status\":\"not_instrumented\"}";
+        tel02_append(research_file, out.str());
+        tel02_research_targets[faction] = current;
+    }
+}
+void telemetry_combat_exchange(int attacker, int defender, const char* mode,
+    int type_flags, int attack_strength, int defend_strength,
+    int attacker_hp_before, int defender_hp_before,
+    int attacker_hp_after, int defender_hp_after,
+    bool retreated, bool marine_detached) {
+    if (!recording || !combat_file || attacker < 0 || defender < 0
+        || attacker >= *VehCount || defender >= *VehCount) return;
+    const VEH& atk = Vehs[attacker];
+    const VEH& def = Vehs[defender];
+    std::ostringstream out = tel02_row("hp_exchange");
+    out << ",\"mode\":" << json_string(mode)
+        << ",\"combat_type_flags\":" << type_flags
+        << ",\"attacker_faction\":" << atk.faction_id
+        << ",\"defender_faction\":" << def.faction_id
+        << ",\"attacker_unit_id\":" << atk.unit_id
+        << ",\"defender_unit_id\":" << def.unit_id
+        << ",\"attacker_reactor\":" << atk.reactor_type()
+        << ",\"defender_reactor\":" << def.reactor_type()
+        << ",\"target_x\":" << def.x << ",\"target_y\":" << def.y
+        << ",\"offense_final_raw\":" << attack_strength
+        << ",\"defense_final_raw\":" << defend_strength
+        << ",\"attacker_hp_before\":" << attacker_hp_before
+        << ",\"attacker_hp_after\":" << attacker_hp_after
+        << ",\"defender_hp_before\":" << defender_hp_before
+        << ",\"defender_hp_after\":" << defender_hp_after
+        << ",\"retreated\":" << (retreated ? "true" : "false")
+        << ",\"marine_detachment\":" << (marine_detached ? "true" : "false")
+        << ",\"result_scope\":\"hp_exchange_before_postcombat_cleanup\"";
+    tel02_add_vehicle(out, attacker, "attacker");
+    tel02_add_vehicle(out, defender, "defender");
+    out << "}";
+    tel02_append(combat_file, out.str());
 }
 
 void telemetry_end_session() {

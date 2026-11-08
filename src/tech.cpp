@@ -779,8 +779,13 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
     }
     plr->tech_trade_source[tech_id] = faction_id_2 <= 0 ? 0 : faction_id_2;
     int is_first = TechOwners[tech_id] == 0;
+    const bool already_owned = (TechOwners[tech_id] & bm_fac) != 0;
     TechOwners[tech_id] |= (1 << faction_id);
     ++plr->tech_achieved;
+    // This applies only to real technology IDs; tech_achieved also handles
+    // maps, comm frequencies and prototype transfers in earlier branches.
+    telemetry_research_acquired(faction_id, tech_id, faction_id_2,
+        already_owned, is_share);
     if (!*CurrentTurn || *SkipTechScreenA) {
         return;
     }

@@ -1059,6 +1059,7 @@ void __cdecl mod_base_change(int base_id, int item_id) {
         }
     }
     base->minerals_accumulated = base->minerals_accumulated_2 - mineral_penalty;
+    telemetry_production_queue_changed(base_id, old_item, item_id, base->minerals_accumulated);
     draw_radius(base->x, base->y, 2, 2);
     if ((faction_id == player_id && is_human(faction_id)) || *SkipTechScreenB) {
         return;
@@ -3441,6 +3442,9 @@ int __cdecl mod_base_production() {
             }
             veh->morale = clamp(morale_val + 1, 0, 6);
             veh->state |= VSTATE_UNK_2000;
+            // Actual unit creation and paid mineral cost, before a colony pod
+            // can remove the producing base.
+            telemetry_production_unit(*CurrentBaseID, unit_id, veh_id, unit_cost);
             if (faction_id == player_id && is_human(faction_id)) {
                 veh->flags |= VFLAG_UNK_1000;
             }
@@ -3711,6 +3715,8 @@ int __cdecl mod_base_production() {
             }
         }
     }
+    // The facility/satellite/project mutation has been committed above.
+    telemetry_production_facility(*CurrentBaseID, facility_id, facility_cost);
     draw_tile(base->x, base->y, 2);
     int cur_queue = base_queue(*CurrentBaseID);
     bool is_extra = (facility_id >= FAC_SKY_HYDRO_LAB && facility_id <= FAC_STOCKPILE_ENERGY);

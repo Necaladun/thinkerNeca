@@ -60,6 +60,24 @@ void telemetry_council_resolved(const CouncWindow* window, int native_result,
 // with a turn-boundary reconciliation for paths that write queues directly.
 void telemetry_project_queue_changed(int base_id, int previous_item, int next_item);
 void telemetry_project_completed(int base_id, int facility_id);
+// TEL-LOG-02: read-only completed production, vehicle lifecycle,
+// actual combat HP exchanges and technology acquisition. IDs for vehicles
+// are session-scoped; native Vehs array slots are not persistent identities.
+void telemetry_unit_baseline();
+void telemetry_unit_created(int veh_id);
+void telemetry_unit_destroyed(int veh_id);
+void telemetry_unit_owner_changed(int veh_id, int from_faction, int to_faction, const char* cause);
+void telemetry_production_queue_changed(int base_id, int old_item, int new_item, int minerals_after);
+void telemetry_production_unit(int base_id, int unit_id, int veh_id, int cost);
+void telemetry_production_facility(int base_id, int facility_id, int cost);
+void telemetry_research_acquired(int faction_id, int tech_id, int source_faction,
+    bool already_owned, int is_share);
+void telemetry_research_reconcile();
+void telemetry_combat_exchange(int attacker, int defender, const char* mode,
+    int type_flags, int attack_strength, int defend_strength,
+    int attacker_hp_before, int defender_hp_before,
+    int attacker_hp_after, int defender_hp_after,
+    bool retreated, bool marine_detached);
 void telemetry_end_session();
 
 // Human-friendly campaign labels are separate from stable folder IDs. A save

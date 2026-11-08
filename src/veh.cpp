@@ -596,6 +596,7 @@ int __cdecl veh_init(int unit_id, int faction_id, int x, int y) {
         }
     }
     veh_drop(veh_id, x, y);
+    telemetry_unit_created(veh_id);
     spot_all(veh_id, 1);
 
     if (plr->target_x < 0) {
@@ -706,6 +707,8 @@ void __cdecl veh_kill(int veh_id) {
     const int home_base_id = veh->home_base_id;
     // log_say("KILLINGVEHICLE", veh_id, faction_id, unit_id);
     debug("veh_kill %2d %2d %d %d %d\n", x, y, faction_id, unit_id, veh_id);
+    // Capture identity before native array compaction invalidates slots.
+    telemetry_unit_destroyed(veh_id);
 
     if (*MultiplayerActive) {
         DeletionList_add_deletion(DeleteList, veh_id);
