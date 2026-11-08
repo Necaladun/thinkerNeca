@@ -18,7 +18,8 @@ game = (root / "src/game.cpp").read_text(encoding="utf-8")
 create = base[base.index("if (unit_id == BSC_MIND_WORMS) {"):
               base.index("// remove redundant Spore Launcher check",
                          base.index("if (unit_id == BSC_MIND_WORMS) {"))]
-assert "if (faction_id == player_id && !(*GameInterludeState & 0x10)) {" in create
+assert "if (faction_id == player_id && is_human(faction_id)" in create
+assert "&& !(*GameInterludeState & 0x10)) {" in create
 assert create.index("autosim_interlude(4, base->name, 1, 0);") < create.index(
     "veh->state |= VSTATE_ASSISTANT_WORM;")
 
