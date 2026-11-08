@@ -20,9 +20,6 @@ int council_calling_faction = 0;
 int council_active_meeting = 0;
 const CouncWindow* council_active_window = NULL;
 bool council_result_written = false;
-int council_governor_before = -1;
-int council_passes_before = 0;
-unsigned council_state_before = 0;
 int project_event_seq = 0;
 struct ProjectQueueState {
     int faction = 0;
@@ -781,9 +778,6 @@ void telemetry_council_initialized(const CouncWindow* win, int arg1, int arg2) {
     council_active_meeting = council_meeting_seq;
     council_active_window = win;
     council_result_written = false;
-    council_governor_before = *GovernorFaction;
-    council_passes_before = ProposalPassCount[proposal];
-    council_state_before = (unsigned)*GameState;
     std::ostringstream proposal_row = council_record("proposal");
     proposal_row << ",\"proposal_id\":" << proposal
         << ",\"candidate_faction\":" << win->candidate_faction_id
@@ -890,6 +884,10 @@ static void project_append(const char* event, const ProjectQueueState& state,
     out << ",\"next_facility_id\":";
     if (next_facility) out << next_facility;
     else out << "null";
+    out << ",\"next_project_name\":";
+    if (next_facility >= SP_ID_First && next_facility <= SP_ID_Last)
+        out << json_string(Facility[next_facility].name);
+    else out << "null";
     out << ",\"source\":" << json_string(source)
         << ",\"change_cause\":" << json_string(reason)
         << ",\"ai_reason\":null,\"reason_status\":\"not_instrumented\"}";
@@ -905,10 +903,9 @@ static void project_transition(const ProjectQueueState* previous,
         project_append("started", *next, 0, next->facility,
             source, "new_owner_queue");
     } else if (previous && next) {
+        // A switch is one event, not a second new project start.
         project_append("changed", *previous, previous->facility, next->facility,
             source, "production_queue_changed");
-        project_append("started", *next, previous->facility, next->facility,
-            source, "project_switched_to");
     } else if (previous) {
         const char* cause = SecretProjects[previous->facility - SP_ID_First] != SP_Unbuilt
             ? "project_no_longer_available" : "production_queue_replaced_or_base_lost";
@@ -956,11 +953,13 @@ void telemetry_project_completed(int base_id, int facility_id) {
 static void telemetry_project_reconcile_completed_turn() {
     if (!recording || !projects_file) return;
     std::map<std::pair<int,int>, ProjectQueueState> current;
+    std::map<std::pair<int,int>, int> present_bases;
     for (int i = 0; i < *BaseCount; ++i) {
         const BASE& b = Bases[i];
+        const std::pair<int,int> key(b.x, b.y);
+        present_bases[key] = b.faction_id;
         const int facility = project_facility_on_queue(b);
         if (!facility) continue;
-        const std::pair<int,int> key(b.x, b.y);
         current[key] = project_state(b, facility);
         const auto old = project_queues.find(key);
         project_transition(old == project_queues.end() ? NULL : &old->second,
@@ -969,11 +968,16 @@ static void telemetry_project_reconcile_completed_turn() {
     }
     for (const auto& previous : project_queues) {
         if (current.find(previous.first) == current.end()) {
-            const char* reason = SecretProjects[previous.second.facility - SP_ID_First]
-                != SP_Unbuilt ? "project_completed_elsewhere_or_unavailable"
-                : "queue_changed_or_base_lost";
-            project_append("abandoned", previous.second,
-                previous.second.facility, 0, "completed_turn_reconciliation", reason);
+            const auto city = present_bases.find(previous.first);
+            const bool lost = city == present_bases.end();
+            const bool captured = !lost && city->second != previous.second.faction;
+            const char* reason = lost ? "base_removed" :
+                captured ? "base_captured" :
+                SecretProjects[previous.second.facility - SP_ID_First] != SP_Unbuilt
+                ? "project_completed_elsewhere_or_unavailable" : "production_queue_replaced";
+            project_append(lost || captured ? "interrupted" : "abandoned",
+                previous.second, previous.second.facility, 0,
+                "completed_turn_reconciliation", reason);
             if (!recording) return;
         }
     }
