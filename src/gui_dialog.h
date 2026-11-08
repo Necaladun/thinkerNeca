@@ -41,7 +41,7 @@ int autosim_notice_netmsg2(const char* label, const char* image);
 int autosim_notice_dialog(const char* label, int faction_id);
 int autosim_notice_diplomacy(NetMessage* msg, const char* label, int delay,
     int style, const char* image);
-enum AutosimControlRequest { AUTOSIM_CTL_NONE, AUTOSIM_CTL_PAUSE, AUTOSIM_CTL_STOP };
+enum AutosimControlRequest { AUTOSIM_CTL_NONE, AUTOSIM_CTL_PAUSE, AUTOSIM_CTL_STOP, AUTOSIM_CTL_MENU };
 void autosim_request_control(AutosimControlRequest request);
 void autosim_collect_queued_keys();
 void autosim_collect_stop_file();
