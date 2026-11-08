@@ -64,14 +64,15 @@ assert "if (autosim_show_control_dialog(&state) != AUTOSIM_DIALOG_ARM)" in dialo
 # session whose local INI no longer contains a positive turn budget.
 loop = turn[turn.index("void __cdecl control_turn()"):]
 assert "bool startup_confirmed = false;" in loop
-assert "telemetry_resumed_linked_campaign()" in loop
-assert "if ((autosim_ready() || linked_preflight_ready()) && !startup_confirmed)" in loop
+assert "autosim_preflight_ready = [&]()" in loop
+assert "((unsigned)FactionStatus[0] & 0xFEu) == 0" in loop
+assert "if (autosim_preflight_ready() && !startup_confirmed)" in loop
 assert "autosim_fill_dialog_state(&preflight, AUTOSIM_DIALOG_STARTUP);" in loop
 assert "if (answer == AUTOSIM_DIALOG_START)" in loop
 assert "if (!autosim_apply_dialog_options(preflight))" in loop
 assert "startup_confirmed = true;" in loop
 assert "set_human(MapWin->cOwner, true);" in loop
-assert loop.index("if ((autosim_ready() || linked_preflight_ready())") < loop.index("if (run_upkeep)")
+assert loop.index("if (autosim_preflight_ready() && !startup_confirmed)") < loop.index("if (run_upkeep)")
 
 # At completed-turn boundaries, no-save Continue starts a fresh budget,
 # save actions retain the temp/native serializer and normal F9/F10.
@@ -94,6 +95,7 @@ for term in ("telemetry_get_campaign_id", "telemetry_get_session_id",
     assert term in tele_h and term in tele
 assert "state->campaign_id = telemetry_get_campaign_id();" in dialog
 assert "state->session_id = telemetry_get_session_id();" in dialog
+assert "state->resumed_campaign = telemetry_resumed_linked_campaign();" in dialog
 
 # New sidecars append an optional runtime profile while preserving old
 # fingerprint-bound v2 linked-save format. Restore profile ONLY after the
