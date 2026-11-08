@@ -267,8 +267,8 @@ INT_PTR CALLBACK autosim_dialog_proc(HWND dialog, UINT message,
         return TRUE;
     }
     int count = ctx->state->additional_turns;
-    if (id == ID_SAVE_CONTINUE || id == ID_START
-    || id == ID_ARM || id == ID_CONTINUE) {
+    if (id == ID_SAVE_CONTINUE || id == ID_SAVE_EXIT
+    || id == ID_START || id == ID_ARM || id == ID_CONTINUE) {
         const std::string input = read_field(dialog, ID_MORE_TURNS);
         if (input.empty() || input.size() > 6) count = 0;
         else {
@@ -333,6 +333,11 @@ bool autosim_apply_dialog_options(const AutosimDialogState& state) {
     conf.autosim_suppress_notices = state.suppress_notices ? 1 : 0;
     conf.autosim_fast_combat = state.fast_combat ? 1 : 0;
     conf.autosim_manual_turns = state.additional_turns;
+    char action[120] = {};
+    snprintf(action, sizeof(action), "turns=%d notices=%d fast=%d",
+        conf.autosim_manual_turns, conf.autosim_suppress_notices ? 1 : 0,
+        conf.autosim_fast_combat ? 1 : 0);
+    telemetry_record_ui_notice("autosim", "SETTINGS", action);
     return true;
 }
 
