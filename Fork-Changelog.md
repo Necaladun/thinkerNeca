@@ -2,6 +2,11 @@
 
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
 
+## Unmerged AUTO-002 — editable simulation control and campaign naming (8 November 2026)
+
+- Source implementation: native Win32 **Simulation Control** at complete AI turn cap and F9/F10/stop file: summary of full turns/years/colonies/units, user-entered 1–100000 additional turns, editable telemetry name and SAV basename, Save & Continue, Save & Exit, and next-turn observed-faction human takeover. The existing patched `mod_save_daemon` serializer writes to a temp SAV, then commits the requested name only after successful serialization. Failed/cancelled saves leave controls open.
+- TEL-001 naming/lineage: readable new campaign folder IDs and independently editable display names, surfaced in HTML and Tkinter analyzer; named-save `.autosim-campaign` sidecar with file fingerprint offers explicit rejoin on native reload with a new session number. Other saves create new campaigns; original SAV format unchanged. **Unmerged; native Windows simulation/save/reload/manual-control testing outstanding.**
+
 ## Unmerged AUTO-002 — verified-binary native Council window diagnostics (8 November 2026)
 
 - Verified user's patched `terranx.exe` hash against earlier installed binary and disassembled native Council chain, ballot and Governor-resolution handling. Added optional telemetry-only `CouncWin_init` entry/exit logging, including proposal, vote mask, ballot selections and weights, with exact-original-callsite check and matching `__thiscall` forwarding. Does **not** suppress Council UI or make any decision. Develop/Release x86 CI at `be514ef` [run 42452468919](https://github.com/Necaladun/thinkerNeca/actions/runs/42452468919) passed; native runtime is unverified. Project notice IDs confirm the logged Empath Guild finished on turn 97 and Council election on turn 117, not the same turn. Pre-Council save is still required to isolate modal safely.
