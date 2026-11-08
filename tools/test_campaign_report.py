@@ -93,6 +93,30 @@ class CampaignReportTests(unittest.TestCase):
             self.assertIn("Faction 1", html_text)
             self.assertEqual(len((output / "factions.csv").read_text(encoding="utf-8").splitlines()), 15)
 
+    def test_active_runtime_and_legacy_status_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            campaign, session = fixture(Path(tmp))
+            # An old session without the new status field must not falsely
+            # report zero simulation time.
+            self.assertEqual(summarize_session(session)["runtime"], "Not recorded")
+            old_page = (generate(campaign) / "index.html").read_text(encoding="utf-8")
+            self.assertIn("Active AI run time:", old_page)
+            self.assertIn("Not recorded", old_page)
+
+            status_path = session / "status.json"
+            status = json.loads(status_path.read_text(encoding="utf-8"))
+            status["simulation_elapsed_ms"] = 671995  # 11 minutes, 11 seconds
+            status["simulation_time_basis"] = (
+                "active_ai_wall_time_excludes_operator_pauses"
+            )
+            status_path.write_text(json.dumps(status), encoding="utf-8")
+            self.assertEqual(summarize_session(session)["runtime"], "0:11:11")
+            page = (generate(campaign) / "index.html").read_text(encoding="utf-8")
+            self.assertIn("Active AI run time: <strong>0:11:11</strong>", page)
+            self.assertIn("operator/startup/post-victory pauses excluded", page)
+            self.assertEqual(len(scan_campaigns(Path(tmp))), 1)
+            self.assertEqual(scan_campaigns(Path(tmp))[0]["runtime"], "0:11:11")
+
     def test_structured_council_project_ledgers_and_legacy_diagnostics(self):
         with tempfile.TemporaryDirectory() as tmp:
             campaign, session = fixture(Path(tmp))
