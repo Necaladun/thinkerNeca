@@ -63,7 +63,8 @@ require(dialog.index("mod_save_daemon(temp_name)") <
         dialog.index("MoveFileExA(temp_name"), "Save commit must follow successful serializer")
 require('"saves/" + stem + ".sav"' in dialog, "Named saves must be loadable game saves")
 require("read_named_save_link(" in telemetry and
-        '"thinkerNeca-campaign-v1"' in telemetry and
+        '"thinkerNeca-campaign-v2"' in telemetry and
+        "file_fingerprint(candidate.c_str()) != fingerprint" in telemetry and
         "valid_campaign_id" in telemetry and
         "MessageBoxA(*phWnd, prompt.c_str()" in telemetry,
         "Campaign relinking must be explicitly accepted and validate the sidecar")
