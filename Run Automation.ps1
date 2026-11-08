@@ -1,10 +1,33 @@
-param([switch]$SelfTest)
+param([switch]$SelfTest, [switch]$GuiSelfTest)
 
 # Stage A launch GUI. Nothing in thinker.ini, thinker_user.ini or the game's
 # Alpha Centauri.ini is written. The same thinker.exe is always launched.
 $ErrorActionPreference = 'Stop'
 $gameRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $MyInvocation.MyCommand.Path))
 $prefsPath = Join-Path $gameRoot 'automation.ini'
+
+# Independent launcher log is created BEFORE starting the game.
+# It remains available even if terranx crashes before telemetry starts.
+$script:launcherLogPath = $null
+$script:launcherTranscriptStarted = $false
+if (-not $SelfTest) {
+    try {
+        $logs = Join-Path $gameRoot 'automation\logs'
+        [void][System.IO.Directory]::CreateDirectory($logs)
+        $name = 'launcher-' + (Get-Date -Format 'yyyyMMdd-HHmmss') +
+                '-' + [Guid]::NewGuid().ToString('N').Substring(0,8) + '.log'
+        $script:launcherLogPath = Join-Path $logs $name
+        Start-Transcript -Path $script:launcherLogPath -ErrorAction Stop | Out-Null
+        $script:launcherTranscriptStarted = $true
+    } catch {
+        Write-Host ('WARNING: Launcher diagnostics unavailable: ' + $_.Exception.Message)
+    }
+    Write-Host 'thinkerNeca Automation Launcher'
+    Write-Host ('Game directory: ' + $gameRoot)
+    if ($script:launcherLogPath) {
+        Write-Host ('Diagnostic log: ' + $script:launcherLogPath)
+    }
+}
 
 function New-Defaults {
     return @{
@@ -161,7 +184,7 @@ function Save-GameScreenshot([int]$pidToCapture, [string]$root) {
         Write-Host 'If Null Rendering was active, only previously drawn content may be visible.'
     } finally { $bitmap.Dispose() }
 }
-function Run-Monitor([string]$runProfilePath, [int]$warningSeconds) {
+function Run-Monitor([string]$runProfilePath, [int]$warningSeconds, [int]$launcherPid) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -182,6 +205,9 @@ public static class AutoMonitorWin32 {
     $monitorStart = [DateTime]::UtcNow
     Write-Host ''
     Write-Host 'thinkerNeca Automation Monitor'
+    Write-Host ('Run profile: ' + $runProfilePath)
+    Write-Host ('Game PID handoff: ' + $pidFile)
+    Write-Host ('Game progress: ' + $statusFile)
     Write-Host 'G: Show game  |  R: Restore rendering  |  N: Null rendering'
     Write-Host 'P: Screenshot  |  S: Stop at next full turn  |  Space: Pause at next full turn'
     Write-Host 'Q: Leave monitor open? No - Q closes this console WITHOUT killing the game.'
@@ -193,6 +219,18 @@ public static class AutoMonitorWin32 {
                     [ref]$foundPid) -and $foundPid -gt 0) {
                 $gamePid = $foundPid
                 Write-Host ('Game process detected: PID ' + $gamePid)
+            }
+        }
+        if ($gamePid -eq 0 -and
+            ([DateTime]::UtcNow - $monitorStart).TotalSeconds -gt 3) {
+            $launcherAlive = $false
+            try {
+                $launcherProcess = [System.Diagnostics.Process]::GetProcessById($launcherPid)
+                $launcherAlive = -not $launcherProcess.HasExited
+            } catch { $launcherAlive = $false }
+            if (-not $launcherAlive) {
+                throw ('thinker.exe exited without creating a terranx.exe PID file. ' +
+                    'Check the launcher log and debug.txt for a startup/injection error.')
             }
         }
         if ([System.IO.File]::Exists($statusFile)) {
@@ -282,9 +320,11 @@ try {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
     [System.Windows.Forms.Application]::EnableVisualStyles()
-    foreach ($filename in @('thinker.exe','thinker.dll','terranx.exe')) {
-        if (-not [System.IO.File]::Exists((Join-Path $gameRoot $filename))) {
-            throw ('Missing ' + $filename + ' beside Run Automation.bat')
+    if (-not $GuiSelfTest) {
+        foreach ($filename in @('thinker.exe','thinker.dll','terranx.exe')) {
+            if (-not [System.IO.File]::Exists((Join-Path $gameRoot $filename))) {
+                throw ('Missing ' + $filename + ' beside Run Automation.bat')
+            }
         }
     }
     $options = Read-Options $prefsPath
@@ -502,10 +542,25 @@ try {
                 [System.Windows.Forms.MessageBoxIcon]::Warning)
         }
     })
+    if ($GuiSelfTest) {
+        if ($tabs.TabPages.Count -ne 4 -or $presentation.Items.Count -ne 3 -or
+            $worldSize.Items.Count -ne 5 -or $turns.Maximum -ne 100000) {
+            throw 'Windows WinForms launcher controls failed the GUI smoke test.'
+        }
+        $form.Dispose()
+        Write-Host 'AUTO-LAUNCH Windows WinForms GUI construction passed'
+        exit 0
+    }
+    Write-Host 'Pre-game setup GUI ready.'
     $result=$form.ShowDialog()
     $form.Dispose()
     if ($result -ne [System.Windows.Forms.DialogResult]::OK -or
-        -not $script:selectedProfile) { exit 0 }
+        -not $script:selectedProfile) {
+        Write-Host 'User cancelled pre-game setup; no simulation launched.'
+        exit 0
+    }
+    Write-Host ('Selected profile: ' + $script:selectedProfile)
+    Write-Host 'Starting existing thinker.exe and its terranx.exe child.'
 
     $startInfo=New-Object System.Diagnostics.ProcessStartInfo
     $startInfo.FileName=Join-Path $gameRoot 'thinker.exe'
@@ -515,14 +570,25 @@ try {
         [string]$script:selectedProfile
     $launcher=[System.Diagnostics.Process]::Start($startInfo)
     if (-not $launcher) {throw 'Could not start thinker.exe'}
+    $launcherPid = [int]$launcher.Id
+    Write-Host ('thinker.exe launcher PID: ' + $launcherPid)
     $launcher.Dispose()
-    Run-Monitor ([string]$script:selectedProfile) $script:warningSeconds
+    Run-Monitor ([string]$script:selectedProfile) $script:warningSeconds $launcherPid
+    Write-Host 'Monitor finished. The batch console remains open for diagnostics.'
 } catch {
+    Write-Host ('AUTOMATION LAUNCH ERROR: ' + $_.Exception.ToString())
+    if ($_.ScriptStackTrace) { Write-Host ('PowerShell stack: ' + $_.ScriptStackTrace) }
     try {
         [void][System.Windows.Forms.MessageBox]::Show(
             $_.Exception.Message,'thinkerNeca Automation Launcher',
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error)
-    } catch { Write-Error $_.Exception.Message }
+    } catch {
+        Write-Host ('Error dialog unavailable: ' + $_.Exception.Message)
+    }
     exit 1
+} finally {
+    if ($script:launcherTranscriptStarted) {
+        try { Stop-Transcript | Out-Null } catch {}
+    }
 }
