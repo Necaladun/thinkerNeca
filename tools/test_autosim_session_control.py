@@ -27,14 +27,18 @@ require(boundary.index("telemetry_record_completed_turn();") <
         "A complete-turn snapshot must precede the new control window")
 require("if (eligible && full_cycle) ++total_autosim_turns;" in boundary,
         "Partial initial loaded cycle must not count towards session total")
-require("dialog.additional_turns = conf.autosim_manual_turns;" in boundary,
+require("autosim_fill_dialog_state(&dialog, AUTOSIM_DIALOG_RUNNING);" in boundary
+        and "state->additional_turns = conf.autosim_manual_turns > 0" in dialog,
         "Continue input must seed current requested count")
 require("conf.autosim_manual_turns = dialog.additional_turns;" in boundary
         and "auto_driver.completed_turns = 0;" in boundary,
         "Continue must reset segment cap and take new user-requested turn count")
-require(boundary.index("autosim_save_named(") <
-        boundary.index("auto_driver.completed_turns = 0;"),
-        "Continue must not advance segment after failed/cancelled save")
+save_path = boundary[boundary.index("if (selection == AUTOSIM_DIALOG_SAVE_CONTINUE"):]
+require(save_path.index("autosim_save_named(") < save_path.index(
+        "auto_driver.completed_turns = 0;"),
+        "Save & Continue must not advance segment after failed/cancelled save")
+require('if (selection == AUTOSIM_DIALOG_CONTINUE)' in boundary,
+        "Explicit no-save continuation must have its own completed-cycle path")
 require("set_human(MapWin->cOwner, true);" in boundary and
         "handover_to_human_next_turn" in boundary,
         "Manual takeover must restore only observed human flag at full-cycle boundary")
