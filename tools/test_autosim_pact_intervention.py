@@ -40,12 +40,13 @@ assert "Fpact_ends pact_ends = (Fpact_ends)0x53C650;" in engine
 assert "Fnet_pact_ends net_pact_ends = (Fnet_pact_ends)0x539660;" in engine
 
 # The source-owned Governor winner report is already a one-way notice
-# and notification clearing remains. Native CouncWindow is not replaced.
+# and notification clearing remains. Native resolution is reused by the
+# separate all-AI Governor experiment; ordinary human UI remains native.
 assert 'autosim_notice_popp(ScriptFile, "COUNCILHOTGOVWIN", "council_sm.pcx");' in turn
 assert 'autosim_notice_popp(ScriptFile, "COUNCILHOTGOVLOSE", "council_sm.pcx");' in turn
 assert 'autosim_notice_popp(ScriptFile, "COUNCILHOTGOVNONE", "council_sm.pcx");' in turn
 assert "clear_council_notify(MapWin->cOwner);" in turn
 assert "CouncWin_init(win, faction_id, faction_id_2);" in turn
-assert 'telemetry_record_ui_notice("council_native", "CouncWin_init", action);' in turn
+assert 'telemetry_record_council_event("CouncWin_init", faction_id, action);' in turn
 
 print("AUTO-002 pact/intervention source contract passed (native Council and pact dialogs remain unverified)")
