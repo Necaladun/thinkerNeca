@@ -1,6 +1,7 @@
 
 #include "gui.h"
 #include "empire_report.h"
+#include "autosim_control.h"
 
 const void* MainWinHandle = &MapWin->oMainWin; // 0x939444
 bool minor_native_geology_underlay_installed = false;
@@ -622,6 +623,23 @@ LRESULT WINAPI ModWinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     // picker opens *over* the colony, not after the colony is closed.
     if (msg == empire_report_production_message()) {
         empire_report_dispatch_production((int)wParam, (uint32_t)lParam);
+        return 0;
+    }
+
+    // Dedicated operator shortcut, separate from native F9/F10.
+    // Never enter a modal dialog inside active AI processing. The turn driver
+    // consumes its request at the next complete faction-cycle boundary.
+    if (msg == WM_KEYDOWN && wParam == VK_F12 && !*GameHalted
+    && !*MultiplayerActive && !*PbemActive
+    && ctrl_key_down() && shift_key_down() && !alt_key_down()) {
+        if (!(lParam & (1u << 30))) {
+            if (autosim_control_active()) {
+                autosim_request_control(AUTOSIM_CTL_MENU);
+            } else if (current_window() == GW_World && win_has_focus()
+            && !*WinModalState) {
+                autosim_show_manual_setup();
+            }
+        }
         return 0;
     }
 
