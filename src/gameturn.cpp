@@ -2565,7 +2565,7 @@ void __cdecl turn_upkeep() {
     if (*CurrentTurn == 75 && has_tech(Facility[FAC_BIOLOGY_LAB].preq_tech, *CurrentPlayerFaction)) {
         autosim_interlude(1, 0, 1, 0);
     }
-    if (voice_of_planet()) {
+    if (voice_of_planet() && is_human(*CurrentPlayerFaction)) {
         Faction& plr = Factions[*CurrentPlayerFaction];
         if (!(plr.player_flags & PFLAG_UNK_2000)) {
             plr.player_flags |= PFLAG_UNK_2000;
