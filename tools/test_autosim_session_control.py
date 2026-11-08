@@ -73,8 +73,10 @@ require("read_named_save_link(" in telemetry and
         "MessageBoxA(*phWnd, prompt.c_str()" in telemetry,
         "Campaign relinking must be explicitly accepted and validate the sidecar")
 require('campaign_id = prefix.str()' in telemetry and
-        '"AI-Sim-" << folder_slug(' in telemetry,
-        "New campaign directories must have readable names")
+        'folder_slug(campaign_display_name.c_str())' in telemetry and
+        'GetLocalTime(&local);' in telemetry and
+        '"%04u%02u%02u-%02u%02u%02u"' in telemetry,
+        "New campaign directories must use the selected campaign name and timestamp")
 require('make_dir(session_dir, false)' in telemetry and
         '"session-%03d"' in telemetry, "Resume must create next free session")
 require('display_name' in telemetry and
