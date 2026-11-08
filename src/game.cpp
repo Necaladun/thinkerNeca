@@ -356,6 +356,9 @@ void __cdecl control_game() {
             *MultiplayerActive = 0;
             flush_input();
             std::string telemetry_source_save;
+            // Native menu saves are captured by mod_load_daemon on success.
+            // Do not accidentally inherit the previous game's file identity.
+            telemetry_note_loaded_save(NULL);
             if (start_lobby) {
                 prefs_load(0);
                 prefs_use();
