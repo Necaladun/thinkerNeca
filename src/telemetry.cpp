@@ -19,6 +19,7 @@ std::string campaign_created_utc;
 std::string last_loaded_save;
 int last_committed_turn = -1;
 bool recording = false;
+bool resumed_linked_campaign = false;
 
 std::string utc_stamp() {
     SYSTEMTIME time;
@@ -123,7 +124,8 @@ bool make_dir(const std::string& path, bool allow_existing) {
 std::string file_fingerprint(const char* path);
 
 bool read_named_save_link(const std::string& save_path, std::string* id,
-    std::string* created, std::string* display) {
+    std::string* created, std::string* display,
+    int* saved_turns, int* saved_notices, int* saved_fast) {
     std::vector<std::string> candidates(1, save_path);
     if (save_path.find_first_of("\\/") == std::string::npos)
         candidates.push_back("saves/" + save_path);
@@ -137,6 +139,10 @@ bool read_named_save_link(const std::string& save_path, std::string* id,
             && fgets(stamp, sizeof(stamp), fp)
             && fgets(label, sizeof(label), fp)
             && fgets(fingerprint, sizeof(fingerprint), fp);
+        // Optional v2-compatible sixth line: a simulation operator profile.
+        // Older linked saves without the line remain readable.
+        char options[128] = {};
+        if (ok) fgets(options, sizeof(options), fp);
         fclose(fp);
         if (!ok) continue;
         auto remove_newline = [](char* value) {
@@ -158,6 +164,17 @@ bool read_named_save_link(const std::string& save_path, std::string* id,
         if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
             continue;
         *id = linked_id; *created = stamp; *display = label;
+        int turns = 0, notices = -1, fast = -1;
+        char trailing = 0;
+        if (sscanf(options, "autosim-v1 %d %d %d %c",
+            &turns, &notices, &fast, &trailing) == 3
+        && turns >= 1 && turns <= 100000
+        && (notices == 0 || notices == 1)
+        && (fast == 0 || fast == 1)) {
+            if (saved_turns) *saved_turns = turns;
+            if (saved_notices) *saved_notices = notices;
+            if (saved_fast) *saved_fast = fast;
+        }
         return true;
     }
     return false;
@@ -270,6 +287,7 @@ void telemetry_begin_session(const char* source_save) {
     campaign_id.clear();
     campaign_created_utc.clear();
     campaign_display_name = readable_campaign_default();
+    resumed_linked_campaign = false;
     if (!conf.telemetry_enabled || *MultiplayerActive || *PbemActive) {
         return;
     }
@@ -283,8 +301,10 @@ void telemetry_begin_session(const char* source_save) {
         ? source_save : last_loaded_save;
     bool joined = false;
     std::string linked_id, linked_stamp, linked_name;
+    int linked_turns = 0, linked_notices = -1, linked_fast = -1;
     if (!source.empty()
-    && read_named_save_link(source, &linked_id, &linked_stamp, &linked_name)) {
+    && read_named_save_link(source, &linked_id, &linked_stamp, &linked_name,
+        &linked_turns, &linked_notices, &linked_fast)) {
         const std::string prompt = "Resume telemetry in existing campaign?\n\n"
             + linked_name + "\n\nSave: " + source
             + "\n\nNo: record as a new campaign.";
@@ -295,6 +315,14 @@ void telemetry_begin_session(const char* source_save) {
             campaign_display_name = linked_name;
             campaign_dir = "campaigns/" + campaign_id;
             joined = true;
+            resumed_linked_campaign = true;
+            // Only apply an explicit operator profile after the campaign
+            // relink has been accepted. Session identity stays unchanged.
+            if (linked_turns > 0) {
+                conf.autosim_manual_turns = linked_turns;
+                conf.autosim_suppress_notices = linked_notices;
+                conf.autosim_fast_combat = linked_fast;
+            }
         }
     }
     if (!joined) {
@@ -538,6 +566,10 @@ void telemetry_end_session() {
 }
 
 
+bool telemetry_resumed_linked_campaign() {
+    return resumed_linked_campaign;
+}
+
 const char* telemetry_get_campaign_id() {
     return campaign_id.c_str();
 }
@@ -585,9 +617,14 @@ bool telemetry_record_named_save(const char* save_path) {
         DeleteFileA(path.c_str());
         return false;
     }
+    char saved_options[96] = {};
+    snprintf(saved_options, sizeof(saved_options), "autosim-v1 %d %d %d\n",
+        conf.autosim_manual_turns,
+        conf.autosim_suppress_notices ? 1 : 0,
+        conf.autosim_fast_combat ? 1 : 0);
     const std::string contents = "thinkerNeca-campaign-v2\n" + campaign_id
         + "\n" + campaign_created_utc + "\n" + campaign_display_name
-        + "\n" + fingerprint + "\n";
+        + "\n" + fingerprint + "\n" + saved_options;
     if (!atomic_write(path, contents)) {
         DeleteFileA(path.c_str());
         OutputDebugStringA("thinkerNeca TEL-001: failed to write named-save campaign link\n");
