@@ -473,6 +473,7 @@ struct AutosimRunProfile {
     int notices = -1;
     int fast = -1;
     int render = -1;
+    int unlimited_expansion = 0; // old run profiles retain normal AI colony cap
     int size = -1, ocean = -1, erosion = -1, cloud = -1, life = -1;
     int difficulty = -1, observer = -1, monitor = -1;
     std::string mode;
@@ -499,6 +500,7 @@ static int autosim_profile_option(void* data, const char* section,
     if (!strcmp(name, "suppress_notices")) return autosim_profile_int(value, 1, &p->notices);
     if (!strcmp(name, "fast_combat")) return autosim_profile_int(value, 1, &p->fast);
     if (!strcmp(name, "render_mode")) return autosim_profile_int(value, 2, &p->render);
+    if (!strcmp(name, "unlimited_expansion")) return autosim_profile_int(value, 1, &p->unlimited_expansion);
     if (!strcmp(name, "world_size")) return autosim_profile_int(value, 4, &p->size);
     if (!strcmp(name, "world_ocean")) return autosim_profile_int(value, 2, &p->ocean);
     if (!strcmp(name, "world_erosion")) return autosim_profile_int(value, 2, &p->erosion);
@@ -521,6 +523,7 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_suppress_notices = 0;
     cf->autosim_fast_combat = 0;
     cf->autosim_render_mode = 0;
+    cf->autosim_unlimited_expansion = 0;
     autosim_launcher_active = false;
     autosim_auto_new_game = false;
     autosim_launch_campaign_name.clear();
@@ -553,6 +556,7 @@ static bool autosim_apply_launch_profile(Config* cf) {
     cf->autosim_suppress_notices = p.notices;
     cf->autosim_fast_combat = p.fast;
     cf->autosim_render_mode = p.render >= 0 ? p.render : (p.fast ? 1 : 0);
+    cf->autosim_unlimited_expansion = p.unlimited_expansion;
     autosim_launch_campaign_name = p.name;
     autosim_launch_profile_path = path;
     autosim_auto_new_game = p.mode == "new";
