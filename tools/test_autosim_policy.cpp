@@ -142,55 +142,62 @@ static void test_scoped_combat_visual_preferences() {
 }
 
 static void test_full_turn_fast_visual_preferences() {
-    // Matches src/engine_enums.h; policy uses those named flags in
-    // AutoScopedAutosimFastPrefs (host harness must not include Win32 headers).
-    constexpr int fast_battle = 0x8;
+    // Match src/engine_enums.h: source policy uses these named masks.
+    // This Win32-free host test checks nested/disabled preference restoration.
+    constexpr int fast = 0x8;
+    constexpr int no_center = 0x80000;
     constexpr int dont_quick_enemy = 0x4;
     constexpr int dont_quick_ally = 0x8000;
     constexpr int map_animations = 0x80;
+    constexpr int edge_scroll = 0x1000;
     constexpr int quick_orders = 0x40;
     constexpr int quick_all = 0x80;
+    constexpr int hide_path = 0x2000000;
     constexpr int pause_battles = 0x10;
+    constexpr int blink = 0x200;
+    constexpr int base_names = 0x2000;
+    constexpr int base_production = 0x1000;
     constexpr int other_basic = 0x400 | 0x200;
-    constexpr int other_more = 0x100 | 0x200;
+    constexpr int other_more = 0x100 | 0x400;
 
-    const int original_basic = dont_quick_enemy | dont_quick_ally
-        | map_animations | other_basic;
-    const int original_more = pause_battles | other_more;
+    constexpr int basic_on = fast | no_center;
+    constexpr int basic_off = dont_quick_enemy | dont_quick_ally
+        | map_animations | edge_scroll;
+    constexpr int more_on = quick_all | quick_orders | hide_path;
+    constexpr int more_off = pause_battles | blink | base_names | base_production;
+
+    const int original_basic = basic_off | other_basic;
+    const int original_more = more_off | other_more;
     int basic = original_basic;
     int more = original_more;
+
     {
         AutoScopedCombatPrefs full_turn(true, &basic, &more,
-            fast_battle,
-            dont_quick_enemy | dont_quick_ally | map_animations,
-            quick_all | quick_orders, pause_battles);
-        assert((basic & fast_battle) != 0);
-        assert((basic & (dont_quick_enemy | dont_quick_ally | map_animations)) == 0);
-        assert((more & (quick_all | quick_orders)) == (quick_all | quick_orders));
-        assert((more & pause_battles) == 0);
+            basic_on, basic_off, more_on, more_off);
+        assert((basic & basic_on) == basic_on);
+        assert((basic & basic_off) == 0);
+        assert((more & more_on) == more_on);
+        assert((more & more_off) == 0);
         assert((basic & other_basic) == other_basic);
         assert((more & other_more) == other_more);
         const int active_basic = basic;
         const int active_more = more;
         {
-            // Nested battle scopes restore the full turn's fast profile.
-            AutoScopedCombatPrefs combat(true, &basic, &more,
-                fast_battle, dont_quick_enemy | dont_quick_ally | map_animations,
-                quick_all | quick_orders, pause_battles);
+            AutoScopedCombatPrefs nested_battle(true, &basic, &more,
+                basic_on, basic_off, more_on, more_off);
             assert(basic == active_basic);
             assert(more == active_more);
         }
         assert(basic == active_basic);
         assert(more == active_more);
     }
-    // Autosave and Save Game run only after the phase scope has exited.
+    // Native autosave / manual Save Game run outside the temporary scope.
     assert(basic == original_basic);
     assert(more == original_more);
 
     {
         AutoScopedCombatPrefs disabled(false, &basic, &more,
-            fast_battle, dont_quick_enemy | dont_quick_ally | map_animations,
-            quick_all | quick_orders, pause_battles);
+            basic_on, basic_off, more_on, more_off);
         assert(basic == original_basic);
         assert(more == original_more);
     }
