@@ -113,6 +113,17 @@ inline AutoUiAction autosim_xpop_policy(const char* label, bool has_callback) {
     if (!label || has_callback) {
         return AUTO_UI_NATIVE;
     }
+    // Native satellite-vs-satellite attack results are passive reports.
+    // Only allow no-callback notifications; leave the native orbital
+    // combat calculation, satellite losses and all choice UI untouched.
+    // The native popup entrypoint is not independently established yet:
+    // this allowlist applies only if the route reaches X_pop/X_pop_2.
+    if (std::strcmp(label, "WEKILLEDIT") == 0
+        || std::strcmp(label, "THEYKILLEDIT") == 0
+        || std::strcmp(label, "WEMUFFEDIT") == 0
+        || std::strcmp(label, "THEYMUFFEDIT") == 0) {
+        return AUTO_UI_NOTICE;
+    }
     // Intervention reports ignore the return value. Actual AI relations
     // are handled by intervention()/double_cross(), not by the popup.
     if (std::strcmp(label, "AIDSUS") == 0
