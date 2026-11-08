@@ -37,7 +37,7 @@ check("Council sponsor and reason remain explicitly unknown",
       'proposer_faction\\":null' in tele
       and '"native_ai_reason_not_instrumented"' in tele
       and '"human_choice_not_instrumented"' in tele
-      and '"human"' in tele
+      and 'is_human(fc) ? "true" : "false"' in tele
       and 'convening_faction' in tele
       and "council_calling_faction" in tele)
 check("Council presentation diagnostics are not Council history",
