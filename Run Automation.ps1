@@ -1307,6 +1307,64 @@ try {
             $archiveCadence.Items.Count -ne 6 -or $turns.Maximum -ne 100000) {
             throw 'Windows WinForms launcher controls failed the GUI smoke test.'
         }
+        # Exercise the real WinForms row binding, not just JSON parsing.
+        # Two sessions in one campaign and a second campaign must appear
+        # as three independent clickable ListViewItem objects.
+        function New-GuiCampaignTestRow([string]$name, [string]$folder, [string]$session) {
+            return [pscustomobject]@{
+                campaign_dir = ('C:\ci\campaigns\' + $folder)
+                folder = $folder
+                campaign_name = $name
+                session_id = $session
+                player = 'Gaia'
+                years = '2101-2111'
+                turns = '11'
+                bases = '25'
+                status = 'Closed'
+                started = '9 Nov 2026'
+                updated = '9 Nov 2026'
+                runtime = '1m'
+                source_save = 'synthetic'
+                factions = 'Gaia, Hive'
+                error = $null
+            }
+        }
+        $guiFixture = @(
+            (New-GuiCampaignTestRow 'Campaign One' 'campaign-one' 'session-001'),
+            (New-GuiCampaignTestRow 'Campaign One' 'campaign-one' 'session-002'),
+            (New-GuiCampaignTestRow 'Campaign Two' 'campaign-two' 'session-001')
+        )
+        $guiJson = ConvertTo-Json -InputObject $guiFixture -Depth 4 -Compress
+        $guiRows = Convert-CampaignSessionRows $guiJson
+        $sessionList.Tag.Clear()
+        foreach ($row in $guiRows) { [void]$sessionList.Tag.Add($row) }
+        & $displayCampaignRows
+        if ($sessionList.Items.Count -ne 3) {
+            throw ('Campaign picker collapsed independent sessions into ' +
+                $sessionList.Items.Count + ' row(s).')
+        }
+        if ([string]$sessionList.Items[0].Tag.session_id -ne 'session-001' -or
+            [string]$sessionList.Items[1].Tag.session_id -ne 'session-002' -or
+            [string]$sessionList.Items[2].Tag.campaign_name -ne 'Campaign Two') {
+            throw 'Campaign picker lost per-session ListViewItem.Tag selection identity.'
+        }
+        # Filtering must preserve game/session identity, rather than presenting
+        # all matching campaigns as a joined single-row string.
+        $sessionFilter.Text = 'Campaign Two'
+        & $displayCampaignRows
+        if ($sessionList.Items.Count -ne 1 -or
+            [string]$sessionList.Items[0].Tag.campaign_name -ne 'Campaign Two') {
+            throw 'Campaign picker multi-row filtering failed.'
+        }
+        $sessionFilter.Text = ''
+        & $displayCampaignRows
+        if ($sessionList.Items.Count -ne 3) {
+            throw 'Clearing the campaign filter did not restore all sessions.'
+        }
+        $sessionList.Tag.Clear()
+        $sessionList.Items.Clear()
+        $sessionFilter.Text = ''
+        Write-Host 'AUTO-LAUNCH multi-campaign WinForms row binding passed'
         $worldSource.SelectedIndex = 1
         if ($worldSize.Enabled -or $worldOcean.Enabled -or $customX.Enabled) {
             throw 'Fixed-Planet source must disable random size/climate/custom fields.'
