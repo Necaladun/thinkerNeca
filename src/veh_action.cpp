@@ -1,5 +1,7 @@
 
 #include "veh_action.h"
+#include "autosim.h"
+#include "telemetry.h"
 
 
 int __cdecl terrain_avail(FormerItem frm_id, int ocean, int faction_id) {
@@ -765,14 +767,14 @@ void __cdecl action_destroy(int veh_id, int tgt_item, int tgt_x, int tgt_y) {
                     Console_focus(MapWin, tx, ty, 0);
                     if (is_forest_destroy) {
                         if (unit_id == BSC_SPORE_LAUNCHER) {
-                            popp(ScriptFile, "SPOREFOREST", 0, "sporlnch_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "SPOREFOREST", "sporlnch_sm.pcx");
                         } else {
-                            NetMsg_pop(NetMsg, "ATEFOREST", 5000, 0, 0);
+                            autosim_notice_netmsg(NetMsg, "ATEFOREST", 5000, 0, 0);
                         }
                     } else if (unit_id == BSC_SPORE_LAUNCHER) {
-                        popp(ScriptFile, "SPORESLAUNCHED", 0, "sporlnch_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "SPORESLAUNCHED", "sporlnch_sm.pcx");
                     } else {
-                        NetMsg_pop(NetMsg, "ATESTUFF", 5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ATESTUFF", 5000, 0, 0);
                     }
                 }
             }
@@ -1071,9 +1073,9 @@ int __cdecl action_airdrop(int veh_id, int tx, int ty, int flags) {
         parse_says(0, base_id >= 0 ? Bases[base_id].name : "", -1, -1);
         parse_says(1, get_noun(faction_id), -1, -1);
         if (drop_range(faction_id) >= Rules->max_airdrop_rng_wo_orbital_insert) {
-            popp(ScriptFile, "MADEORBITAL", 0, image_drop, 0);
+            autosim_notice_popp(ScriptFile, "MADEORBITAL", image_drop);
         } else {
-            popp(ScriptFile, "MADEAIRDROP", 0, image_drop, 0);
+            autosim_notice_popp(ScriptFile, "MADEAIRDROP", image_drop);
         }
     }
     veh->state |= VSTATE_MADE_AIRDROP;
@@ -1225,9 +1227,9 @@ void __cdecl action_oblit(int veh_id, int base_id) {
     parse_says(4, get_name(faction_id), -1, -1);
 
     if (faction_id == player_id) {
-        popp(ScriptFile, "OBLITTED", 0, "baseobl_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "OBLITTED", "baseobl_sm.pcx");
     } else if (faction_id_fmr == player_id || is_visible) {
-        popp(ScriptFile, "OBLITTED2", 0, "baseobl_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "OBLITTED2", "baseobl_sm.pcx");
     }
     if (Rules->tgl_oblit_base_atrocity) {
         atrocity(faction_id, faction_id_fmr, 2, 0);
@@ -1357,10 +1359,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
         parse_num(1, remaining_odp);
         if (faction_id_def == player_id) {
             parse_says(1, get_adjective(faction_id_atk), -1, -1);
-            popp(ScriptFile, label_we_shot, 0, "space_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, label_we_shot, "space_sm.pcx");
         } else if (faction_id_atk == player_id) {
             parse_says(1, get_adjective(faction_id_def), -1, -1);
-            popp(ScriptFile, label_they_shot, 0, "space_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, label_they_shot, "space_sm.pcx");
         }
     };
 
@@ -1376,10 +1378,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
                     parse_says(0, Bases[base_id].name, -1, -1);
                     if (faction_id_def == player_id) {
                         parse_says(1, get_adjective(faction_id_atk), -1, -1);
-                        popp(ScriptFile, flag ? "FWESHOTIT2" : "TWESHOTIT2", 0, "space_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, flag ? "FWESHOTIT2" : "TWESHOTIT2", "space_sm.pcx");
                     } else if (faction_id_atk == player_id) {
                         parse_says(1, get_adjective(Bases[base_id].faction_id), -1, -1);
-                        popp(ScriptFile, flag ? "FTHEYSHOTIT2" : "TTHEYSHOTIT2", 0, "space_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, flag ? "FTHEYSHOTIT2" : "TTHEYSHOTIT2", "space_sm.pcx");
                     }
                     return 1;
                 }
@@ -1389,10 +1391,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
     if (plr_def->satellites_ODP > 0) {
         if (*MultiplayerActive || !is_human(faction_id_def)) {
             if (faction_id_def == player_id) {
-                popp(ScriptFile, flag ? "FWEMUSTSAC" : "TWEMUSTSAC", 0, "space_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, flag ? "FWEMUSTSAC" : "TWEMUSTSAC", "space_sm.pcx");
             } else if (faction_id_atk == player_id) {
                 parse_says(0, get_noun(faction_id_def), -1, -1);
-                popp(ScriptFile, "THEYMUSTSAC", 0, "space_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "THEYMUSTSAC", "space_sm.pcx");
             }
             plr_def->satellites_ODP--;
             if (plr_def->satellites_ODP < plr_def->ODP_deployed) {
@@ -1420,10 +1422,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
                     if (has_flechette) {
                         if (faction_id_def == player_id) {
                             parse_says(1, get_adjective(faction_id_atk), -1, -1);
-                            popp(ScriptFile, "WEFAILEDFLECHETTE", 0, "space_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "WEFAILEDFLECHETTE", "space_sm.pcx");
                         } else if (faction_id_atk == player_id) {
                             parse_says(1, get_adjective(faction_id_def), -1, -1);
-                            popp(ScriptFile, "THEYFAILEDFLECHETTE", 0, "space_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "THEYFAILEDFLECHETTE", "space_sm.pcx");
                         }
                     }
                     return 0;
@@ -1434,10 +1436,10 @@ int  __cdecl shoot_it(int faction_id_atk, int faction_id_def, int tx, int ty, in
     if (has_flechette) {
         if (faction_id_def == player_id) {
             parse_says(1, get_adjective(faction_id_atk), -1, -1);
-            popp(ScriptFile, "WEFAILEDFLECHETTE", 0, "space_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "WEFAILEDFLECHETTE", "space_sm.pcx");
         } else if (faction_id_atk == player_id) {
             parse_says(1, get_adjective(faction_id_def), -1, -1);
-            popp(ScriptFile, "THEYFAILEDFLECHETTE", 0, "space_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "THEYFAILEDFLECHETTE", "space_sm.pcx");
         }
     }
     return 0;
@@ -1473,7 +1475,7 @@ void  __cdecl action_tectonic(int veh_id, int tx, int ty) {
         parse_says(1, get_name(faction_id_atk), -1, -1);
         parse_says(2, get_noun(faction_id_atk), -1, -1);
         parse_says(3, Bases[tgt_base_id].name, -1, -1);
-        popp(ScriptFile, "TECTONICMISSILE", 0, "tectonic_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "TECTONICMISSILE", "tectonic_sm.pcx");
     }
     int hit_factions[MaxPlayerNum] = {};
     int shot_down = 0;
@@ -1513,7 +1515,7 @@ void  __cdecl action_tectonic(int veh_id, int tx, int ty) {
             parse_says(1, get_title(faction_id_atk), -1, -1);
             parse_says(2, get_name(faction_id_atk), -1, -1);
             parse_says(3, get_noun(faction_id_atk), -1, -1);
-            popp(ScriptFile, "TECMOFIED", 0, "tectonic_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "TECMOFIED", "tectonic_sm.pcx");
         }
         TectonicDetonationCount[faction_id_atk]++;
         *GameDrawState |= 4;
@@ -1534,7 +1536,7 @@ void  __cdecl action_fungal(int veh_id, int tx, int ty) {
         parse_says(1, get_name(faction_id_atk), -1, -1);
         parse_says(2, get_noun(faction_id_atk), -1, -1);
         parse_says(3, Bases[tgt_base_id].name, -1, -1);
-        popp(ScriptFile, "FUNGALMISSILE", 0, "fungpayld_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "FUNGALMISSILE", "fungpayld_sm.pcx");
     }
     int range = TableRange[1];
     int hit_factions[MaxPlayerNum] = {};
@@ -1619,7 +1621,7 @@ void  __cdecl action_fungal(int veh_id, int tx, int ty) {
             parse_says(1, get_title(faction_id_atk), -1, -1);
             parse_says(2, get_name(faction_id_atk), -1, -1);
             parse_says(3, get_noun(faction_id_atk), -1, -1);
-            popp(ScriptFile, "FUNGMOTIZED", 0, "fungpayld_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "FUNGMOTIZED", "fungpayld_sm.pcx");
         }
     }
 }
@@ -1717,7 +1719,7 @@ void __cdecl action_give(int veh_id, int faction_id_tgt) {
         if (near_id >= 0) {
             parse_says(4, Bases[near_id].name, -1, -1);
             if (*GameLanguage || is_human(faction_id)) {
-                NetMsg_pop(NetMsg, "GOTUNIT", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "GOTUNIT", 5000, 0, 0);
             // simplify check to remove region_base_plan
             } else if (Units[veh->unit_id].plan == PLAN_DEFENSE) {
                 X_pop("GOTUNITDEFEND", 0);
@@ -1728,9 +1730,9 @@ void __cdecl action_give(int veh_id, int faction_id_tgt) {
     } else if (faction_id == player_id) {
         parse_says(3, get_noun(faction_id_tgt), -1, -1);
         if (faction_id_tgt) {
-            NetMsg_pop(NetMsg, "GAVEUNIT", 5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "GAVEUNIT", 5000, 0, 0);
         } else {
-            NetMsg_pop(NetMsg, "GAVEWILD", 5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "GAVEWILD", 5000, 0, 0);
         }
     }
 }
@@ -1978,7 +1980,13 @@ int __cdecl order_veh(int veh_id, int offset, int flag) {
                 Vehs[veh_id].flags &= ~VFLAG_PROBE_PACT_OPERATIONS;
                 if (Factions[veh_fc_id].diplo_status[tgt_fc_id] & DIPLO_PACT) {
                     if (!move_delay && veh_fc_id == MapWin->cOwner) {
-                        if (base_id < 0) {
+                        if (autosim_ui_active()) {
+                            // An observed AI should take the same probe path as any
+                            // unobserved AI, without a human permission dialog.
+                            telemetry_record_ui_notice("probe_choice",
+                                base_id < 0 ? "PROBEPACTTEAM" : "PROBEPACT",
+                                "use_unobserved_ai_path");
+                        } else if (base_id < 0) {
                             if (stack_check(stack_veh_id, 2, PLAN_PROBE, tgt_fc_id, -1)) {
                                 parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                                 if (X_pop("PROBEPACTTEAM", 0)) {
@@ -2218,7 +2226,8 @@ int __cdecl order_veh(int veh_id, int offset, int flag) {
                     FX_play(Sounds, 13);
                     parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                     parse_says(1, Vehs[stack_veh_id].name(), -1, -1);
-                    NetMsg_pop(NetMsg, tgt_at_sea ? "ISLESPOTTED" : "WORMSSPOTTED", 5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg,
+                        tgt_at_sea ? "ISLESPOTTED" : "WORMSSPOTTED", 5000, 0, 0);
                 }
                 goto MOV_END;
             }
@@ -2244,7 +2253,8 @@ MOV_SPOT:
                 FX_play(Sounds, 13);
                 parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                 parse_says(1, Vehs[stack_veh_id].name(), -1, -1);
-                NetMsg_pop(NetMsg, tgt_fc_id ? "SPOTTED" : "SPOTTED0", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg,
+                    tgt_fc_id ? "SPOTTED" : "SPOTTED0", 5000, 0, 0);
             }
             goto MOV_END;
         }
@@ -2259,7 +2269,8 @@ MOV_SPOT:
                 FX_play(Sounds, 13);
                 parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                 parse_says(1, Vehs[stack_veh_id].name(), -1, -1);
-                NetMsg_pop(NetMsg, tgt_fc_id ? "SPOTTED" : "SPOTTED0", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg,
+                    tgt_fc_id ? "SPOTTED" : "SPOTTED0", 5000, 0, 0);
                 goto MOV_END;
             }
         }
@@ -2320,8 +2331,13 @@ MOV_SPOT:
                         parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                         parse_says(1, Vehs[stack_veh_id].name(), -1, -1);
                         parse_says(2, get_title(veh_fc_id), -1, -1);
-                        int choice;
-                        if (!MFactions[tgt_fc_id].is_alien()) {
+                        int choice = 1;
+                        if (autosim_ui_active()) {
+                            // AI already chose to attack: match the native path when
+                            // its faction is not the observed MapWin owner.
+                            telemetry_record_ui_notice("probe_choice",
+                                "ENEMYPROBE2", "use_unobserved_ai_path");
+                        } else if (!MFactions[tgt_fc_id].is_alien()) {
                             choice = popp(ScriptFile, "ENEMYPROBE2", 0, "capture_sm.pcx", 0);
                         } else {
                             choice = popp(ScriptFile, "ENEMYPROBE2", 0, "al_cap_sm.pcx", 0);
@@ -2368,11 +2384,11 @@ MOV_SPOT:
                         if (tgt_fc_id == MapWin->cOwner) {
                             parse_says(0, get_adjective(veh_fc_id), -1, -1);
                             parse_says(1, get_title(tgt_fc_id), -1, -1);
-                            NetMsg_pop(NetMsg, "GOTMYPROBE", 5000, 0, 0);
+                            autosim_notice_netmsg(NetMsg, "GOTMYPROBE", 5000, 0, 0);
                         } else if (veh_fc_id == MapWin->cOwner) {
                             parse_says(0, get_adjective(tgt_fc_id), -1, -1);
                             parse_says(1, get_title(veh_fc_id), -1, -1);
-                            NetMsg_pop(NetMsg, "GOTYOURPROBE", 5000, 0, 0);
+                            autosim_notice_netmsg(NetMsg, "GOTYOURPROBE", 5000, 0, 0);
                         }
                         goto MOV_END;
                     }
@@ -2384,7 +2400,13 @@ MOV_SPOT:
         if (moves_avail < Rules->move_rate_roads
         && Vehs[veh_id].unit_id != BSC_SPORE_LAUNCHER
         && Vehs[veh_id].unit_id != BSC_MIND_WORMS) {
-            if (veh_fc_id == MapWin->cOwner && !move_delay && *VehAttackFlags & 1) {
+            const bool observed_attack = veh_fc_id == MapWin->cOwner
+                && !move_delay && (*VehAttackFlags & 1);
+            const bool ai_hasty = autosim_use_ai_hasty_rule(
+                autosim_ui_active(), is_human(veh_fc_id),
+                veh_fc_id == MapWin->cOwner, (*VehAttackFlags & 1) != 0,
+                move_delay != 0);
+            if (observed_attack && !ai_hasty) {
                 parse_says(0, Vehs[veh_id].name(), -1, -1);
                 parse_num(0, moves_avail);
                 parse_num(1, Rules->move_rate_roads);
@@ -2392,7 +2414,11 @@ MOV_SPOT:
                     goto MOV_END;
                 }
             } else if (!is_human(veh_fc_id)) {
-                // TODO this condition could be adjusted
+                // Preserve the existing AI short-movement cutoff; do not
+                // blindly confirm an otherwise disallowed hasty attack.
+                if (ai_hasty) {
+                    telemetry_record_ui_notice("order_veh", "HASTY", "ai_movement_rule");
+                }
                 if (moves_avail <= Rules->move_rate_roads / 2) {
                     goto MOV_END;
                 }
@@ -2417,7 +2443,7 @@ MOV_SPOT:
                         || (fc_base_id >= 0 && Bases[fc_base_id].eco_damage)) {
                             // log_say_2("Agitated", 0, 0, 0);
                             if (veh_fc_id == MapWin->cOwner) {
-                                NetMsg_pop(NetMsg, "WORMSAGITATED", 5000, 0, 0);
+                                autosim_notice_netmsg(NetMsg, "WORMSAGITATED", 5000, 0, 0);
                             }
                         } else {
                             // log_say_2("Precapture who, enemy", veh_fc_id, stack_veh_id, 0);
@@ -2455,21 +2481,21 @@ MOV_SPOT:
                                         parse_says(0, Vehs[stack_veh_id].name(), -1, -1);
                                         if (tgt_unit_id == BSC_SPORE_LAUNCHER) {
                                             if (plr->units_active[BSC_SPORE_LAUNCHER]) {
-                                                NetMsg_pop(NetMsg, "WORMCAPTURE", 5000, 0, 0);
+                                                autosim_notice_netmsg(NetMsg, "WORMCAPTURE", 5000, 0, 0);
                                             } else {
-                                                popp(ScriptFile, "WORMCAPTURE", 0, "sporlnch_sm.pcx", 0);
+                                                autosim_notice_popp(ScriptFile, "WORMCAPTURE", "sporlnch_sm.pcx");
                                             }
                                         } else if (tgt_unit_id == BSC_SEALURK) {
                                             if (plr->units_active[BSC_SEALURK]) {
-                                                NetMsg_pop(NetMsg, "WORMCAPTURE", 5000, 0, 0);
+                                                autosim_notice_netmsg(NetMsg, "WORMCAPTURE", 5000, 0, 0);
                                             } else {
-                                                popp(ScriptFile, "WORMCAPTURE", 0, "sealrk_sm.pcx", 0);
+                                                autosim_notice_popp(ScriptFile, "WORMCAPTURE", "sealrk_sm.pcx");
                                             }
                                         } else if (plr->units_active[tgt_unit_id]) {
-                                            NetMsg_pop(NetMsg, "WORMCAPTURE", 5000, 0, 0);
+                                            autosim_notice_netmsg(NetMsg, "WORMCAPTURE", 5000, 0, 0);
                                         } else {
                                             bool sea = is_ocean(mapsq(tgt_x, tgt_y));
-                                            popp(ScriptFile, "WORMCAPTURE", 0, sea ? "isle_sm.pcx" : "mindworm_sm.pcx", 0);
+                                            autosim_notice_popp(ScriptFile, "WORMCAPTURE", sea ? "isle_sm.pcx" : "mindworm_sm.pcx");
                                         }
                                     }
                                     // log_say_2("Captured", 0, 0, 0);
@@ -2478,7 +2504,7 @@ MOV_SPOT:
                             }
                             Vehs[stack_veh_id].flags |= VFLAG_UNK_2000;
                             if (veh_fc_id == MapWin->cOwner) {
-                                NetMsg_pop(NetMsg, "WORMNOCAPTURE", 5000, 0, 0);
+                                autosim_notice_netmsg(NetMsg, "WORMNOCAPTURE", 5000, 0, 0);
                             }
                             // log_say_2("No Capture", 0, 0, 0);
                         }
@@ -2822,10 +2848,21 @@ MOV_NAVAL:
                 MapWin->field_23BF0 = 1;
                 if (veh_fc_id == MapWin->cOwner) {
                     MapWin->field_23BF0 = 2;
-                    Console_cursor_next(MapWin, tgt_x, tgt_y);
+                    if (!autosim_fast_combat_active()) {
+                        Console_cursor_next(MapWin, tgt_x, tgt_y);
+                    }
                 }
             }
         }
+    }
+    // AUTO-002: visibility was already computed and the legal movement
+    // decision was made. No human controls any faction in this mode.
+    // Follow the existing offscreen movement path: retain stack_put,
+    // rotation and all state updates without focusing/animating every step.
+    // The normal per-turn map redraw remains unchanged.
+    if (autosim_fast_combat_active()) {
+        move_delay = 0;
+        visual_tgl = false;
     }
     if (visual_tgl && !ctrl_key_down()
     && (move_delay || !(*GamePreferences & PREF_ADV_NO_CENTER_VEH_ORDERS))) {
@@ -2996,7 +3033,7 @@ MOV_NAVAL:
         veh_id = *CurrentVehID;
     }
     if (base_id >= 0 && veh_cargo(veh_id)) {
-        if (veh_fc_id == MapWin->cOwner || (*MultiplayerActive && is_human(veh_fc_id))) {
+        if (is_human(veh_fc_id) && (veh_fc_id == MapWin->cOwner || *MultiplayerActive)) {
             if (Vehs[veh_id].order != ORDER_MOVE_TO
             || (Vehs[veh_id].waypoint_x[0] == tgt_x && Vehs[veh_id].waypoint_y[0] == tgt_y)) {
                 for (int cur_id = veh_top(veh_id); cur_id >= 0; cur_id = Vehs[cur_id].next_veh_id_stack) {
@@ -3009,7 +3046,8 @@ MOV_NAVAL:
             }
         }
     }
-    if (veh_fc_id == MapWin->cOwner && *GamePreferences & PREF_AUTO_WAKE_VEH_TRANS_REACH_LAND) {
+    if (is_human(veh_fc_id) && veh_fc_id == MapWin->cOwner
+    && *GamePreferences & PREF_AUTO_WAKE_VEH_TRANS_REACH_LAND) {
         if (Vehs[veh_id].triad() == TRIAD_SEA && veh_cargo(veh_id) && tgt_at_sea) {
             if ((veh_speed(veh_id, 0) - Vehs[veh_id].moves_spent <= 0)
             && (Vehs[veh_id].order != ORDER_MOVE_TO
@@ -3162,11 +3200,11 @@ MOV_UPKEEP:
                             if (veh_fc_id == MapWin->cOwner) {
                                 MapWin->VehID = -1;
                                 parse_says(0, get_noun(iter_fc_id), -1, -1);
-                                popp(ScriptFile, "TOOKARTIFACT", 0, "artstolen_sm.pcx", 0);
+                                autosim_notice_popp(ScriptFile, "TOOKARTIFACT", "artstolen_sm.pcx");
                             } else if (Vehs[iter_id].faction_id == MapWin->cOwner) {
                                 parse_says(0, Vehs[iter_id].name(), -1, -1);
                                 parse_says(1, get_noun(veh_fc_id), -1, -1);
-                                popp(ScriptFile, "TAKENARTIFACT", 0, "artstolen_sm.pcx", 0);
+                                autosim_notice_popp(ScriptFile, "TAKENARTIFACT", "artstolen_sm.pcx");
                             }
                             veh_fc_id = Vehs[veh_id].faction_id;
                             break;
@@ -3245,7 +3283,11 @@ MOV_UPKEEP:
             }
         }
     }
-    if (veh_fc_id == MapWin->cOwner) {
+    // KEEPMOVING is a *human observer* 32-iteration confirmation. The
+    // observed AI must use the same autonomous path as every other AI:
+    // no human modal and no arbitrary order cancellation on its behalf.
+    // This does not change pathfinding or unit orders for non-observed AI.
+    if (veh_fc_id == MapWin->cOwner && !autosim_control_active()) {
         if (Vehs[veh_id].order == ORDER_MOVE_TO || (Vehs[veh_id].state & (VSTATE_EXPLORE|VSTATE_ON_ALERT))) {
             ++Vehs[veh_id].iter_count;
             if (Vehs[veh_id].state & VSTATE_UNK_10000 && offset == (Vehs[veh_id].rotate_angle ^ 4)) {

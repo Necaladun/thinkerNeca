@@ -1,6 +1,25 @@
 
 #include "probe.h"
+#include "telemetry.h"
 
+
+// Source-local presentation wrappers: probe actions and diplomacy execute normally.
+// In autosim, only return-unused post-action notifications are skipped.
+static void probe_notice_popp2(const char* label, const char* image) {
+    if (autosim_ui_active()) {
+        telemetry_record_ui_notice("probe_popp2", label, "suppressed_notice");
+    } else {
+        popp_2(label, image, 0);
+    }
+}
+
+static void probe_notice_portrait(const char* label, Sprite* portrait) {
+    if (autosim_ui_active()) {
+        telemetry_record_ui_notice("probe_portrait", label, "suppressed_notice");
+    } else {
+        X_pops(label, portrait, 0);
+    }
+}
 
 static void popup_init_image(Popup* popup, const char* image, int* bx, int* by) {
     if (!Buffer_get_pcx_dimensions(image, bx, by)) {
@@ -275,7 +294,7 @@ int probe_upkeep(int faction1) {
                     MFactions[faction2].thinker_probe_lost |= (1 << faction1);
                     if (faction1 == MapWin->cOwner) {
                         parse_says(0, MFactions[faction2].adj_name_faction, -1, -1);
-                        popp("modmenu", "SPYFOUND", 0, "infil_sm.pcx", 0);
+                        autosim_notice_popp("modmenu", "SPYFOUND", "infil_sm.pcx");
                     }
                 }
             }
@@ -293,7 +312,7 @@ int probe_upkeep(int faction1) {
             }
             if (faction1 == MapWin->cOwner && MFactions[faction1].thinker_probe_lost & (1 << faction2)) {
                 parse_says(0, MFactions[faction2].noun_faction, -1, -1);
-                popp("modmenu", "SPYLOST", 0, "capture_sm.pcx", 0);
+                autosim_notice_popp("modmenu", "SPYLOST", "capture_sm.pcx");
             }
         }
     }
@@ -372,7 +391,7 @@ int __cdecl probe(int veh_id, int tgt_base_id, int tgt_veh_id, int toggle) {
         if (!has_abil(Vehs[veh_id].unit_id, ABL_AMPHIBIOUS)) {
             if (veh_fc_id == MapWin->cOwner && toggle && is_human(veh_fc_id) && *VehAttackFlags & 1) {
                 parse_says(0, Ability[abil_index(8)].name, -1, -1);
-                NetMsg_pop(NetMsg, "PROBEABILAMPHIBIOUS", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "PROBEABILAMPHIBIOUS", 5000, 0, 0);
             }
             return 0;
         }
@@ -380,7 +399,7 @@ int __cdecl probe(int veh_id, int tgt_base_id, int tgt_veh_id, int toggle) {
     if (!veh_at_sea && tgt_at_sea && !has_abil(Vehs[veh_id].unit_id, ABL_AMPHIBIOUS)) {
         if (veh_fc_id == MapWin->cOwner && toggle && is_human(veh_fc_id) && *VehAttackFlags & 1) {
             parse_says(0, Ability[abil_index(8)].name, -1, -1);
-            NetMsg_pop(NetMsg, "PROBEABILAMPHIBIOUS2", 5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "PROBEABILAMPHIBIOUS2", 5000, 0, 0);
         }
         return 0;
     }
@@ -394,10 +413,10 @@ int __cdecl probe(int veh_id, int tgt_base_id, int tgt_veh_id, int toggle) {
             if (*VehAttackFlags & 2 && toggle) {
                 if (veh_fc_id == MapWin->cOwner) {
                     parse_says(0, MFactions[tgt_fc_id].adj_name_faction, -1, -1);
-                    NetMsg_pop(NetMsg, "HUNTERSEEKER", -5000, 0, "huntsk_sm.pcx");
+                    autosim_notice_netmsg(NetMsg, "HUNTERSEEKER", -5000, 0, "huntsk_sm.pcx");
                 } else if (tgt_fc_id == MapWin->cOwner) {
                     parse_says(0, MFactions[veh_fc_id].adj_name_faction, -1, -1);
-                    NetMsg_pop(NetMsg, "HUNTERSEEKER2", -5000, 0, "huntsk_sm.pcx");
+                    autosim_notice_netmsg(NetMsg, "HUNTERSEEKER2", -5000, 0, "huntsk_sm.pcx");
                 }
                 kill(veh_id);
             }
@@ -496,14 +515,19 @@ MOV_START:
                 : !(plr->diplo_status[tgt_fc_id] & DIPLO_HAVE_INFILTRATOR)) {
                     set_treaty(veh_fc_id, tgt_fc_id, DIPLO_HAVE_INFILTRATOR, 1);
                     if (veh_fc_id == MapWin->cOwner) {
-                        report_intel(tgt_fc_id);
+                        if (autosim_ui_active()) {
+                            telemetry_record_ui_notice("probe_intelligence",
+                                "INFILTRATION_INTELLIGENCE_REPORT", "suppressed_notice");
+                        } else {
+                            report_intel(tgt_fc_id);
+                        }
                     }
                 }
                 if (tgt_fc_id == MapWin->cOwner) {
                     parse_says(0, get_title(veh_fc_id), -1, -1);
                     parse_says(1, get_name(veh_fc_id), -1, -1);
                     parse_says(2, get_noun(veh_fc_id), -1, -1);
-                    NetMsg_pop(NetMsg, "DETECTINFILTRATE", -5000, 0, infil_img);
+                    autosim_notice_netmsg(NetMsg, "DETECTINFILTRATE", -5000, 0, infil_img);
                 }
             }
             if (veh_fc_id == MapWin->cOwner) {
@@ -533,7 +557,7 @@ MOV_START:
                     parse_says(0, Bases[tgt_base_id].name, -1, -1);
                     mod_success_rates(1, mod_morale_veh(veh_id, 1, 0), -1, tgt_base_id);
                     if (!mod_success_rates(2, mod_morale_veh(veh_id, 1, 0), 1, tgt_base_id)) {
-                        NetMsg_pop(NetMsg, "ADVDECIPHER1", -5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ADVDECIPHER1", -5000, 0, 0);
                         return 0;
                     }
                     if (!popp(ScriptFile, "ADVDECIPHER", 0, infil_img, 0)) {
@@ -584,7 +608,7 @@ MOV_START:
             }
             if (is_human(veh_fc_id)) {
                 if (veh_fc_id == MapWin->cOwner && *VehAttackFlags & 2) {
-                    NetMsg_pop(NetMsg, "STOLENOTHING", -5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "STOLENOTHING", -5000, 0, 0);
                     return 0;
                 }
                 goto MOV_FRAME;
@@ -601,7 +625,7 @@ MOV_START:
                     int morale = mod_morale_veh(veh_id, 1, 0);
                     mod_success_rates(1, morale, -1, tgt_base_id);
                     if (!mod_success_rates(2, morale, 1, tgt_base_id)) {
-                        NetMsg_pop(NetMsg, "ADVENERGY1", -5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ADVENERGY1", -5000, 0, 0);
                         return 0;
                     }
                     if (!popp(ScriptFile, "ADVENERGY", 0, infil_img, 0)) {
@@ -663,7 +687,7 @@ MOV_START:
                 }
             } else {
                 if (veh_fc_id == MapWin->cOwner && is_human(veh_fc_id) && *VehAttackFlags & 1) {
-                    NetMsg_pop(NetMsg, "NOASSASSIN", -5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "NOASSASSIN", -5000, 0, 0);
                 }
             }
             return 0;
@@ -678,7 +702,7 @@ MOV_START:
                 }
             } else {
                 if (veh_fc_id == MapWin->cOwner && is_human(veh_fc_id)) {
-                    NetMsg_pop(NetMsg, "NOFREEWILLY", -5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "NOFREEWILLY", -5000, 0, 0);
                 }
             }
             return 0;
@@ -690,13 +714,13 @@ MOV_START:
                     && !has_abil(Vehs[veh_id].unit_id, ABL_AIR_SUPERIORITY)) {
                 if (veh_fc_id == MapWin->cOwner && toggle && is_human(veh_fc_id) && *VehAttackFlags & 1) {
                     parse_says(0, Ability[abil_index(32)].name, -1, -1);
-                    NetMsg_pop(NetMsg, "PROBEABILSUPERIORITY", 5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "PROBEABILSUPERIORITY", 5000, 0, 0);
                 }
                 return 0;
             }
             if (!tgt_fc_id || Vehs[tgt_veh_id].is_native_unit()) { // remove redundant Spore Launcher reference
                 if (veh_fc_id == MapWin->cOwner && toggle && is_human(veh_fc_id) && *VehAttackFlags & 1) {
-                    NetMsg_pop(NetMsg, "ALIENPROBE", -5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "ALIENPROBE", -5000, 0, 0);
                 }
                 return 0;
             }
@@ -715,7 +739,7 @@ MOV_START:
             if (MFactions[tgt_fc_id].rule_flags & RFLAG_MINDCONTROL) {
                 if (veh_fc_id == MapWin->cOwner && plr_human && toggle && *VehAttackFlags & 1) {
                     parse_says(0, MFactions[tgt_fc_id].adj_name_faction, -1, -1);
-                    NetMsg_pop(NetMsg, "MINDIMMUNITY2", -5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "MINDIMMUNITY2", -5000, 0, 0);
                 }
                 return 0;
             }
@@ -742,7 +766,7 @@ MOV_START:
             } else {
                 if (veh_fc_id == MapWin->cOwner && plr_human && toggle && *VehAttackFlags & 1) {
                     parse_says(0, MFactions[tgt_fc_id].adj_name_faction, -1, -1);
-                    NetMsg_pop(NetMsg, "IMMUNITY", -5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "IMMUNITY", -5000, 0, 0);
                 }
                 return 0;
             }
@@ -864,7 +888,7 @@ MOV_START:
         if (is_human(veh_fc_id)) {
             if (veh_fc_id == MapWin->cOwner && *VehAttackFlags & 1) {
                 parse_says(0, MFactions[tgt_fc_id].adj_name_faction, -1, -1);
-                NetMsg_pop(NetMsg, "MINDIMMUNITY", -5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "MINDIMMUNITY", -5000, 0, 0);
             }
             return 0;
         }
@@ -901,7 +925,7 @@ MOV_START:
         if (is_human(veh_fc_id)) {
             if (veh_fc_id == MapWin->cOwner && *VehAttackFlags & 1) {
                 parse_says(0, MFactions[tgt_fc_id].adj_name_faction, -1, -1);
-                NetMsg_pop(NetMsg, "IMMUNITY", -5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "IMMUNITY", -5000, 0, 0);
             }
             return 0;
         }
@@ -921,7 +945,7 @@ MOV_START:
                 mod_success_rates(2, mod_morale_veh(veh_id, 1, 0), 1, -1);
                 if (plr->energy_credits < mc_cost) {
                     wave_it(9);
-                    NetMsg_pop(NetMsg, "THOUGHTCONTROL", -5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "THOUGHTCONTROL", -5000, 0, 0);
                     return 0;
                 }
                 wave_it(32);
@@ -1217,9 +1241,9 @@ MOV_DEFEND:
         prb_state = -prb_state;
         if (veh_fc_id == MapWin->cOwner) {
             if (!plr_alien) {
-                NetMsg_pop_2("BUSTED", "capture_sm.pcx");
+                autosim_notice_netmsg2("BUSTED", "capture_sm.pcx");
             } else {
-                NetMsg_pop_2("BUSTED", "al_cap_sm.pcx");
+                autosim_notice_netmsg2("BUSTED", "al_cap_sm.pcx");
             }
         }
         if (tgt_fc_id == MapWin->cOwner) {
@@ -1243,7 +1267,7 @@ MOV_DEFEND:
                     parse_says(1, StrBuffer, -1, -1);
                     snprintf(StrBuffer, StrBufLen, "DECIPHERED%d", veh_fc_id != MapWin->cOwner);
                 }
-                NetMsg_pop_2(StrBuffer, infil_img);
+                autosim_notice_netmsg2(StrBuffer, infil_img);
             }
             tech_achieved(veh_fc_id, prb_tech_id, tgt_fc_id, 0);
         } else {
@@ -1253,7 +1277,7 @@ MOV_DEFEND:
         break;
     case PRB_ACTIVATE_SABOTAGE_VIRUS:
         if (sabotage_id == 99) {
-            NetMsg_pop_2("VIRUSABORT", 0);
+            autosim_notice_netmsg2("VIRUSABORT", 0);
             return 1;
         }
         if (sabotage_id == 0) {
@@ -1272,7 +1296,7 @@ MOV_DEFEND:
         }
         if (sabotage_id == 0 || sabotage_id != 98) {
             if (veh_fc_id == MapWin->cOwner || tgt_fc_id == MapWin->cOwner) {
-                NetMsg_pop_2(StrBuffer, infil_img);
+                autosim_notice_netmsg2(StrBuffer, infil_img);
             }
             BaseWin_check_base(BaseWin, tgt_base_id);
             draw_tile(Bases[tgt_base_id].x, Bases[tgt_base_id].y, 2);
@@ -1295,11 +1319,11 @@ MOV_DEFEND:
             if (Vehs[cur_id].faction_id == MapWin->cOwner) {
                 parse_says(0, Units[Vehs[cur_id].unit_id].name, -1, -1);
                 parse_says(1, get_adjective(veh_fc_id), -1, -1);
-                NetMsg_pop_2("BUSTMYPLANET", infil_img);
+                autosim_notice_netmsg2("BUSTMYPLANET", infil_img);
             } else if (veh_fc_id == MapWin->cOwner) {
                 parse_says(0, Units[Vehs[cur_id].unit_id].name, -1, -1);
                 parse_says(2, get_adjective(Vehs[cur_id].faction_id), -1, -1);
-                NetMsg_pop_2("BUSTYOURPLANET", infil_img);
+                autosim_notice_netmsg2("BUSTYOURPLANET", infil_img);
             }
             kill(cur_id);
             if (veh_id > cur_id) {
@@ -1325,13 +1349,13 @@ MOV_DEFEND:
             parse_num(0, steal_val);
             parse_says(0, Bases[tgt_base_id].name, -1, -1);
             parse_says(2, get_adjective(tgt_fc_id), -1, -1);
-            NetMsg_pop_2(steal_val ? "GOTENERGY" : "GOTNOENERGY", infil_img);
+            autosim_notice_netmsg2(steal_val ? "GOTENERGY" : "GOTNOENERGY", infil_img);
         } else if (tgt_fc_id == MapWin->cOwner) {
             Console_update_data(MapWin, 0);
             parse_num(0, steal_val);
             parse_says(0, Bases[tgt_base_id].name, -1, -1);
             parse_says(2, get_adjective(veh_fc_id), -1, -1);
-            NetMsg_pop_2(steal_val ? "TOOKENERGY" : "TOOKNOENERGY", infil_img);
+            autosim_notice_netmsg2(steal_val ? "TOOKENERGY" : "TOOKNOENERGY", infil_img);
         }
         break;
     case PRB_INCITE_DRONE_RIOTS:
@@ -1347,13 +1371,13 @@ MOV_DEFEND:
         parse_says(0, Bases[tgt_base_id].name, -1, -1);
         if (CurrentBase[0]->drone_total <= CurrentBase[0]->talent_total) {
             if (veh_fc_id == MapWin->cOwner || tgt_fc_id == MapWin->cOwner) {
-                NetMsg_pop_2("DRONEINCITE1", plr_alien ? "ALdrone_sm.pcx" : "drone_sm.pcx");
+                autosim_notice_netmsg2("DRONEINCITE1", plr_alien ? "ALdrone_sm.pcx" : "drone_sm.pcx");
             }
         } else {
             CurrentBase[0]->state_flags |= BSTATE_DRONE_RIOTS_ACTIVE;
             draw_tile(Bases[tgt_base_id].x, Bases[tgt_base_id].y, 2);
             if (veh_fc_id == MapWin->cOwner || tgt_fc_id == MapWin->cOwner) {
-                NetMsg_pop_2("DRONEINCITE0", plr_alien ? "ALdrone_sm.pcx" : "drone_sm.pcx");
+                autosim_notice_netmsg2("DRONEINCITE0", plr_alien ? "ALdrone_sm.pcx" : "drone_sm.pcx");
             }
         }
         break;
@@ -1365,7 +1389,7 @@ MOV_DEFEND:
             parse_num(0, res_rnd_val);
             parse_says(0, Bases[tgt_base_id].name, -1, -1);
             parse_says(1, get_adjective(tgt_fc_id), -1, -1);
-            NetMsg_pop_2("ASSASSINATED", infil_img);
+            autosim_notice_netmsg2("ASSASSINATED", infil_img);
         }
         break;
     case PRB_FREE_CAPTURED_FACTION_LEADER:
@@ -1409,7 +1433,7 @@ MOV_DEFEND:
                     parse_says(0, get_title(capture_id), -1, -1);
                     parse_says(1, get_name(capture_id), -1, -1);
                     parse_says(2, get_noun(capture_id), -1, -1);
-                    NetMsg_pop_2("WILLYFREE", "fac_escape_sm.pcx");
+                    autosim_notice_netmsg2("WILLYFREE", "fac_escape_sm.pcx");
                 }
                 if (!(*GameRules & RULES_SCN_NO_TECH_TRADING)) {
                     for (prb_tech_id = 0; prb_tech_id < MaxTechnologyNum; prb_tech_id++) {
@@ -1486,7 +1510,7 @@ MOV_DEFEND:
             parse_says(0, Bases[tgt_base_id].name, -1, -1);
             parse_says(1, get_noun(veh_fc_id), -1, -1);
             snprintf(StrBuffer, StrBufLen, "GENETICWARFARE%d", veh_fc_id != MapWin->cOwner);
-            popp_2(StrBuffer, infil_img, 0);
+            probe_notice_popp2(StrBuffer, infil_img);
         }
         break;
     case PRB_MIND_CONTROL_UNIT:
@@ -1522,7 +1546,7 @@ MOV_DEFEND:
         if (tgt_fc_id == MapWin->cOwner) {
             Console_focus(MapWin, Vehs[tgt_veh_id].x, Vehs[tgt_veh_id].y, veh_fc_id);
             parse_says(1, get_noun(veh_fc_id), -1, -1);
-            NetMsg_pop_2("SUBVERTED", infil_img);
+            autosim_notice_netmsg2("SUBVERTED", infil_img);
         }
         if (prb_diff) {
             return 1;
@@ -1592,7 +1616,7 @@ MOV_DEFEND:
                     say_num(morale != mod_morale_veh(veh_id, 1, 0) && mod_morale_veh(veh_id, 1, 0) >= 1);
                 }
                 if (veh_fc_id == MapWin->cOwner) {
-                    NetMsg_pop_2(StrBuffer, infil_img);
+                    autosim_notice_netmsg2(StrBuffer, infil_img);
                 }
             }
         }
@@ -1615,7 +1639,7 @@ MOV_DEFEND:
                 parse_says(5, get_name(tgt_fc_id), -1, -1);
                 snprintf(StrBuffer, StrBufLen, "MINDCONTROL%d",
                     (veh_fc_id == MapWin->cOwner ? 0 : (tgt_fc_id == MapWin->cOwner ? 1 : 2)));
-                popp_2(StrBuffer, infil_img, 0);
+                probe_notice_popp2(StrBuffer, infil_img);
             }
             for (int i = *VehCount - 1; i >= 0; --i) {
                 if (Vehs[i].faction_id == tgt_fc_id) {
@@ -1658,7 +1682,7 @@ MOV_DEFEND:
             mod_capture_base(tgt_base_id, veh_fc_id, 1);
         }
         if (veh_fc_id == MapWin->cOwner && ret_base_id < 0) {
-            NetMsg_pop_2(action_id == PRB_MIND_CONTROL_CITY ? "PROBESUCCUMB" : "PROBECAUGHT",
+            autosim_notice_netmsg2(action_id == PRB_MIND_CONTROL_CITY ? "PROBESUCCUMB" : "PROBECAUGHT",
                 plr_alien ? "al_cap_sm.pcx" : "capture_sm.pcx");
         }
 MOV_UPKEEP:
@@ -1693,9 +1717,9 @@ MOV_UPKEEP:
                 parse_says(0, get_title(-prb_state), -1, -1);
                 parse_says(1, get_name(-prb_state), -1, -1);
                 if (!plr_alien) {
-                    NetMsg_pop_2("FRAMEFLOP", "capture_sm.pcx");
+                    autosim_notice_netmsg2("FRAMEFLOP", "capture_sm.pcx");
                 } else {
-                    NetMsg_pop_2("FRAMEFLOP", "al_cap_sm.pcx");
+                    autosim_notice_netmsg2("FRAMEFLOP", "al_cap_sm.pcx");
                 }
             }
             treaty_on(-prb_state, veh_fc_id, DIPLO_VENDETTA);
@@ -1714,16 +1738,16 @@ MOV_UPKEEP:
             if (*MultiplayerActive) {
                 agenda_on(-prb_state, veh_fc_id, AGENDA_UNK_20);
                 if (-prb_state == MapWin->cOwner) {
-                    NetMsg_pop_2("HAVEFRAMEEXCUSE", 0);
+                    autosim_notice_netmsg2("HAVEFRAMEEXCUSE", 0);
                 }
                 if (veh_fc_id == MapWin->cOwner) {
                     parse_says(0, get_title(-prb_state), -1, -1);
                     parse_says(1, get_name(-prb_state), -1, -1);
                     parse_says(2, get_noun(-prb_state), -1, -1);
                     if (!plr_alien) {
-                        NetMsg_pop_2("HASFRAMEEXCUSE", "capture_sm.pcx");
+                        autosim_notice_netmsg2("HASFRAMEEXCUSE", "capture_sm.pcx");
                     } else {
-                        NetMsg_pop_2("HASFRAMEEXCUSE", "al_cap_sm.pcx");
+                        autosim_notice_netmsg2("HASFRAMEEXCUSE", "al_cap_sm.pcx");
                     }
                 }
             } else if (has_treaty(-prb_state, veh_fc_id, DIPLO_PACT)) {
@@ -1778,7 +1802,7 @@ MOV_UPKEEP:
                 parse_says(0, get_title(tgt_fc_id), -1, -1);
                 parse_says(1, get_name(tgt_fc_id), -1, -1);
                 parse_says(2, get_noun(tgt_fc_id), -1, -1);
-                NetMsg_pop_2("HASNETEXCUSE", 0);
+                autosim_notice_netmsg2("HASNETEXCUSE", 0);
                 return 1;
             }
         } else {
@@ -1828,7 +1852,7 @@ MOV_UPKEEP:
             parse_says(0, get_title(tgt_fc_id), -1, -1);
             parse_says(1, get_name(tgt_fc_id), -1, -1);
             parse_says(2, get_noun(tgt_fc_id), -1, -1);
-            NetMsg_pop_2("FRAMEJOB", infil_img);
+            autosim_notice_netmsg2("FRAMEJOB", infil_img);
         }
         if (veh_fc_id == MapWin->cOwner) {
             parse_says(0, get_title(tgt_fc_id), -1, -1);
@@ -1837,7 +1861,7 @@ MOV_UPKEEP:
             parse_says(3, get_title(prb_state), -1, -1);
             parse_says(4, get_name(prb_state), -1, -1);
             parse_says(5, get_noun(prb_state), -1, -1);
-            NetMsg_pop_2("FRAMED", infil_img);
+            autosim_notice_netmsg2("FRAMED", infil_img);
         }
         return 1;
     }
@@ -1855,7 +1879,7 @@ MOV_UPKEEP:
                     clear();
                     says("KEPTPACT");
                     say_num(1);
-                    X_pops(StrBuffer, FactionPortraits[tgt_fc_id], 0);
+                    probe_notice_portrait(StrBuffer, FactionPortraits[tgt_fc_id]);
                 }
                 return 1;
             }
@@ -1863,13 +1887,13 @@ MOV_UPKEEP:
         if (action_id == PRB_PROCURE_RESEARCH_DATA || action_id < PRB_MIND_CONTROL_CITY) {
             if (plr->ranking < tgt->ranking && plr->ranking < 5) {
                 if (veh_fc_id == MapWin->cOwner) {
-                    X_pops("EXCUSEDPACT", FactionPortraits[tgt_fc_id], 0);
+                    probe_notice_portrait("EXCUSEDPACT", FactionPortraits[tgt_fc_id]);
                 }
                 return 1;
             }
         }
         if (veh_fc_id == MapWin->cOwner) {
-            X_pops("USEDEXCUSE", FactionPortraits[tgt_fc_id], 0);
+            probe_notice_portrait("USEDEXCUSE", FactionPortraits[tgt_fc_id]);
         }
         if (action_id >= PRB_MIND_CONTROL_CITY) {
             double_cross(veh_fc_id, tgt_fc_id, -1);
@@ -1898,13 +1922,13 @@ MOV_UPKEEP:
             cause_friction(tgt_fc_id, veh_fc_id, game_randv(4));
             if (veh_fc_id == MapWin->cOwner) {
                 snprintf(StrBuffer, StrBufLen, "KEPT%d", action_id);
-                X_pops(StrBuffer, FactionPortraits[tgt_fc_id], 0);
+                probe_notice_portrait(StrBuffer, FactionPortraits[tgt_fc_id]);
             }
             return 1;
         }
     }
     if (veh_fc_id == MapWin->cOwner) {
-        X_pops("USEDEXCUSE", FactionPortraits[tgt_fc_id], 0);
+        probe_notice_portrait("USEDEXCUSE", FactionPortraits[tgt_fc_id]);
     }
     if (action_id >= PRB_MIND_CONTROL_CITY) {
         double_cross(veh_fc_id, tgt_fc_id, -1);

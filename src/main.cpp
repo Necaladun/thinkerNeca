@@ -8,6 +8,24 @@ AIPlans plans[MaxPlayerNum];
 set_str_t movedlabels;
 map_str_t musiclabels;
 std::string startup_load_path = "";
+bool autosim_launcher_active = false;
+bool autosim_auto_new_game = false;
+int autosim_new_world_size = 2;
+int autosim_new_world_source = 0;
+int autosim_new_custom_x = 40;
+int autosim_new_custom_y = 80;
+bool autosim_new_rules_override = false;
+uint32_t autosim_new_rules_mask = 0x1A0E; // DefaultRules, stock victory/rule defaults
+int autosim_new_random_leaders = 0;
+int autosim_new_world_ocean = 1;
+int autosim_new_world_erosion = 1;
+int autosim_new_world_cloud = 1;
+int autosim_new_world_life = 1;
+int autosim_new_difficulty = 3;
+int autosim_new_observer = 1;
+std::string autosim_new_roster[7];
+std::string autosim_launch_campaign_name;
+std::string autosim_launch_profile_path;
 std::vector<std::pair<std::string,std::string>> faction_pool;
 std::vector<std::pair<size_t,size_t>> faction_pair;
 
@@ -46,6 +64,14 @@ int option_handler(void* user, const char* section, const char* name, const char
         cf->editor_free_units = atoi(value);
     } else if (MATCH("autosave_interval")) {
         cf->autosave_interval = atoi(value);
+    } else if (MATCH("telemetry_enabled")) {
+        cf->telemetry_enabled = atoi(value) != 0;
+    } else if (MATCH("autosim_manual_turns")) {
+        cf->autosim_manual_turns = clamp(atoi(value), 0, 100000);
+    } else if (MATCH("autosim_suppress_notices")) {
+        cf->autosim_suppress_notices = (atoi(value) != 0);
+    } else if (MATCH("autosim_fast_combat")) {
+        cf->autosim_fast_combat = (atoi(value) != 0);
     } else if (MATCH("warn_on_former_replace")) {
         cf->warn_on_former_replace = atoi(value);
     } else if (MATCH("manage_player_bases")) {
@@ -444,6 +470,185 @@ int opt_list_parse(int32_t* dst, char* src, int num, int min_val, int max_val) {
     return 0;
 }
 
+
+// Stage A: run-specific [automation] INI. Supplied only by the separate
+// launcher via an inherited environment variable; never read in normal mode.
+struct AutosimRunProfile {
+    int schema = -1;
+    int turns = -1;
+    int telemetry = -1;
+    int notices = -1;
+    int fast = -1;
+    int render = -1;
+    int unlimited_expansion = 0; // old run profiles retain normal AI colony cap
+    int archive_interval = 0; // no archive writes in older profiles
+    int timing = 0;
+    int size = -1, ocean = -1, erosion = -1, cloud = -1, life = -1;
+    int world_source = 0; // old profiles use the existing generated-world route
+    int custom_x = -1, custom_y = -1;
+    int rules_mode = 0; // old profiles retain installed-game rules
+    int rules_mask = -1, rules_random = -1;
+    int difficulty = -1, observer = -1, monitor = -1;
+    std::string mode;
+    std::string source_save;
+    std::string name;
+    std::string faction_slots[7]; // explicit canonical game filenames
+    int faction_slot_count = 0;
+};
+
+static int autosim_profile_int(const char* s, int maxval, int* result) {
+    if (!s || !s[0]) return 0;
+    char* end = NULL;
+    const long value = strtol(s, &end, 10);
+    if (!end || *end || value < 0 || value > maxval) return 0;
+    *result = (int)value;
+    return 1;
+}
+
+static int autosim_profile_option(void* data, const char* section,
+    const char* name, const char* value) {
+    AutosimRunProfile* p = (AutosimRunProfile*)data;
+    if (strcmp(section, "automation")) return 0;
+    if (!strcmp(name, "schema")) return autosim_profile_int(value, 1, &p->schema);
+    if (!strcmp(name, "turns")) return autosim_profile_int(value, 100000, &p->turns);
+    if (!strcmp(name, "telemetry_enabled")) return autosim_profile_int(value, 1, &p->telemetry);
+    if (!strcmp(name, "suppress_notices")) return autosim_profile_int(value, 1, &p->notices);
+    if (!strcmp(name, "fast_combat")) return autosim_profile_int(value, 1, &p->fast);
+    if (!strcmp(name, "render_mode")) return autosim_profile_int(value, 2, &p->render);
+    if (!strcmp(name, "unlimited_expansion")) return autosim_profile_int(value, 1, &p->unlimited_expansion);
+    if (!strcmp(name, "archive_interval")) return autosim_profile_int(value, 10000, &p->archive_interval);
+    if (!strcmp(name, "timing_enabled")) return autosim_profile_int(value, 1, &p->timing);
+    if (!strncmp(name, "faction_", 8) && strlen(name) == 9
+    && name[8] >= '1' && name[8] <= '7') {
+        const char* const allowed[] = {
+            "GAIANS", "HIVE", "UNIV", "MORGAN", "SPARTANS", "BELIEVE", "PEACE",
+            "CYBORG", "PIRATES", "DRONE", "ANGELS", "FUNGBOY", "CARETAKE", "USURPER"
+        };
+        bool valid = false;
+        for (const char* id : allowed) {
+            if (!strcmp(value, id)) { valid = true; break; }
+        }
+        if (!valid) return 0;
+        std::string& selected = p->faction_slots[name[8] - '1'];
+        if (!selected.empty()) return 0; // duplicate option in one run profile
+        selected = value;
+        ++p->faction_slot_count;
+        return 1;
+    }
+    if (!strcmp(name, "world_size")) return autosim_profile_int(value, 6, &p->size);
+    if (!strcmp(name, "world_source")) return autosim_profile_int(value, 2, &p->world_source);
+    if (!strcmp(name, "custom_map_x")) return autosim_profile_int(value, 512, &p->custom_x);
+    if (!strcmp(name, "custom_map_y")) return autosim_profile_int(value, 512, &p->custom_y);
+    if (!strcmp(name, "rules_mode")) return autosim_profile_int(value, 1, &p->rules_mode);
+    if (!strcmp(name, "rules_mask")) return autosim_profile_int(value, 65535, &p->rules_mask);
+    if (!strcmp(name, "rules_random")) return autosim_profile_int(value, 3, &p->rules_random);
+    if (!strcmp(name, "world_ocean")) return autosim_profile_int(value, 2, &p->ocean);
+    if (!strcmp(name, "world_erosion")) return autosim_profile_int(value, 2, &p->erosion);
+    if (!strcmp(name, "world_cloud")) return autosim_profile_int(value, 2, &p->cloud);
+    if (!strcmp(name, "world_life")) return autosim_profile_int(value, 2, &p->life);
+    if (!strcmp(name, "difficulty")) return autosim_profile_int(value, 5, &p->difficulty);
+    if (!strcmp(name, "observer")) return autosim_profile_int(value, 7, &p->observer);
+    if (!strcmp(name, "monitor_seconds")) return autosim_profile_int(value, 60, &p->monitor);
+    if (!strcmp(name, "mode")) { p->mode = value; return 1; }
+    if (!strcmp(name, "source_save")) { p->source_save = value; return 1; }
+    if (!strcmp(name, "campaign_name")) { p->name = value; return 1; }
+    return 0;
+}
+
+static bool autosim_apply_launch_profile(Config* cf) {
+    // Legacy automation keys in thinker.ini and thinker_user.ini cannot
+    // activate simulation/logging outside the explicit automation launcher.
+    cf->telemetry_enabled = 0;
+    cf->autosim_manual_turns = 0;
+    cf->autosim_suppress_notices = 0;
+    cf->autosim_fast_combat = 0;
+    cf->autosim_render_mode = 0;
+    cf->autosim_unlimited_expansion = 0;
+    cf->autosim_archive_interval = 0;
+    cf->autosim_timing_enabled = 0;
+    for (std::string& slot : autosim_new_roster) slot.clear();
+    autosim_launcher_active = false;
+    autosim_auto_new_game = false;
+    autosim_new_world_source = 0;
+    autosim_new_custom_x = 40;
+    autosim_new_custom_y = 80;
+    autosim_new_rules_override = false;
+    autosim_new_rules_mask = 0x1A0E;
+    autosim_new_random_leaders = 0;
+    autosim_launch_campaign_name.clear();
+    autosim_launch_profile_path.clear();
+
+    char path[4096] = {};
+    const DWORD n = GetEnvironmentVariableA(
+        "THINKERNECA_AUTOSIM_PROFILE", path, sizeof(path));
+    if (!n) return true; // ordinary thinker.exe launch
+    if (n >= sizeof(path)) return false;
+
+    AutosimRunProfile p;
+    if (ini_parse(path, autosim_profile_option, &p) != 0
+    || p.schema != 1 || p.turns < 1 || p.turns > 100000
+    || p.telemetry < 0 || p.notices < 0 || p.fast < 0
+    || (p.archive_interval > 0 && !p.telemetry)
+    || p.name.empty() || p.name.size() > 88
+    || (p.monitor != -1 && p.monitor < 30)
+    || (p.mode == "new" && (p.size < 0 || p.ocean < 0 || p.erosion < 0
+        || p.cloud < 0 || p.life < 0 || p.difficulty < 0 || p.observer < 1))
+    || (p.mode == "new" && p.world_source == 0 && p.size == 6
+        && (p.custom_x < 16 || p.custom_y < 16))
+    || (p.mode == "new" && p.rules_mode == 1
+        && (p.rules_mask < 0 || p.rules_random < 0))
+    || (p.mode != "new" && p.mode != "load")
+    || (p.faction_slot_count != 0 && p.faction_slot_count != 7)
+    || (p.mode == "new" && !p.source_save.empty())
+    || (p.mode == "load" && (p.source_save.size() < 4
+        || _stricmp(p.source_save.c_str() + p.source_save.size() - 4, ".sav") != 0
+        || !FileExists(p.source_save.c_str())))) return false;
+    for (unsigned char ch : p.name)
+        if (ch < 32 || ch == 127) return false;
+    if (p.faction_slot_count == 7) {
+        for (int i = 0; i < 7; ++i) {
+            for (int j = i + 1; j < 7; ++j) {
+                if (p.faction_slots[i] == p.faction_slots[j]) return false;
+            }
+        }
+    }
+
+    cf->telemetry_enabled = p.telemetry;
+    cf->autosim_manual_turns = p.turns;
+    cf->autosim_suppress_notices = p.notices;
+    cf->autosim_fast_combat = p.fast;
+    cf->autosim_render_mode = p.render >= 0 ? p.render : (p.fast ? 1 : 0);
+    cf->autosim_unlimited_expansion = p.unlimited_expansion;
+    cf->autosim_archive_interval = p.archive_interval;
+    cf->autosim_timing_enabled = p.timing;
+    autosim_launch_campaign_name = p.name;
+    autosim_launch_profile_path = path;
+    autosim_auto_new_game = p.mode == "new";
+    if (autosim_auto_new_game) {
+        autosim_new_world_size = p.size;
+        autosim_new_world_source = p.world_source;
+        if (p.custom_x >= 16) autosim_new_custom_x = p.custom_x;
+        if (p.custom_y >= 16) autosim_new_custom_y = p.custom_y;
+        autosim_new_rules_override = p.rules_mode == 1;
+        if (autosim_new_rules_override) {
+            autosim_new_rules_mask = (uint32_t)p.rules_mask;
+            autosim_new_random_leaders = p.rules_random;
+        }
+        autosim_new_world_ocean = p.ocean;
+        autosim_new_world_erosion = p.erosion;
+        autosim_new_world_cloud = p.cloud;
+        autosim_new_world_life = p.life;
+        autosim_new_difficulty = p.difficulty;
+        autosim_new_observer = p.observer;
+        if (p.faction_slot_count == 7) {
+            for (int i = 0; i < 7; ++i) autosim_new_roster[i] = p.faction_slots[i];
+        }
+    }
+    if (p.mode == "load") startup_load_path = p.source_save;
+    autosim_launcher_active = true;
+    return true;
+}
+
 static bool is_save_file(const std::string& path) {
     if (path.length() < 4) {
         return false;
@@ -529,6 +734,12 @@ DLL_EXPORT BOOL APIENTRY DllMain(HINSTANCE UNUSED(hinstDLL), DWORD fdwReason, LP
             if (FileExists("thinker_user.ini")
             && ini_parse("thinker_user.ini", option_handler, &conf) < 0) {
                 MessageBoxA(0, "Error while opening thinker_user.ini file.",
+                    MOD_VERSION, MB_OK | MB_ICONSTOP);
+                exit_fail();
+            }
+            if (!autosim_apply_launch_profile(&conf)) {
+                MessageBoxA(0, "Automation run profile invalid or inaccessible.\n"
+                    "Use Run Automation.bat or clear THINKERNECA_AUTOSIM_PROFILE.",
                     MOD_VERSION, MB_OK | MB_ICONSTOP);
                 exit_fail();
             }

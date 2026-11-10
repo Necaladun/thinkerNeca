@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - master
+      # Temporary CI access while AUTO-002 remains an unmerged feature branch.
+      - feature/auto-002-noninteractive-ui
 
 # One build per live PR revision; cancel superseded CI jobs.
 concurrency:
@@ -59,19 +61,83 @@ jobs:
         run: python tools/test_reserved_landmark_slot.py
       - name: Check Sunny Mesa centre-only energy bonus
         run: python tools/test_mesa_energy.py
+      - name: Test AUTO-001 AI-only turn driver policy (host C++11)
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic tools/test_autosim_policy.cpp -o build/ci/test_autosim_policy
+          build/ci/test_autosim_policy
+      - name: Test AUTO-002 probe notice and choice source contract
+        run: python tools/test_autosim_probe_ui.py
+      - name: Test AUTO-002 Council human-diplomacy guard and trace source contract
+        run: python tools/test_autosim_council_diplomacy.py
+      - name: Test AUTO-002 native Council-window tracing ABI and callsite guard
+        run: python tools/test_autosim_council_native_trace.py
+      - name: Check TEL-LOG-01 Council and Secret Project game events versus UI suppression
+        run: python tools/test_autosim_gameplay_logging.py
+      - name: Check TEL-LOG-02 source hooks and analyzer output
+        run: python tools/test_autosim_log02.py
+      - name: Check AUTO-TIME campaign folder naming and pause-excluded runtime
+        run: python tools/test_autosim_campaign_naming_timing.py
+      - name: Test AUTO-002 Council headless native preflight and telemetry contract
+        run: python tools/test_autosim_council_headless.py
+      - name: Test AUTO-002 physical hotkeys and external-stop control
+        run: python tools/test_autosim_operator_control.py
+      - name: Test AUTO-002 end-of-run control, named saves and TEL-001 lineage
+        run: python tools/test_autosim_session_control.py
+      - name: Test AUTO-002 unified startup/menu and linked-save operator settings
+        run: python tools/test_autosim_operator_menu.py
+      - name: Test AUTO-LAUNCH Stage A profile isolation and script writer
+        run: |
+          python tools/test_autosim_launch_profile.py
+          pwsh -NoProfile -File './Run Automation.ps1' -SelfTest
+      - name: Test AUTO-LAUNCH native custom map sources and regular game-rule profiles
+        run: python tools/test_autosim_game_setup.py
+      - name: Test AUTO-NULL renderer gates, monitor and zero-input new-game contracts
+        run: python tools/test_autosim_null_newgame.py
+      - name: Check AUTO-002 full-turn presentation and autosave source contract
+        run: python tools/test_autosim_presentation_contract.py
+      - name: Check AUTO-002 satellite, wipeout and late-game notices
+        run: python tools/test_autosim_lategame_notices.py
+      - name: Check AUTO-002 orbital strike, defense and satellite lifecycle
+        run: python tools/test_autosim_orbital_strikes.py
+      - name: Check TEL-ORBIT orbital JSONL event stream and native-result hook
+        run: python tools/test_autosim_orbit_logging.py
+      - name: Check AUTO-002 missile, random-event and observed-AI movement notices
+        run: python tools/test_autosim_missile_move_ui.py
+      - name: Check AUTO-002 sea-level, tidal colony and atrocity notices
+        run: python tools/test_autosim_sealevel_atrocity.py
+      - name: Check AUTO-002 pact, intervention and Council notifications
+        run: python tools/test_autosim_pact_intervention.py
+      - name: Check AUTO-OBS Stage 3 observer, expansion and terminal contracts
+        run: python tools/test_autosim_stage3.py
+      - name: Check AUTO-LOG phase timings, SAV archives and unified launcher tools
+        run: python tools/test_autosim_logging_archive.py
+      - name: Check AUTO-002 first Mind Worm loss and alien interludes
+        run: python tools/test_autosim_rare_interludes.py
       - name: Validate distributed thinker.ini options
         run: python tools/test_thinker_ini_contract.py
+      - name: Test offline TEL-001 campaign report
+        run: |
+          python -m py_compile tools/campaign_report.py tools/test_campaign_report.py
+          python tools/test_campaign_report.py
       - name: Validate fork docs and local links
         run: python tools/test_project_docs.py
       - name: Check independent minor-terrain SAV decoder
         run: python tools/test_minor_save.py
-      - name: Upload Windows Develop binaries
+      - name: Stage unified automation launcher and headless report engine
+        run: |
+          cp "Run Automation.bat" "Run Automation.ps1" build/ci/
+          mkdir -p build/ci/tools
+          cp "tools/campaign_report.py" build/ci/tools/
+      - name: Upload Windows Develop binaries and Stage A launcher
         uses: actions/upload-artifact@v4
         with:
           name: thinker-develop-win32
           path: |
             build/ci/thinker.dll
             build/ci/thinker.exe
+            build/ci/Run Automation.bat
+            build/ci/Run Automation.ps1
+            build/ci/tools/campaign_report.py
           if-no-files-found: error
 
   # Compile-only parity check. Custom Titanium/Inspector native hooks remain
@@ -98,3 +164,20 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
       - name: Compile Release DLL and launcher (no runtime/artwork assertion)
         run: cmake --build build/ci-release --parallel 2
+
+  launcher-windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Construct Windows PowerShell 5.1 launcher and integrated report bridge
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -STA -File '.\Run Automation.ps1' -SelfTest
+          if ($LASTEXITCODE -ne 0) { throw 'Launcher run-profile self-test failed' }
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -STA -File '.\Run Automation.ps1' -ReportSelfTest
+          if ($LASTEXITCODE -ne 0) { throw 'Integrated reporter bridge failed' }
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -STA -File '.\Run Automation.ps1' -GuiSelfTest
+          if ($LASTEXITCODE -ne 0) { throw 'WinForms GUI construction failed' }

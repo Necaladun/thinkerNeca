@@ -149,6 +149,14 @@ struct Config {
     int render_high_detail = 1; // unlisted option
     int editor_free_units = 1; // unlisted option
     int autosave_interval = 1;
+    int telemetry_enabled = 0; // independent per-campaign JSONL recorder
+    int autosim_manual_turns = 0; // AUTO-001 manual handover: completed AI-only turns, 0=off
+    int autosim_suppress_notices = 0; // AUTO-002 opt-in, only when all factions are AI
+    int autosim_fast_combat = 1; // AUTO-002: temporary fast all-AI presentation (historic option name), 0=off
+    int autosim_render_mode = 0; // 0=normal, 1=fast, 2=null map rendering; launcher opt-in only
+    int autosim_unlimited_expansion = 0; // launch-profile only; bypass AI colony cap during all-AI automation
+    int autosim_archive_interval = 0; // archive a safe full-cycle SAV every N turns; 0=disabled
+    int autosim_timing_enabled = 0; // only requested phase timing during explicit launcher sessions
     int warn_on_former_replace = 1;
     int manage_player_bases = 0;
     int manage_player_units = 0;
@@ -376,6 +384,7 @@ struct AIPlans {
 #include "patch.h"
 #include "game.h"
 #include "gameturn.h"
+#include "telemetry.h"
 #include "gamewin.h"
 #include "faction.h"
 #include "faction_diplo.h"
@@ -413,6 +422,24 @@ extern AIPlans plans[MaxPlayerNum];
 extern set_str_t movedlabels;
 extern map_str_t musiclabels;
 extern std::string startup_load_path;
+extern bool autosim_launcher_active;
+extern bool autosim_auto_new_game;
+extern int autosim_new_world_size;
+extern int autosim_new_world_source; // 0 generated, 1 Planet, 2 Huge Planet
+extern int autosim_new_custom_x; // native Custom Map X (actual map width is 2*x)
+extern int autosim_new_custom_y;
+extern bool autosim_new_rules_override;
+extern uint32_t autosim_new_rules_mask; // regular low 16-bit game rules
+extern int autosim_new_random_leaders; // bit 0 personality, bit 1 social agenda
+extern int autosim_new_world_ocean;
+extern int autosim_new_world_erosion;
+extern int autosim_new_world_cloud;
+extern int autosim_new_world_life;
+extern int autosim_new_difficulty;
+extern int autosim_new_observer;
+extern std::string autosim_new_roster[7]; // empty: retain native setup for that slot
+extern std::string autosim_launch_campaign_name;
+extern std::string autosim_launch_profile_path;
 extern std::vector<std::pair<std::string,std::string>> faction_pool;
 extern std::vector<std::pair<size_t,size_t>> faction_pair;
 

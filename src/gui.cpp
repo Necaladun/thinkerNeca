@@ -1,6 +1,7 @@
 
 #include "gui.h"
 #include "empire_report.h"
+#include "autosim_control.h"
 
 const void* MainWinHandle = &MapWin->oMainWin; // 0x939444
 bool minor_native_geology_underlay_installed = false;
@@ -625,6 +626,40 @@ LRESULT WINAPI ModWinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         return 0;
     }
 
+    // Dedicated operator shortcut, separate from native F9/F10.
+    // Never enter a modal dialog inside active AI processing. The turn driver
+    // consumes its request at the next complete faction-cycle boundary.
+    if (msg == WM_KEYDOWN && wParam == VK_F12 && !*GameHalted
+    && !*MultiplayerActive && !*PbemActive
+    && ctrl_key_down() && shift_key_down() && !alt_key_down()) {
+        if (!(lParam & (1u << 30))) {
+            if (autosim_control_active()) {
+                autosim_request_control(AUTOSIM_CTL_MENU);
+            } else if (current_window() == GW_World && win_has_focus()
+            && !*WinModalState) {
+                autosim_show_manual_setup();
+            }
+        }
+        return 0;
+    }
+
+    // AUTO-002: controls only queue a request, never interrupt a live AI
+    // action. The turn driver handles it after the current full turn.
+    // Repeated keydown events must not re-arm the request.
+    if ((msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
+    && !*GameHalted && autosim_control_active()
+    && (wParam == VK_F9 || wParam == VK_F10)) {
+        // F10 often arrives via WM_SYSKEYDOWN; previously it could be
+        // missed by the WM_KEYDOWN-only native window-procedure path.
+        if (!(lParam & (1u << 30))) {
+            autosim_request_control(wParam == VK_F10
+                ? AUTOSIM_CTL_STOP : AUTOSIM_CTL_PAUSE);
+            telemetry_record_ui_notice("autosim_input",
+                wParam == VK_F10 ? "F10" : "F9", "winproc_latched");
+        }
+        return 0;
+    }
+
     // Experimental, deliberately independent of production/upkeep processing.
     if (msg == WM_KEYDOWN && empire_report_visible()) {
         if (wParam == VK_ESCAPE || wParam == VK_OEM_3) {
@@ -962,6 +997,13 @@ void __cdecl amovie_project(int movie_id)
 
 void __cdecl mod_amovie_project(const char* name)
 {
+    // Cinematic presentation only. Do not change the player's movie
+    // preference or the project's production/achievement processing.
+    if (autosim_ui_active()) {
+        telemetry_record_ui_notice("movie", name ? name : "",
+            "suppressed_project_movie");
+        return;
+    }
     if (!strlen(name) || !conf.video_player) {
         return;
     } else if (conf.video_player == 1) {

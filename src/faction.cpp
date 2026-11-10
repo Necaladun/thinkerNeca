@@ -1,5 +1,6 @@
 
 #include "faction.h"
+#include "gui_dialog.h"
 
 static char PlrBuf[StrBufLen] = {};
 
@@ -202,6 +203,12 @@ bool allow_expand(int faction_id) {
     if (is_human(faction_id)) {
         return true;
     }
+    // Explicit Automation Launcher run profile only. Normal Thinker games,
+    // saves and thinker.ini retain the configured AI colony production cap.
+    // Keep scenario no-colony and engine-wide MaxBaseNum checks above intact.
+    if (conf.autosim_unlimited_expansion && autosim_control_active()) {
+        return true;
+    }
     for (int i = 1; i < MaxPlayerNum && conf.expansion_autoscale > 0; i++) {
         if (is_human(i) && is_alive(i)) {
             bases = max(bases, Factions[i].base_count);
@@ -370,7 +377,7 @@ void __cdecl set_treaty(int faction_id_1, int faction_id_2, uint32_t status, boo
                 if (faction_id_1 == MapWin->cOwner) {
                     ParseNumTable[0] = turns;
                     parse_says(0, get_noun(faction_id_2), -1, -1);
-                    NetMsg_pop(NetMsg, "SPYRENEW", 5000, 0, 0);
+                    autosim_notice_netmsg(NetMsg, "SPYRENEW", 5000, 0, 0);
                 }
             }
         } else {
@@ -425,7 +432,7 @@ void __cdecl atrocity(int faction_id, int faction_id_tgt, int skip_init_check, i
     if (un_charter()) {
         if (*SunspotDuration > 0) {
             if (faction_id == *CurrentPlayerFaction) {
-                NetMsg_pop(NetMsg, "ATROCITYSPOTS", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "ATROCITYSPOTS", 5000, 0, 0);
             }
         } else if (!*ExpansionEnabled || skip_human_check || (!m_plr->is_alien() && !m_tgt->is_alien())) {
             for (int i = 1; i < MaxPlayerNum; i++) {
@@ -484,11 +491,11 @@ void __cdecl atrocity(int faction_id, int faction_id_tgt, int skip_init_check, i
                 parse_num(0, turns);
                 if (!m_plr->is_alien()) {
                     if (faction_id == *CurrentPlayerFaction) {
-                        NetMsg_pop(NetMsg, "ATROCITY2", 5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ATROCITY2", 5000, 0, 0);
                     } else if (faction_id_tgt == faction_id) {
-                        NetMsg_pop(NetMsg, "ATROCITY1", 5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ATROCITY1", 5000, 0, 0);
                     } else {
-                        NetMsg_pop(NetMsg, "ATROCITY", 5000, 0, 0);
+                        autosim_notice_netmsg(NetMsg, "ATROCITY", 5000, 0, 0);
                     }
                 }
                 plr->sanction_turns += turns;
@@ -529,7 +536,7 @@ void __cdecl major_atrocity(int faction_id, int faction_id_tgt) {
                     parse_says(4, get_name(faction_id), -1, -1);
                     parse_says(5, get_noun(faction_id), -1, -1);
                     snprintf(StrBuffer, StrBufLen, "MAJORATROCITY%d", faction_id != *CurrentPlayerFaction);
-                    popp(ScriptFile, StrBuffer, 0, "council_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, StrBuffer, "council_sm.pcx");
                 }
             }
         }
@@ -737,7 +744,7 @@ int __cdecl steal_tech(int faction_id, int faction_id_tgt, int is_steal) {
             StrBuffer[0] = '\0';
             say_tech(StrBuffer, tech_id, 0);
             parse_says(1, StrBuffer, -1, -1);
-            NetMsg_pop(NetMsg, "STOLETECH", 5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "STOLETECH", 5000, 0, 0);
         }
         tech_achieved(faction_id, tech_id, faction_id_tgt, 0);
         if (!is_human(faction_id) && tech_id != 9999) {
@@ -1869,7 +1876,8 @@ int __cdecl mod_setup_player(int faction_id, int setup_id, int is_probe) {
     MFaction* m = &MFactions[faction_id];
     const bool special_spawn = setup_id == -282;
     const bool initial_spawn = !*CurrentTurn || special_spawn;
-    const bool is_player = faction_id == *CurrentPlayerFaction;
+    // A camera observer is not a human participant in all-AI automation.
+    const bool is_player = faction_id == *CurrentPlayerFaction && !autosim_session_active();
     const bool plr_alien = m->is_alien();
     const bool plr_aquatic = m->is_aquatic();
     debug("setup_player %d %d %d %d %s\n", *CurrentTurn, faction_id, setup_id, is_probe, m->filename);
@@ -2108,7 +2116,35 @@ int __cdecl mod_setup_player(int faction_id, int setup_id, int is_probe) {
         if (!is_human(faction_id) || *MultiplayerActive) {
             plr->unk_102 = 0;
             set_alive(faction_id, false);
+            const bool unattended = autosim_session_active();
+            if (unattended && faction_id == *CurrentPlayerFaction) {
+                // CurrentPlayerFaction aliases MapWin->cOwner. Change camera
+                // only, preserving native faction death and combat outcomes.
+                int replacement = 0;
+                for (int step = 1; step < MaxPlayerNum; ++step) {
+                    const int id = 1 + ((faction_id - 1 + step) % (MaxPlayerNum - 1));
+                    if (is_alive(id)) { replacement = id; break; }
+                }
+                if (replacement) {
+                    MapWin->cOwner = replacement;
+                    char change[80];
+                    snprintf(change, sizeof(change), "from=%d to=%d", faction_id, replacement);
+                    telemetry_record_ui_notice("observer", "REASSIGNED", change);
+                } else {
+                    telemetry_record_ui_notice("observer", "NO_SURVIVOR",
+                        "terminal_world_extinction");
+                }
+            }
             int other_id = FactionRankings[7];
+            if (unattended) {
+                other_id = 0;
+                for (int rank = MaxPlayerNum - 1; rank >= 1; --rank) {
+                    if (is_alive(FactionRankings[rank])) {
+                        other_id = FactionRankings[rank];
+                        break;
+                    }
+                }
+            }
             if (faction_id == other_id) {
                 other_id = FactionRankings[6];
             }
@@ -2117,8 +2153,10 @@ int __cdecl mod_setup_player(int faction_id, int setup_id, int is_probe) {
             for (int i = 1; i < MaxPlayerNum; i++) {
                 if (is_alive(i)) {
                     num_active++;
-                    if (!*MultiplayerActive && Factions[i].diplo_status[*CurrentPlayerFaction] & DIPLO_PACT
-                    && Factions[i].diplo_status[*CurrentPlayerFaction] & DIPLO_HAVE_SURRENDERED) {
+                    const int conquest_leader = unattended ? other_id : *CurrentPlayerFaction;
+                    if (!*MultiplayerActive && conquest_leader > 0
+                    && Factions[i].diplo_status[conquest_leader] & DIPLO_PACT
+                    && Factions[i].diplo_status[conquest_leader] & DIPLO_HAVE_SURRENDERED) {
                         num_active--;
                     } else if (i != other_id && Factions[i].diplo_status[other_id] & DIPLO_PACT
                     && *GameRules & RULES_VICTORY_COOPERATIVE && num_allied < 2) {
@@ -2142,14 +2180,18 @@ int __cdecl mod_setup_player(int faction_id, int setup_id, int is_probe) {
                 *GameVictoryType = setup_id ? VIC_LOST_CAPTURE : VIC_LOST_REMOVE;
             }
             if (!is_player) {
-                if (num_active - num_allied < 2) {
+                if (unattended && !num_active) {
+                    // Planet can wipe out all factions; report no conqueror.
+                    *GameVictoryType = VIC_NONE;
+                    *GameState |= STATE_GAME_DONE;
+                } else if (num_active - num_allied < 2) {
                     if (num_allied) {
-                        popp(ScriptFile, "CONQCOOP", 0, "conq_sm.pcx", 0);
+                        if (!unattended) autosim_notice_popp(ScriptFile, "CONQCOOP", "conq_sm.pcx");
                         if (*GameVictoryType == VIC_NONE) {
                             *GameVictoryType = VIC_UNIFY_COOP;
                         }
-                    } else if (other_id == *CurrentPlayerFaction) {
-                        popp(ScriptFile, "CONQSING", 0, "conq_sm.pcx", 0);
+                    } else if (unattended || other_id == *CurrentPlayerFaction) {
+                        if (!unattended) autosim_notice_popp(ScriptFile, "CONQSING", "conq_sm.pcx");
                         if (*GameVictoryType == VIC_NONE) {
                             *GameVictoryType = VIC_UNIFY_SOLO;
                         }
@@ -2444,7 +2486,8 @@ int __cdecl mod_setup_player(int faction_id, int setup_id, int is_probe) {
 int __cdecl mod_eliminate_player(int faction_id, int setup_id) {
     Faction* plr = &Factions[faction_id];
     MFaction* m = &MFactions[faction_id];
-    const bool is_player = faction_id == *CurrentPlayerFaction;
+    // A camera observer is not a human participant in all-AI automation.
+    const bool is_player = faction_id == *CurrentPlayerFaction && !autosim_session_active();
     const bool plr_alien = m->is_alien();
     if (!faction_id) {
         return 0;
@@ -2488,15 +2531,17 @@ int __cdecl mod_eliminate_player(int faction_id, int setup_id) {
         } else { // The faction has been eradicated
             snprintf(file, StrBufLen, "%s2.pcx", m->filename);
         }
-        popp(ScriptFile, name, 0, file, 0);
+        autosim_notice_popp(ScriptFile, name, file);
         if (!setup_val) {
             mon_killed_faction(setup_id, faction_id);
         }
         if (!*MultiplayerActive && !setup_val && setup_id == *CurrentPlayerFaction
+        && is_human(setup_id)
         && (*GamePreferences & PREF_AV_SECRET_PROJECT_MOVIES)) {
             mod_amovie_project(&m->filename[0]);
         }
-        if (!*MultiplayerActive && setup_val && setup_id == *CurrentPlayerFaction) {
+        if (!*MultiplayerActive && setup_val && setup_id == *CurrentPlayerFaction
+        && is_human(setup_id)) {
             // TRACKED event, escape location may be revealed by random chance
             bool infiltrate = Factions[setup_id].diplo_status[faction_id] & DIPLO_HAVE_INFILTRATOR;
             int veh_id;
@@ -2521,14 +2566,15 @@ int __cdecl mod_eliminate_player(int faction_id, int setup_id) {
                 MapWin_set_center(MapWin, x, y, 1);
                 parse_says(6, get_adjective(faction_id), -1, -1);
                 if (!plr_alien) {
-                    popp(ScriptFile, "TRACKED", 0, "escpod_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "TRACKED", "escpod_sm.pcx");
                 } else {
-                    popp(ScriptFile, "TRACKED", 0, "al_pod_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "TRACKED", "al_pod_sm.pcx");
                 }
             }
         }
-        if (faction_id != *CurrentPlayerFaction && plr_alien && MFactions[*CurrentPlayerFaction].is_alien()) {
-            interlude(42, 0, 1, 0);
+        if (faction_id != *CurrentPlayerFaction && plr_alien
+        && is_human(*CurrentPlayerFaction) && MFactions[*CurrentPlayerFaction].is_alien()) {
+            autosim_interlude(42, 0, 1, 0);
         }
     }
     return 1;

@@ -6,6 +6,451 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-LOG session picker separation (10 November 2026; PR #11 draft)
+
+**User-reported Windows defect:** in the integrated `Campaign tools & archive` WinForms view, multiple campaigns appeared combined into a single row, preventing selection and opening of individual recorded games. The stored campaign data and reporter JSONL were not identified as damaged. The source previously assigned the PowerShell `ConvertFrom-Json` pipeline output directly into a ListView data tag; the one-session smoke test could not catch array nesting.
+
+**Correction:** `Convert-CampaignSessionRows` / `Add-CampaignSessionNode` explicitly normalize possibly nested JSON arrays into individual session objects. The UI uses one `ListViewItem` with its own `.Tag` per session in a generic list; columns fit the viewport and the full campaign/session path is a tooltip. Filter and refresh preserve separate entries. The folder button now opens `campaign_dir/sessions/session-NNN`; the ZIP button is labelled as a full campaign export.
+
+**Windows CI:** the PowerShell `-ReportSelfTest` now exercises the actual Python `--scan-json` bridge with two campaigns and three sessions, preserving three unique campaign/session paths and checking empty arrays. `-GuiSelfTest` constructs the real WinForms list and asserts three separate item tags, filter-to-one and restored rows. Build/structural tests remain separate. **Required installed check:** with real multi-campaign recordings, refresh, select different sessions, double-click/open each report, use the session folder button, filter and clear, and verify ZIP still contains every session. No claim of installed Windows correctness from synthetic GUI CI alone.
+
+## TEL-LOG-02: production/unit/combat/research (9 November 2026, draft PR #11)
+
+**Source-only; Windows acceptance pending:** New telemetry streams `production.jsonl`, `units.jsonl`, `combat.jsonl` and `research.jsonl` record actual C++ source mutation events independent of UI suppression: `mod_base_change` explicit queue changes after retool, `mod_base_production` completed builds/Stockpile Energy after game state mutation, `mod_base_upkeep` observed `mod_base_hurry` deltas, `veh_init` placement and `veh_kill` pre-compaction removal, `veh_upgrade` paid prototype changes, Marine Detachment owner changes, `mod_capture_base` verified surviving-base ownership change, `mod_battle_fight_2` actual HP exchanges (never option=0 odds queries), and `tech_achieved` real tech owner-bit gains (excluding maps, commlinks and prototypes). Research target observation is at completed-cycle granularity, not AI choice reasoning. Common event IDs are session-global. HTML/CSV Analyzer supports legacy sessions with absent streams.
+
+**Checks:** `tools/test_autosim_log02.py` verifies source ordering, optional reporting, HTML escaping and stream isolation. Green compilation/static CI is not native runtime proof.
+
+**Required Windows tests:** Run 10+ completed turns with telemetry, compare paid unit/facility/satellite/project completion and unit creation to snapshot totals, kill several units and verify IDs after array compaction, exercise artillery/direct/duel/retreat/Marine and reconcile HP+loss events, distinguish researched/traded/shared tech, ensure no odds-only log entries, test report CSV/HTML/ZIP, normal human and telemetry-disabled runs, same-build save/reload into another session, and telemetry-on/off game progression. Unknown causes, postcombat cleanup, native-only/manual-hurry routes, other transfer paths and cross-session unit identity remain limits.
+
+## AUTO-LAUNCH campaign-name folder IDs and active-run timing (9 November 2026; PR #11 draft)
+
+**Implemented source, native Windows trial pending.** New unlinked campaigns use the chosen launcher campaign display name (ASCII-safe slug, max 40 characters) plus local creation timestamp `YYYYMMDD-HHMMSS`, with collision suffix where necessary. Existing linked saves always reuse their existing immutable campaign ID. `telemetry_begin_session` resets a per-session active AI timer; `src/gameturn.cpp` activates it after all-AI startup confirmation and pauses it before any turn-limit/operator control; `src/game.cpp::end_of_game` freezes at the initial terminal-result write (before victory UI), preserves that value during post-victory saving, and resumes it only for an explicit continuation. Human takeover stops timing. `status.json` and `result.json` record `simulation_elapsed_ms`; victory/turn-control dialogs and integrated reports display the figure, without treating missing old-session data as zero.
+
+**Static/synthetic:** `tools/test_autosim_campaign_naming_timing.py` validates folder creation, linked-save isolation, timer guards and end-of-game/control ordering; `tools/test_campaign_report.py` exercises 11m11s and missing-runtime legacy cases. Windows test still needed: campaign slug and collision; rejoining older campaign; actual stopwatch comparison; leave victory control paused and confirm terminal duration does not grow; save/continue after victory and ensure only active resumed game time is counted; turn-cap pause; native save/reload and normal gameplay unchanged. No claim of runtime correctness solely from compile/CI.
+
+## TEL-LOG-01 game-event logging and diagnostics separation (9 November 2026; PR #11 draft)
+
+**Implemented source only:** `src/gameturn.cpp` now emits structured read-only Council proposal, native ballot array and terminal outcome records into `council.jsonl` through `src/telemetry.cpp`; routine `call_council` tracing removed. There are no added calls to `council_get_vote`, `CouncWin_set_vote`, `council_action` or resolution from telemetry. The installed native Council preflight, modal fallback, AI decision selection and UI suppression hooks are unchanged. `src/base.cpp` observes project changes at `mod_base_change` and the true `SecretProjects[project_id]` ownership assignment, while the completed-turn recorder reconciles direct queue mutations, lost/captured bases and project unavailability. `projects.jsonl` is independent of UI popups. Existing `ui_notices.jsonl` is still written for automation diagnostics, with selective Council anomaly/suppression entries; campaign reports show these in a collapsible diagnostics section.
+
+**Synthetic/structural checks (not game evidence):** `tools/test_autosim_gameplay_logging.py` checks Council hook and resolution preservation, no vote reevaluation, project write ordering, coordinate-keyed reconciliation and stream separation. The legacy Council native/preflight/diplomacy regression tests were updated to the new trace contract. `tools/test_campaign_report.py` checks typed Council proposal/ballots/outcome, raw undecoded `-3` ballot, unknown sponsor and AI reason, project start/switch and HTML escaping, old Council `phase/detail` ignored as gameplay, and separate UI CSV. All new streams are optional to older session readers; no game save format changed.
+
+**Native Windows checks still required:** generate a Council with Governor and at least one other proposal; compare `meeting_id`, native `proposal_id`, all seven raw ballot choices and weights, native outcome and Governor/pass-count changes. Confirm no extra Council modal or changed vote, existing headless resolution and human presentation work, and previously suppressed popup labels stay suppressed. Test a project selected by AI, project switch, abandonment, project finished, competing factions constructing the same project, project lost on capture/destruction and any queue change not using `mod_base_change`. Inspect `projects.jsonl` for duplicate events (especially owner capture or completion within one cycle) and verify no false `started` on a resumed save. Run same-build save/reload/continued turns, report and ZIP extraction. Verify reports generated from older Council-trace sessions still work. No native parity/decision-reason assertions until actual game data is checked.
+
+**Known limits:** Native vote/ballot codes remain intentionally raw; `proposer_faction` and per-AI vote motivation are not established. A native `call_council` argument is recorded as convener only from the hooked AI path, not every possible human/native path. Full-cycle project reconciliation does not capture every sub-turn transient queue selection; completed construction events are at the exact source-owned `SecretProjects` update. No runtime testing performed here.
+
+## TEL-LOG-02 invalid raw-byte JSON (10 November 2026; draft PR #11)
+
+**Actual Windows user evidence:** uploaded 19,932-line `production.jsonl`, 7.6 MiB, where every line fails strict JSON decoding. `faction` is a C++ native one-byte value written as binary 0x01–0x07, not ASCII decimal; 5,805 `unit_completed` rows also contain raw numeric `actual_morale`. 25,737 malformed field occurrences were counted. This explains report failure at line 1 column 164. No evidence the SAV or other stream files themselves were lost.
+
+**Source correction:** the TEL-LOG-02 C++ writer now casts native byte-backed numeric fields to `int` before `ostream` insertion in production, units and combat events. The reporter's `read_jsonl(..., legacy_tel02=True)` is applied only to TEL-LOG-02's four streams; strict parsing is attempted first, then a narrow recovery of known raw numeric-byte field names if necessary. It prints recovered rows/field totals, leaves the source file unmodified, and raises on unrelated malformed JSON. The uploaded production file was independently recovered into a sidecar with **19,932 strictly JSON-valid rows**. Synthetic tests added for two event types, unchanged raw bytes, strict non-TEL-LOG-02 decoding, and unrelated invalid values.
+
+**Acceptance still needed:** latest PR CI Windows Release/Develop and structural tests; install fresh Develop DLL and updated reporter, generate real original session report using unchanged data and validate `production.csv` counts/values; provide separate unit/combat/research streams for integrity audit if their report fails; start a fresh session and confirm all new streams parse as strict JSON; native SAV reload and AI behavior unaffected. CI does not prove Windows game runtime.
+
+## AUTO-LAUNCH custom new-game map and victory/rules setup (9 November 2026; draft PR #11)
+
+**Code inspection:** distributed `docs/alphax.txt` has six generated Planet sizes; the sixth `Very Huge` is native custom-world dimensions 80×160. `game.cpp::map_menu` loads `maps\\xplanet.mp` (Map of Planet) and `maps\\xplanetx.mp` (Huge Map of Planet), which are map files, not random-world presets. Native `size_of_planet` accepts custom native X/Y 16–512; `MapAreaX = 2 * X` internally. Custom dimensions in automation bypass only the original editor prompt, not map initialization or WorldBuilder. The standard `GameRulesOptions` list comprises 15 non-inverted native toggles plus the inverted Unity Survey rule, and two random-faction-leader `GameState` flags.
+
+**Implemented on unmerged PR #11:** two new-game tabs, `World generation` and `Game rules & victory`, now control generated size/Custom X-Y or installed Planet map, regular game rules/victory conditions and leader personality/social agenda randomisation. The profile parser validates `world_source`, size up to custom/Very Huge, X/Y, `rules_mode`, 16-bit `rules_mask` and `rules_random`. The built-in Planet map is checked for presence before the native map menu. Explicit new rules are applied to `AlphaIniPrefs->rules` for this game only and two `GameState` randomisation bits before `setup_game`; no settings file writes, save format changes or suppression logic changes. Old profiles keep previous installed rules and generated-world behaviour.
+
+**Static and CI checks:** `tools/test_autosim_game_setup.py` validates exact rule bit mapping, genuine source map routes, profile bounds, new-game-only state and custom map initialization. The PowerShell `-SelfTest` checks profile persistence and Windows `-GuiSelfTest` checks seven tabs, 16 native toggles, 3 map sources, 7 size choices, 16–512 dimension spinners. A successful CI build does not prove actual world dimensions, map loading, victory behavior or saved-game parity.
+
+**Native acceptance pending:** start generated Very Huge and confirm the in-game world dimensions; start custom native X/Y (e.g., 72×144 and 100×180) and verify map generation/terrain/save-reload; start both installed stock Planet maps (and deliberately choose an absent map to verify clear failure without looping); test custom Conquest-only vs Economic-only conditions and toggled Blind Research, Ironman/Unity Survey and random leaders, inspecting resulting `GameRules`/`GameState` or a reliable recorded manifest and gameplay observations. Confirm loaded SAV ignores all new-game settings and ordinary `thinker.exe` game setup remains unchanged. Giant custom maps beyond the Very Huge preset require memory, speed and same-build SAV checks before support can be considered verified.
+
+## AUTO-LAUNCH integrated reports and 215-turn Windows observation (9 November 2026)
+
+**User-reported actual Windows runtime:** one Huge-map all-AI game ran **215 completed turns in approximately 11 minutes**, reaching **conquest victory**. There were **no other blocking popups**; the last eradication notice (“We have eradicated the Hive”) appeared at the terminal victory transition. This is a strong end-to-end unattended-progress observation for the user's installed Develop build, but the exact DLL hash, phase timings, `orbit.jsonl` completeness, campaign report, saved checkpoints and same-build reload were not independently supplied or checked here. **Do not conflate** this runtime evidence with compilation/CI or call every dialog permanently resolved.
+
+**Terminal popup source cause (read-only audit):** `faction.cpp::mod_eliminate_player` routes `WIPEOUT*` through `autosim_notice_popp`, but `mod_setup_player` may already set `STATE_GAME_DONE` on conquest. `autosim_ui_active()` requires `autosim_control_active()`, which delegates to `auto_turn_eligible(..., game_done=false, ...)`. This makes suppression ineligible for the final `WIPEOUT*`; nonterminal eradication uses the existing wrapper normally. No terminal UI change was made in this launcher/report integration. Future handling must not suppress the intentional victory control dialog.
+
+**New unmerged launcher/report consolidation (PR #11 source change, separate from preceding long-game evidence):** The existing PowerShell WinForms `Campaign tools & archive` tab now supplies session-aware browsing, text filtering, source-save/status/remaining-faction detail, report generation/opening, existing report opening, folder selection/opening, campaign ZIP export and diagnostic log opening in one interface. The separate `tools/Campaign Analyzer.pyw` window is **not launched or packaged**; the original `tools/campaign_report.py` is retained as a headless HTML/CSV engine. Added `--scan-json` CLI for read-only scanner metadata; the original `<campaign> --session` generation is unchanged. Python 3 is required for full metadata scans and report generation (Tkinter is not); if Python cannot run, the tab falls back to direct PowerShell folder/session discovery, displaying unscanned rows with folder opening and ZIP export still enabled. Report generation remains disabled without Python.
+
+**Verification plan:** Python synthetic CLI test checks session JSON, selection identity, generation and invalid argument handling. Windows PowerShell 5.1 CI must construct the complete WinForms GUI and execute a real PowerShell → Python `--scan-json` bridge against a synthetic session. Follow with installed Windows test: open the launcher, select a campaign with multiple sessions, filter, generate and open the selected session report, open existing index.html, choose an alternate campaigns folder, export/reopen ZIP with SAVs, test empty/malformed folders and missing Python, then launch a game from the same GUI without altering game INIs. None of these are established by the prior 215-turn run.
+
+## TEL-ORBIT and active C++ satellite-result suppression (9 November 2026; draft PR #11)
+
+**Root-cause correction (user Windows report):** A previous build (`194a155`) still displayed `WEKILLEDIT` (“We have successfully destroyed the Morganic Sky Hydroponics Lab”). The initial attempt intercepted `popp` at `0x4CF70F` in the original `terranx.exe`. Although that instruction exists in the uploaded executable, `patch.cpp` already executes `write_jump(0x4CF480, (int)action_sat_attack)`, which redirects the entire function to `src/basewin.cpp::action_sat_attack()`. The original EXE result call is unreachable in ordinary patched gameplay. Source inspection of the **active** C++ function finds four direct `popp` calls, with `game_rand() % 100 >= OrbitalAttackChance`, ODP losses/deployment, and target satellite/GSP mutation preserved. The corrected branch replaces all four *return-unused* calls with `autosim_notice_popp`; human play/suppression-off uses the wrapper's unchanged native `popp` fallback. The mistaken EXE hook, wrapper and declaration were removed. This correction still requires real Windows gameplay verification.
+
+**TEL-ORBIT foundation:** `telemetry_enabled` independently creates per-session `orbit.jsonl`. JSONL `schema=1` contains sequence, UTC milliseconds, turn, mission year and processing faction. Source instruments completed orbital launches, `enemy_strategy` attack decisions, pre/post attack inventory deltas (not a replayed RNG roll), environmental satellite losses and session-start/completed-turn inventories, including GSP/Flechette counts. The stream follows existing flush/error/session lifecycle. Windows log accuracy and runtime parity remain unverified.
+
+**Orbital snapshot noise reduction (9 Nov, PR #11 source):** user reported Council logs reduced from approximately a megabyte to 9 KB while `orbit.jsonl` still had per-turn records before any orbital units. Source now gates full seven-faction inventory snapshots until the first actual satellite is present, creates an immediate `first_launch` baseline, and keeps snapshots through subsequent zero-inventory turns. Loaded saves with existing orbital stock start with a snapshot. Orbital launches, attacks, losses and popup suppression are unchanged. Regression checks cover activation, reset and independent events; **native Windows verification pending**. Test a zero-satellite 100+ turn world (empty orbital ledger), first satellite launch (launch + snapshot), loaded late-game SAV (session-start snapshot), and orbital total loss (later snapshots continue).
+
+**Source checks:** `tools/test_autosim_orbital_strikes.py` and `tools/test_autosim_orbit_logging.py` now assert all four callsites in `basewin.cpp`, the existing `write_jump` into that C++ function, continued native human/opt-out fallbacks, and **absence of** the dead `0x4CF70F` hook. The pre-correction CI success at `194a155` did not test reachable suppression and cannot be cited as verification of this fix. New PR-head CI and real Windows tests are separate checkpoints.
+
+**Windows acceptance pending:** confirm all four hit/miss perspectives in the observed AI slot, including the previously reported `WEKILLEDIT`; verify normal human/suppression-off popups, actual ODP and GSP state changes, `orbit.jsonl` events, five unattended turns and same-build save/reload. Compare equivalent suppression-on/off test saves for any RNG/game-state differences. The native Orbital Attack View's command/target-selection dialogs remain untouched.
+
+## AUTO-002 uploaded Script.txt rare-popup census and Mind Worm story loss (8 November 2026)
+
+**User report:** during another new-game all-AI simulation the interlude following the death of the first Mind Worm unit built appeared. User supplied their original `Script.txt` (10,873 lines, approximately 1,500 named top-level dialogue headings) to identify other rare interruptions. The attachment is a *text/template catalogue*, not a trigger list; the current source or native callsites determine runtime reachability and whether choices affect mechanics. Do not add all script headings to the global `X_pop` suppression allowlist.
+
+**First-worm chain, newly patched on unmerged AUTO-002 (new native Windows test pending):** `base.cpp::mod_base_production` calls `autosim_interlude(4)` when a viewed faction produces its first qualifying `BSC_MIND_WORMS` and marks the produced unit `VSTATE_ASSISTANT_WORM`. On that marked unit's death, `veh.cpp::battle_kill` previously checked `!PREF_AV_INTERLUDES_DISABLED`, set the killer's base `BSTATE_ASSISTANT_KILLER_HOME` and faction `PFLAG_UNK_1000`, then invoked unguarded native `interlude(6)`; this is a close match to the user's observation, not independent confirmation of a specific native interlude text. The call now uses `autosim_interlude(6)` and, during eligible all-AI suppression, the guard allows the story flags to be applied even if interludes were disabled. Ordinary human-mode preference semantics remain unchanged. The flags feed a later rare `base.cpp` capture/interlude 7 chain, so skipping the whole block is unsafe. Rare non-victory `interlude(41)` (alien exploration landmark progression) and `interlude(42)` (alien faction eradication) have also been routed through the same native-handler wrapper. Endgame/credits interludes in `game.cpp` are excluded pending victory-flow audit.
+
+**New static contract:** `tools/test_autosim_rare_interludes.py` checks the creation mark, death and killer flags, later capture story, all three newly routed calls, native-handler invocation with temporary UI preference, and continued game-over choice. Integrated into branch Windows CI; 11 independent source checks manually passed. Neither that nor a successful compiler establishes that native `interlude()` advances `GameInterludeState` correctly when presentation is disabled. Reproduce with the first produced Mind Worm and compare pre/post state, subsequent `BSTATE_ASSISTANT_KILLER_HOME` and faction flag, normal-human screen, AI-only log entry `INTERLUDE_6`, and same-build save/reload. Need no global disable of interludes.
+
+**Source-confirmed return-unused or notice-only paths not yet guarded (next candidates):** `veh_action.cpp` direct `NetMsg_pop` for automated borehole/rainfall/terraforming collateral loss (`BOREHOLEMINE`, `TERRAMINE`, `TERRAYOURS`, `DROWNMINE`, `DROWNYOURS`), terrain bombardment and failed/successful air strikes (`BOMBFAILED`, `ARTYBOMBFAILED`, `BOMBSUCCEEDED`, `BOMBARDSUCCEEDED`), aircraft fuel/crash and bunker/artillery related notices; `veh_combat.cpp` direct `popp` `WEMARINEDETACH`/`THEYMARINEDETACH` after unit ownership/capture has already changed, native `NetMsg_pop` morale gains `MORALE`/`MORALE2`, and the internal `net_pop` family for `NUMLOST*`, `NUMGOT*`, `OURBOOTY*`, `THEIRBOOTY*`, `HUSKS`, `NERVEGAS`, `WEDISENGAGED`, `THEYDISENGAGED` and some combat reports. `base.cpp` foreign `RENAMEBASE` popups also ignore their return value. Site-by-site guard should preserve actual terrain/unit effects, morale promotions, colony names, RNG and AI signal logging. Not all these reports necessarily block (some use timed notices); do not claim an observed interruption without runtime reproduction.
+
+**Potential native-only or unverified script labels:** `ENDPACT1`, `ENDPACT2`, `ENDPACT3` (territorial withdrawal and return of units), `GOVERNOR`, `CONVENING`, `VOTINGOPEN` (Council lifecycle), `BUREAUCRACY*`, `NOSUPPORT`, `STARVE`, `DRONEREVOLT`, `DRONERIOT`, `GOLDENAGE*`, `WORMCAPTURE`, `WORMSAGITATED`, `WORMNOCAPTURE`, `SUBMERGED` aggregate warning. These script headings alone do not identify a C++ callsite; some may be native, conditional on UI preferences, or unreachable in all-AI mode. Trace individual native calls if a live popup survives new branch source suppressions.
+
+**Already classified and wrapped in current AUTO-002 source:** most Unity goody outcomes, monolith informational results, forest/kelp/fungus growth, scripted random events including volcanoes, satellite map/research events, strategic missile/Planet Buster *notices* and weather/coastal-loss announcements, `WIPEOUT*`/`TRACKED`, observed intervention and major atrocities, third-party treaty news, and source-owned `COUNCILHOTGOV*` (but not the native Council window). The current `Script.txt` may list all of these even when runtime UI is suppressed.
+
+**Meaningful choices / deliberately not safe to auto-click:** `MONOLITH`, `GOTOGOODY`, `PROBEPACT*`, `ENEMYPROBE*`, `HASTY`, `USENERVE`, `FUNGALSAC`, `TECTONICSAC`, `BUSTERSAC`, `VOTEFORME`/Council vote bribes and real `COUNCILVOTE*`/vote menus; `GAMEOVERMAN`/endgame continuation; diplomatic loans, pacts, trades and extortion responses; ordinary human production/upgrade/retool prompts. If all-AI mode reaches one, identify and rejoin native AI decision-making rather than synthesising a default Yes/No.
+
+**Native acceptance gap:** Need a full fresh/late-game no-click run after updated DLL to distinguish suppressed text notifications from actual native window lifecycle. Log encountered labels and their source/type, continue/save/reload with identical rules and state, and avoid using absence of a popup alone to infer absence of events.
+## AUTO-002 pact termination, allied intervention and Governor winner notifications (8 November 2026)
+
+**Additional user-reported Windows modals:** (1) a Pact of Sisterhood with the Spartans ended and units were removed from territory; (2) Morgan supposedly intervened on behalf of an ally and declared Vendetta against Miriam; (3) a Governor-win announcement after Deirdre won her initial Council vote. These were observed during ongoing AI-only gameplay. The exact DLL build, per-event pre/post saves and updated `ui_notices.jsonl` are not attached for this run; do not treat the message text as proof of a game-state transition.
+
+**One-way source fix, not Windows-tested:** `src/faction.cpp::intervention` calls `X_pop("AIDSTHEM",0)` / `X_pop("AIDSUS",0)` and ignores the result. These exact labels now use the existing `autosim_xpop_policy` return-unused notice allowlist, active only when `autosim_ui_active()` is true; human-mode and disabled-suppression behavior are unchanged. **Diplomacy caveat:** the same function invokes `treaty_on(i, faction_id_atk, DIPLO_UNK_80000000|DIPLO_VENDETTA|DIPLO_COMMLINK)` only under `is_human(faction_id_atk) || is_human(faction_id_def)`. In a pure AI-vs-AI attack, that specific intervention declaration is not made although the observer notice may still appear. This proves a potential observer-report mismatch, not that no other war mechanism acts on Morgan and Miriam. Treat the latter as a separate AI-diplomacy correctness question; do not change diplomacy as part of a notice-only patch.
+
+**Already covered / unisolated:** `src/faction_event.cpp::pact_unpact()` already routes `PACTUNPACT` through `autosim_notice_diplomacy`, and `enemies_unpact()` routes `ENEMYPACTENDS` without bypassing its subsequent treaty-flag removals. The user's own-pact ending/territory withdrawal may originate inside the native `pact_ends` (`0x53C650`) / `net_pact_ends` (`0x539660`) routines, whose internal popup callsite has not been traced. Do not skip either native routine: treaties and unit repositioning are gameplay operations. The source-owned `COUNCILHOTGOVWIN`, `COUNCILHOTGOVLOSE` and `COUNCILHOTGOVNONE` result notices are already routed through `autosim_notice_popp` in a human-turn branch and `clear_council_notify()` still executes. The user's all-AI Governor-win modal is therefore **not proven** to be that exact callsite; the native `CouncWin` lifecycle remains the blocker.
+
+**Regression:** `tools/test_autosim_pact_intervention.py` audits the two intervention labels, all-AI guard, unchanged real diplomacy branch, third-party pact notifications and retained Council result state. Wired into feature-branch Windows CI. Static checks and compilation do not prove native game parity.
+
+**Windows acceptance pending:** after a source-matched build, compare suppression enabled/disabled on a pre-intervention save for the actual `DIPLO_VENDETTA` flags of Morgan and Miriam (as well as pact/commerce state), no `AIDSUS`/`AIDSTHEM` modal, and preserved AI turn progress. On a pre-pact-break save, trace the native `pact_ends`/`net_pact_ends` UI source; confirm pact removal and lawful unit ejection are identical. For Council, separately trace pre-init announcement, voting, Governor-win notice and vote-buying, checking Governor, ballots, treasury, Council scheduling and same-build save/reload. Normal-human and opt-out cases must retain UI.
+## AUTO-002 MY2182 Council ballot completed, operator Save & Exit — Windows evidence (8 November 2026)
+
+**Follow-up received:** user clicked OK on Protocol Director's initial "Deirdre convenes"/First Governor notification. Native CouncWindow then displayed all seven leaders, Deirdre **166 votes**, Lal **256 votes**, with a `VOTE` button and faction/candidate options; screenshot `image(8).png` confirms the panel. User reports Deirdre's *self-vote was already displayed as cast*, then clicked `VOTE` and selected Deirdre, and the native window processed the election. They requested F10, acknowledged it, and at the completed-cycle operator control selected Save & Exit. Uploads: revised `ui_notices(7).jsonl`, `turns(3).jsonl`, `status(3).json`. These are **post-dismissal observations of the same session**, not a new game.
+
+**Exact trace appended after previously blocked `call_council enter`:**
+```text
+turn=82 faction=1 council_native/CouncWin_init enter arg1=0 arg2=1 owner=1 human_mask=00000000 pending=0 governor=-1
+turn=82 faction=1 council_native/CouncWin_init exit proposal=0 candidate=7 outcome=1 vote_mask=FFFFFFFF
+    votes=-3,1,-3,-3,-3,-3,-3,7
+    weights=0,166,135,91,90,59,82,256
+    pending=0 governor=7
+turn=82 faction=1 council_trace/call_council exit actor=1 owner=1 human_mask=00000000 pending=0 governor=7
+turn=82 faction=7 autosim/OPERATOR_STOP control_dialog
+turn=82 faction=7 autosim/SETTINGS turns=400 notices=1 fast=1
+turn=82 faction=7 autosim/SAVED saves/AI-Sim--Gaia--MY0_MY2182.sav
+```
+
+**Interpretation bounded by evidence:** the **first** block is inside native `call_council` before `CouncWin_init`; the **second** block is the native CouncWindow with a manual `VOTE` action. Both block a no-human world (mask zero), although observed faction 1's vote was already visible. Native outcome elected **faction 7 (Peacekeepers/Lal)**, not Deirdre, despite the user's manual Deirdre selection; screenshot weight 166/256 matches the native counts. `-3` entries for five other factions have not been decoded as abstention vs unprocessed/native sentinel; `vote_mask=FFFFFFFF` and `outcome=1` alone do not establish that every faction evaluated an autonomous ballot. This is **not** evidence of correct seven-faction AI voting parity. Need to compare with a native reference or isolate Council per-faction processing before claiming it. The manual `VOTE` action may be a redundant vote or a state-driving UI action; we do not know. **Never simply hide the entire CouncWindow or auto-pick Deirdre.**
+
+**Operator UI positively Windows-tested on new Develop build `71e435e`:** F10 request while a Council session was finishing was consumed at the completed cycle, a normal Simulation Control appeared, Save & Exit successfully recorded the named save, `turns(3).jsonl` includes **one new full MY2182 cycle** (82 total), and `status(3).json` is `state=closed, last_committed_turn=82`. User hasn't reported a same-build reload of that named SAV, nor tested the hotkey's startup/manual setup modes; don't extend this positive result to these paths.
+
+**Next source work:** identify the exact native pre-init announcement site and any native `CouncWin_show/set_vote/make_resolution` UI callback driving phase 2. Instrument enough to distinguish AI ballot computation, UI-only rendering and optional human ballots, using validated x86 ABI and original-target checks. Acceptance must compare identical pre-election saves with/without presentation and verify Governor, actual per-faction votes and abstentions, Council pending/cooldown, diplomacy/credits, native human UI, no double-vote and save/reload. A separate Lal vote-buying offer remains unverified.
+
+## AUTO-002 MY2182 fresh-game Council stop — uploaded native Windows evidence (8 November 2026)
+
+**Evidence received from active, undismissed modal:** screenshot of native **Protocol Director** window: "Lady Deirdre convenes the Planetary Council", agenda "First Planetary Governor", one **OK** button; exact same live session `manifest(2).json`, `status(2).json`, `ui_notices(6).jsonl`, `turns(2).jsonl`, `bases(1).jsonl`. User additionally supplied `Autosave_2181.sav` and `Autosave_2182(1).sav` from this ongoing game, but no post-dismissal Council log yet. The uploaded status is `state=recording`, `last_committed_turn=81`; turn snapshots cover 1–81 only. User confirms installed `telemetry_enabled=1`, `autosim_manual_turns=100`, `autosim_suppress_notices=1`. Startup `ui_notices` shows actual selected settings `turns=400 notices=1 fast=1` overriding the initial manifest's 100-turn INI snapshot (not a recorder failure). Session is `session-001`; recorded observed owner changed from original faction 7 at startup to Gaia faction 1 by the time of the Council. Human mask is zero.
+
+**Exact final source-level trace before popup, MY2182 / processing faction 1:** `movie/empathGuild = suppressed_project_movie` → `project/DATALINKS_PROJECT = suppressed_help_window` → `monument/MONUMENT_EVENT_5 = suppressed_notice` → `popp/COUNCILOPEN = suppressed_notice` → `council_trace/call_council = enter actor=1 owner=1 human_mask=00000000 pending=0 governor=-1 owner_proposal=0 owner_vote=0`. **No corresponding `call_council exit`, `council_native/CouncWin_init enter` or Council resolution** is present in the live undismissed log. This reproduces the key earlier native boundary: the unsuppressed OK-only presentation is inside `call_council` but **before** the traced CouncWindow initialization. At this stage no voter preferences, vote weights or Governor result can be inferred; no human faction is actually active.
+
+**Empath Guild association:** the observed Gaia faction completed Empath Guild in the **same processing sequence immediately preceding** its first Governor election. This strongly substantiates a timing association in this run; it does not prove that Guild completion is an unconditional trigger or explain exact native Council eligibility rules. Earlier runs had different Guild-to-Council delays.
+
+**Next reproducibility step:** preserve copied pre-popup log and original MY2181/MY2182 autosaves, acknowledge the exact OK button and capture any subsequent voting window / Lal bribe and the appended `ui_notices.jsonl` after native returns. Capture `council_native` exit ballot/governor snapshot, `call_council exit`, and at least one more completed turn if feasible. Then use earliest pre-election SAV for same-build Windows comparison. **No Council UI bypass/fix implemented or verified from this evidence alone.**
+
+## AUTO-002 fresh-game fast-run Council blocker (8 November 2026)
+
+**New user Windows observation:** a new game advanced about 68 turns very rapidly in AI-only mode before the first reported blocker, a Planetary Council Governor election said to be convened by Deirdre. User suspects Empath Guild because it supplies faction contact/intelligence and increases Council prominence. User has not supplied this run's pre-Council SAV, post-dismissal log, exact DLL/commit or config in this report. Thus the observation is a reproducible *class of interruption*, not yet a reproducible 68-turn binary test case or a measured causality proof.
+
+**Code and previous log boundary:** `src/faction.cpp::council_votes` gives the Empath Guild +50% votes; Guild also affects diplomatic intelligence and contact handling in faction/diplomacy code. Calling Council remains a distinct eligibility/cadence decision in native `can_call_council` / `call_council`, so project completion is not a sufficient explanation of turn 68. The earlier Windows trace has native `call_council(actor=1)` entry at MY2199 and **no `CouncWin_init` entry until the user acknowledged the announcement**, then a complete native AI ballot and `GovernorFaction=-1->1` inside `CouncWin_init` and normal exit. Human mask was zero. The source-level `COUNCILOPEN` announcement is already wrapped; the blocking window is deeper in native Council. The earlier trace is from a different game and does not prove the new Deirdre election used identical ballots.
+
+**Next investigation/fix is native presentation, not voting rules:** determine the exact pre-`CouncWin_init` modal callsite and whether the CouncWindow lifecycle invokes any human-only offers or vote confirmations. Require matched PE32 `terranx.exe` bytes/disassembly and prefer an original-target-validated narrow hook. Preserve native `council_get_vote`, `CouncWin_set_vote`, `CouncWin_make_resolution`, vote weight, Governor effects, bribe/payment rules, Council scheduling, turn RNG and ordinary human UI. A generic auto-OK or fake no-human ballots is not acceptable.
+
+**Acceptance:** from an AI-only save immediately before the event, unattended run passes the election and advances >=5 additional full cycles. Compare ballots, Governor, vote counts, treasury changes, diplomatic effects, pending flags, Council cooldown and save/reload between native manual-dismiss reference and targeted suppression, plus controls when `autosim_suppress_notices=0` and ordinary human play. Reproduce later Council votes and optional Lal vote-bribe offer separately. Static/CI passing cannot establish this native behaviour.
+## AUTO-002 sea-level colony losses and atrocity notifications (8 November 2026)
+
+**User Windows report on prior installed DLL:** University orbital-insertion popup; sea-level rise followed by tidal flooding and colony loss; Miriam declared Vendetta over Zakharov's major atrocity despite her earlier Planet Buster use. These observations are not runtime tests of the current unmerged patch.
+
+**Already covered in AUTO-002 source:** orbital `MADEORBITAL`/`MADEAIRDROP` in `src/veh_action.cpp::action_airdrop` and sea-level `SEARISING`/`SEAFALLING` in `src/gameturn.cpp::turn_upkeep`. The installed DLL may predate these.
+
+**New source fix:** `src/map.cpp::alt_set` now suppresses four notification-only `BASESUBMERGED*` sites during explicitly eligible all-AI simulation. For the two `X_pop_2` labels, the original call is still executed unchanged in ordinary human mode; the two return-unused `popp` sites use the standard wrapper. Nothing in coast/improvement conversion, population casualty RNG, emergency Pressure Domes, submerged colony count, last/objective colony survival, genuine `mod_base_kill`, or incompatible vehicle losses is bypassed.
+
+**New source fix:** `src/faction.cpp::major_atrocity` retains victim flags, atrocity counts, blemishes, pact cancellation, AI Vendetta and diplomatic state, then now suppresses the dynamic return-unused `MAJORATROCITY%d` popup. `atrocity()` also guards return-unused `ATROCITYSPOTS`/`ATROCITY`/`ATROCITY1`/`ATROCITY2` NetMsg reports without altering sanctions or escalation. The current AI Vendetta rule does not compare the condemning faction's own past major atrocities, so Miriam's reported behaviour is consistent with source but not yet checked against this run's state.
+
+**Source test:** `tools/test_autosim_sealevel_atrocity.py`, wired into Develop CI; it checks the two already-covered routes, four submersion messages, state ordering, retained human UI, treaty/major-atrocity logic and sanctions. Passing static assertions cannot establish Windows gameplay parity.
+
+**Windows acceptance:** from a pre-flood save compare suppression on/off for sea level, Pressure Domes, population, terrain/improvements, actual surviving/destroyed colony and unit counts; test final-colony safeguard and save/reload. From a pre-nuke save compare AI Vendetta, pacts, sanctions, atrocity count and diplomacy state with notices enabled/disabled. Verify no modal for orbital insertion, sea rise, submerged colony or major atrocity under all-AI suppression, and unchanged normal-human behavior. Council/vote decisions remain separate.
+## AUTO-002 random events, strategic missiles and observed-AI movement (8 November 2026)
+
+**Windows user reports (existing installed Develop build, 200+ turns):** volcano-eruption popup; Miriam fired a Planet Buster, causing an announcement and noticeable but acceptable explosion animation; repeated `KEEPMOVING` (Shard Rover Artillery V2, Formers, another unit) appeared despite all-faction AI handover, several times within a few turns. User separately reports the current F9/F10 and simulation throughput generally improved. No before/after Windows run of the new changes has been provided.
+
+**Audit:** `src/gameturn.cpp::random_events` already routes its return-unused random-event messages through `autosim_notice_pop2` or `autosim_notice_popp`, including `BIGFATVOLCANO` and asteroid impact `EATTHIS`. `src/base.cpp` already guards the separate ecology `VOLCANO` plus warming events on current AUTO-002. The installed build likely predates these; confirm version before declaring recurrence. Actual map craters, destroyed bases, random draws, native-life and ecological effects remain untouched.
+
+**New source changes (AUTO-002 branch, native test pending):** `src/veh_action.cpp::order_veh` increments `iter_count` and opens a return-valued `KEEPMOVING` only when the unit's faction equals `MapWin->cOwner`, irrespective of the faction's human bit. After 32 iterations, accepting the human option cancels the orders. This is a genuine observed-AI/human-UI leak. Gate the *entire owner-only confirmation/counter block* behind `!autosim_control_active()` so the observed AI takes the same path as an unobserved AI; do **not** forge an answer, alter pathfinder state or cancel movement. This does not address underlying path oscillation (DIAG-001).
+
+`src/veh_combat.cpp::planet_busting` now routes its return-unused `PLANETBUSTER` announcement through the all-AI notice wrapper. ODP/Flechette interception `shoot`, reactor blast, `world_lower_alt`, game climate, unit/base destruction, major atrocities, and `boom` animations remain unchanged; the user considers the latter rare and acceptable. `src/veh_action.cpp` wraps return-unused `TECTONICMISSILE`, `TECMOFIED`, `FUNGALMISSILE`, `FUNGMOTIZED`, ODP/Flechette success/failure/sacrifice **announcements**, preserving the actual `shoot_it` defender `FUNGALSAC/TECTONICSAC` **human decision** and all AI orbital-defence/terrain/fungal-spawn mechanics. Also classified source-owned orbital drop `MADEORBITAL/MADEAIRDROP`, `OBLITTED*`, artifact theft `TOOKARTIFACT/TAKENARTIFACT`, `HOMELESS*` alien refugees, `CORNERFOILED/CORNERTHEMFOILED`, `ESCAPED/ESCAPED2`, unit gifts and `GOTUNITDEFEND/OFFEND` return-unused notices. `CONQCOOP/CONQSING` informational conquest screens are now guarded; actual victory flags and `GAMEOVERMAN` choice are not bypassed. All new suppressions require the existing explicit all-AI opt-in; the `KEEPMOVING` AI-path fix activates in any eligible automated all-AI session independently of the UI-notice switch.
+
+**Source contracts:** `tools/test_autosim_missile_move_ui.py` verifies the owner-only movement guard, intact original human cancel branch, missile/ODP/tectonic/fungal game logic, source-screen notification routes, preservation of native ODP sacrifice and other choices, and guards on both random-event volcano sites. It runs in Windows CI after `test_autosim_lategame_notices.py`. Compilation, CI test results and Windows runtime must be reported separately; no new Win32 build/result is yet verified in this record.
+
+**Windows acceptance:** reproduce the `KEEPMOVING` case from a late-game save with observed AI and `autosim_suppress_notices=1`; confirm no modal, no forced order cancellation, simulated turns advance and no new indefinite movement; repeat with observer switched to a different AI. Check ordinary human mode still asks and can cancel. Trigger Planet Buster (or use saved just before Miriam's shot) and verify expected ODP interception, impact, cratering, losses, atrocity/diplomacy, retained explosion animation, no popup, and same-build save/reload. Use spawned tectonic/fungal missiles when possible; verify the relevant notice suppression and unchanged ODP/Flechette and fungus/mind-worm mechanics. Check volcano/crater random-event suppression with existing build and compare state, no repeated modals. Run a 200+ turn late game with unknown dialogues logged as follow-ups. Planetary Council and `GAMEOVERMAN` remain intentionally unresolved interactive flows.
+
+## AUTO-002 pact renunciation and failed satellite strike — 9 November source patch
+
+**Windows user observation (preceding build):** Null Rendering still displayed third-party pact renunciation despite neither observer relationship being necessarily Vendetta; the failed-to-destroy satellite popup was also requested for a targeted recheck. The earlier `ENEMYPACTENDS` source filter and the four `X_pop`/`X_pop_2` satellite labels did not guarantee native coverage.
+
+**Unmerged PR #11 source changes:** redirect native `enemies_unpact` (`0x55CE20`) to the source-guarded implementation, leaving native `pact_ends`/`net_pact_ends` and partner-unit withdrawals alone. The earlier `X_pop_2`/`X_pops`/`X_pops_11` suppression filters remain for those entrypoints, but cannot intercept the active `basewin.cpp::action_sat_attack()` routine, which directly called `popp`. After the user reported persistent `WEKILLEDIT` on `194a155`, its four C++ result notices were changed to `autosim_notice_popp`, and the ineffective original-EXE hook was removed. Gameplay parity and Windows continuation still require recheck.
+
+**Required Windows acceptance:** observe a foreign pact breakup without an interruption, verify both treaty flags and withdrawal; observe failed orbital strike without a popup, verify no satellite was destroyed and attacker costs/counters and subsequent turns are correct. Repeat with notice suppression off and normal human control to ensure presentation remains. Check `ui_notices.jsonl` for the precise `ENEMYPACTENDS` or `WEMUFFEDIT`/`THEYMUFFEDIT` label; absent records with a persistent popup indicate an uncovered native route. Save/reload/continue with the same build. At authoring, these are **source/structural edits, not game-verified**.
+
+## AUTO-002 satellite-vs-satellite attack and orbital-defence popup census (8 November 2026)
+
+**User Windows observation:** a new AI-only popup reports destruction of an enemy satellite by an Orbital Defense Pod. User asks to audit every related satellite notification. The user's attached `Script.txt` supplies the *labels and displayed templates*, not engine callsites; this report is not a native test of new source changes.
+
+**Source-owned and already covered:** `base.cpp` completes Sky Hydroponics Lab/Nessus Mining Station/Orbital Power Transmitter/Orbital Defense Pod by updating the corresponding `Faction::satellites_*`, reveals the map and emits guarded `SEEMAP`, suppresses observed and foreign production-only notices, retains `mon_first_in_space`. `tech.cpp` guards tech-driven `SEEMAP2`. `gameturn.cpp` covers random solar-storm `SOLARSTORM`/`SOLARFLARE` (energy satellites and ODP loss) and `ASTEROID` (mining satellites), after their actual inventory changes. Orbital insertion `MADEORBITAL` is not satellite construction and was already covered separately.
+
+**Offensive ODP vs satellite (active C++ path):** Script.txt supplies `WEKILLEDIT`/`THEYKILLEDIT` for success and `WEMUFFEDIT`/`THEYMUFFEDIT` for failure. The actual routine is **`src/basewin.cpp::action_sat_attack()`**, reached through `patch.cpp`'s `write_jump(0x4CF480, ...)`, not the original native EXE body. It uses `game_rand() % 100 >= OrbitalAttackChance` (currently 50) for success, destroys the attacker's ODP on failure, and removes a target satellite or Geosynchronous Survey Pod and deploys the ODP on success. The four passive `popp` calls are now `autosim_notice_popp` in the corrected source, preserving normal-human presentation. `X_pop` filters do not cover these direct C++ calls, and the earlier `0x4CF70F` hook was ineffective and has been removed. AI attack selection in `faction_event.cpp::enemy_strategy` still uses types 0=nutrient, 1=mineral, 2=energy, 3=ODP, 4=GSP.
+
+**Existing AI attack-call boundary telemetry:** when `autosim_ui_active()` and `telemetry_enabled`, AI attacks record `source=satellite_native`, `label=action_sat_attack`, `action=enter` and `exit`, with attacker/target IDs, sat type, target base ID, attacking ODP/deployed count and defending ODP/nutrient/mineral/energy counts. One source-owned `action_sat_attack` call remains between records, no extra RNG or state mutation. If native UI blocks inside the call, `enter` may appear without `exit` until dismissal. This traces only attacks by the source-owned `enemy_strategy` path, not manual native Orbital Attack View clicks.
+
+**Defensive satellites against missile strikes:** `veh_action.cpp::shoot_it` has already wrapped return-unused fungal/tectonic ODP and Flechette success/failure reports `FWESHOTIT`, `TWESHOTIT`, `FTHEYSHOTIT`, `TTHEYSHOTIT`, their `*2` variants, and `FWEMUSTSAC`/`TWEMUSTSAC`/`THEYMUSTSAC`; ODP deployment and sacrifice remain active. The native Planet Buster reports `WEMUSTSAC`, `THEYMUSTSAC`, `WESHOTIT`, `THEYSHOTIT`, `WESHOTIT2`, `THEYSHOTIT2` now share the conditional no-callback allowlist but likewise need native entrypoint verification. **Do not suppress** `BUSTERSAC`, `FUNGALSAC`, `TECTONICSAC`: script gives Yes/No for sacrificing an ODP when normal interception fails; native human choice must remain. `NOKILLERS` / `KILLERSDEPLOYED` are Orbital Attack View warning texts and remain native; no evidence they occur in unattended AI logic.
+
+**Regression updated:** `tools/test_autosim_orbital_strikes.py` checks the four active C++ offensive notification calls, that the native entrypoint is redirected to this C++ routine, that the unreachable EXE popup call is *not* hooked, and that the AI attack, production, environmental and fungal/tectonic defensive behaviour remains in place. Host `tools/test_autosim_policy.cpp` exercises no-callback allowlist vs callback-present native fallback, and explicitly leaves sacrifice prompts native. The source regression is in the Windows CI workflow. These are source/host tests, not Windows game-state validation.
+
+**Windows acceptance:** replay a pre-orbital-attack save with the newest Develop DLL and all-AI `autosim_suppress_notices=1`, `telemetry_enabled=1`. Compare before/after exact ODP deployment/attack inventories and defending satellite type, including both a successful and a failed attack, and base yields when resource satellites are destroyed. A successful unattended run must progress >=5 full cycles without the four result modals; save/reload and inspect `satellite_native enter/exit`, `popp` suppression and `orbit.jsonl` events. If the popup persists, confirm `autosim_ui_active()` in the C++ wrapper instead of hooking unreachable EXE instructions or skipping action resolution. Separately test ordinary human and suppression-off cases, Planet Buster/Fungal/Tectonic missile interceptions and optional sacrifice choices, first satellite map reveal, production counts, environmental satellite losses and human orbital-attack command error reports. **No post-patch Windows verification yet.**
+## AUTO-002 first satellite, eradication and late-game popup audit (8 November 2026)
+
+**User-reported Windows blockers in a running late-game all-AI campaign:** first orbital launch announcement (`SEEMAP`, “launch of our first satellite…map all remaining”), and “we have eradicated [faction]” (`WIPEOUT*`). The earlier run used a build lacking the new source-site suppressions. The user separately reports F9/F10 now work reliably and simulation performance is substantially better; the uploaded pre/post Council traces established a working five-turn Save & Continue segment on the prior Develop build. These observations are runtime evidence for controls, **not** for this new popup patch.
+
+**New source implementation on unmerged AUTO-002 (not yet Windows-tested):** `src/base.cpp` now guards `SEEMAP` after satellite count increments and all visibility/`PFLAG_MAP_REVEALED` updates, both owner and other-faction satellite completion notice paths (including native `popb`, `PRODUCE3` and NetMsg), Subspace Generator `GENERATORME`/`GENERATOR`, ecological `TRIGGERWARMING*` and `VOLCANO`. `src/faction.cpp` guards return-unused `WIPEOUT*` and `TRACKED` announcements after elimination/escape effects and before `mon_killed_faction`. `src/gameturn.cpp` guards return-unused `ALIENSARRIVE`, `ASCENT`, and alien sanctions-end notifications. Orbital loss from solar storms/asteroids was already passed through `autosim_notice_pop2`. `REACTORUPGRADE`, `TREETIME` and technology-based `SEEMAP2` were already allowlisted. All changes require `autosim_suppress_notices=1` plus actual eligible all-AI control, with UI labels logged; ordinary human-mode presentation remains. Do **not** skip any underlying satellite/resource/visibility, alien setup, climate, kill/escape, monument, tech, or interlude logic.
+
+**New source regression:** `tools/test_autosim_lategame_notices.py` checks exact source-site routing, satellite/map state ordering, elimination history, late-game progression and preservation of choice-returning `GAMEOVERMAN`/`INFRASTRUCTURE` and native `NOTRANSCEND`/Council paths. This is not a native game test.
+
+**Windows acceptance pending:** from a save just before a faction's first satellite, run with suppression enabled and off; check no modal `SEEMAP` or satellite-production popup when enabled, all map tiles and bases revealed, satellite count/yields and `mon_first_in_space` unchanged, complete-turn progression, autosave and reload. Reproduce an enemy faction's elimination; verify `WIPEOUT` no longer interrupts, faction removed/not respawned, killer's count and monument history preserved. Follow up during Subspace Generator, first Ascent notification, alien arrival, climate/warming/volcano, and sanctions endings when naturally encountered. Compare suppression disabled and normal-human controls. Council vote and victory `GAMEOVERMAN` remain deliberately interactive/unfixed; `NOTRANSCEND` callback and unclassified native popups remain for further audit.
+
+## AUTO-002 unified operator menu and explicit startup confirmation (8 November 2026)
+
+**Request:** A single operator window to arm all-AI simulation, confirm start after Scenario Editor handover or loading a saved all-AI game, see active campaign/session IDs, change the display name and runtime turn/presentation options, and access existing save/exit/take-control functions. User reports several prior fast games approaching MY2400; this is performance/user experience evidence for the previous installed build, **not** native verification of this new menu code.
+
+**New unmerged implementation:**
+- **Ctrl+Shift+F12** in the interactive world view opens a *setup-only* Win32 mode (no simulation, save or handover invoked from the WndProc). Set a positive 1–100000 turn budget, campaign display name, notice suppression and fast presentation. **Arm** updates in-memory configuration; editor transfer of every faction to AI plus ordinary End Turn is still needed. F9/F10 continue using their native functions in human play.
+- At the first safe `control_turn()` loop entry with **all human faction bits cleared**, single-player, game not ended and observed faction living, show a **startup confirmation before upkeep/faction processing**. This applies to new games, exact fingerprint-linked named saves, and *plain* autosaves even when the local INI budget is zero. **Start Simulation** commits a typed budget/settings and starts the previous pure AI driver; **Take Control** (or dialog-construction failure) restores the observed faction's human bit, rather than silently processing AI.
+- During active simulation, the same hotkey is latched by the WinProc/physical-key/queued-key paths and consumed **only at a full faction-cycle boundary**. This avoids reentrancy inside native AI, diplomacy, combat and serialization. F9/F10 remain backwards-compatible pause/stop aliases in all-AI mode. Running menu: Save & Continue, Save & Exit, Take Control, Continue without save (resets segment count using entered turn budget) and, if it was an early pause, Resume Unchanged. Normal Win32 close is allowed for manual setup or resumable pause, not for mandatory startup/turn-cap confirmation. No partial loaded cycle is counted.
+- Operator fields show current `campaign_id` and `session-NNN`, whether the save rejoined a previous campaign, user-editable *display name* (does not alter stable ID), observed faction/human mask, run-local segment and total turn counts, year/base/unit statistics, and telemetry ON/OFF status. `autosim_suppress_notices` and `autosim_fast_combat` are runtime-only checkboxes; telemetry itself remains controlled at game load and is not toggled mid-session.
+- Named saves retain native atomic serializer, fingerprint-bound `.autosim-campaign` sidecar and previous explicit Yes/No campaign rejoin. Sidecar now has an **optional sixth line** `autosim-v1 <turns> <suppression> <fast>`; older five-line sidecars are compatible. On accepting a verified rejoin, settings are restored **before startup confirmation**; declining starts a fresh campaign. A plain autosave cannot silently inherit campaign identity. Save/reload still creates a new immutable `session-NNN`. `telemetry_begin_session` still asks the linked campaign Yes/No separately: **not yet merged into the startup window**.
+- No INI write, save format mutation, faction/AI logic, Council voting, native end-turn hotkeys or RNG calls have been added by the operator menu.
+
+**Static regression:** updated `tools/test_autosim_session_control.py` for explicit unsaved continuation; added `tools/test_autosim_operator_menu.py` and wired into the feature-branch Develop CI. Tests check first-phase preflight before `run_upkeep`, fail-closed manual restoration, full-cycle-only save/control, exact shortcut modifiers, separate setup/running/startup modes, callbacks/turn-boundaries, stable session identity and the backwards-compatible optional sidecar profile. No successful compilation/Windows smoke test has yet been recorded for these commits.
+
+**Windows acceptance:** (1) Start a new human game and open Ctrl+Shift+F12; confirm native F9/F10 still work and manual setup does not execute AI or save. (2) Arm 5 turns, change campaign name/checkboxes, hand over all factions in Scenario Editor, End Turn, observe one preflight *before* processing and confirm Start. (3) Verify five **complete** AI faction cycles, one menu at cap, and Save & Continue/Continue without save for 3 more cycles, with unchanged faction turn accounting. (4) During an active longer run press Ctrl+Shift+F12/F9/F10 and verify one menu only at full cycle boundary; repeat with focus lost and key-release. (5) Save & Exit; load exact named SAV and accept link: check same stable campaign ID, new session number, restored runtime options and new preflight; decline link and check new campaign. (6) Load ordinary year-named autosave with all humans cleared and installed `autosim_manual_turns=0`: check startup preflight and new campaign without native Console lockup. (7) Startup Take Control and running Take Control must lead to playable observed human faction, no duplicated upkeep, and reload/continuation with same build. (8) Save failure/overwrite-cancel keeps control window open and never advances or exits. (9) Recheck world-view hotkey in scenario editor, 800x600/1920x1080, Develop/Release and native Council popup interaction.
+
+## AUTO-002 simulation control + campaign naming — test plan (8 November 2026)
+
+**Implementation with partial Windows native smoke:** new `src/autosim_control.cpp/.h` modal Win32 simulation control, with editable **1–100000 additional whole turns**, campaign display name and native SAV basename. On user Save & Continue it invokes patched `mod_save_daemon()` through a temporary file + verified commit, then resets only the new run's segment counter; Save & Exit returns to menu on success. Take Control sets the living observed faction's human bit at a completed-cycle boundary; native next-turn upkeep/human input must be tested for both duplicate-upkeep and lost-turn behaviour. F9 Resume is offered for early pause; F10/file stop now open this dialog. No Council modal fix. The first attempted [CI run 42454064047](https://github.com/Necaladun/thinkerNeca/actions/runs/42454064047) failed C++11 `DialogContext` initialization; the follow-up compiled both Win32 builds and passed new controls/lineage source checks but exposed an outdated previous save-path contract, now corrected. [Latest CI 42454429090](https://github.com/Necaladun/thinkerNeca/actions/runs/42454429090) at `09cd616e` **passed** both x86 Develop/Release compilation, source contracts (including new control window, named game saves and explicit campaign links), host policy and synthetic analyzer tests. The downloadable Develop artifact contains `thinker.dll` and `thinker.exe`. **Do not equate this with native runtime verification.**
+
+**Named recording:** `campaign.json.display_name` is independently editable while stable new folders are readable `AI-Sim-<faction>-MY<year>-<date>[-N]`. A real named save gets a `.sav.autosim-campaign` marker with original created timestamp, display name, validated ID and an FNV-1a/length fingerprint. A subsequently loaded exact saved file offers an **explicit Yes/No** to create the next `session-NNN` in the existing campaign or start new. Same-process Save & Continue retains current session and logs segment transitions. Synthetic analyzer tests should verify display labels, old-folder fallback and multiple sessions. No inferred lineage from matching seeds or filenames.
+
+**Required Windows acceptance matrix:** simulation cap at 10, type 7 further turns, Save & Continue → exactly 7 more complete turns → dialog; verify current/total count and year/colonies/units. Save & Exit with default/edited name: check `saves/<name>.sav`, load it through normal game menu, advance a turn, continue AI, and inspect no duplicate/upkeep effects. Test save overwrite cancellation, overwrite success, invalid names/count, missing saves directory, failed I/O and old-save preservation. Return to Manual: take control of observer on *next* proper turn; inspect colonies/map, end a human turn; save/load and ensure ordinary gameplay works. F9 Resume, F10, unfocused stop file, and their source/default switches; map focus and 1024×768 UI clipping. Test native load with sidecar Yes rejoin in `session-002`, No fresh campaign, modified-SAV fingerprint refusal, old campaign analyzer compatibility, campaign rename with special characters, telemetry disabled, human and multiplayer opt-out, and normal save preferences. Real Council popups may still block before the turn cap.
+
+## AUTO-002 Empath Guild timing vs Council vote — event ID cross-check (8 November 2026)
+
+**Source/file reconciliation:** `src/base.cpp` serializes Secret Project notices with the project index, computed as facility ID - `SP_ID_First=70`. In uploaded `ui_notices(1).jsonl`, `PROJECT4` occurred on **turn 97** for processing faction 1 and maps to Empath Guild (`FAC_EMPATH_GUILD=74`). `PROJECT36` occurred on **turn 117** for faction 3 and maps to Planetary Energy Grid (`FAC_PLANETARY_ENERGY_GRID=106`). The Governor election occurred on turn 117 during `call_council(actor=5)`, **20 turns after the Empath Guild**, not at its completion. The owner/leader name mapping for this save is unavailable. This is observed correlation, not proof of Council eligibility cause. A pre-Council same-build SAV remains necessary.
+
+## AUTO-002 patched terranx.exe inspection and native Council trace (8 November 2026)
+
+**Source artifact verified:** uploaded `terranx(4).exe` SHA-256 `01901cbf7196b0c5d0df9540a029520f5df8fd9a6b343deef8b5663872805fcf`, same as the user-reported installed game executable. Static Win32 x86 `objdump` disassembly shows `call_council` (`0x52C880`) calling `council` (`0x428350`) at `0x52D9C2`, and `council` calling `CouncWin_init` (`0x427230`) at `0x4284CA`. Window initialization populates AI votes with `council_get_vote` and can call `CouncWin_set_vote`; native resolution calculates outcomes and changes Governor state. A UI/window lifecycle is interleaved, preventing an established safe show/no-show bypass. The Council election is user-observed to often coincide with Deirdre building the Empath Guild; **the Guild as a direct trigger and exact AI selection timing have not been confirmed**.
+
+**New non-mutating code on AUTO-002:** a preflighted patch at `0x4284CA`, enabled only for `telemetry_enabled=1` and `autosim_manual_turns>0`, forwards to the original `__thiscall CouncWin_init` via a matching wrapper. It records entry immediately before native code and exit with proposal, candidate, outcome, mask, ballots and vote counts to `ui_notices.jsonl` as `source=council_native`. It does not skip the Council, bypass a modal, forge votes or alter Governor. Structural regression `tools/test_autosim_council_native_trace.py` and Windows x86 Develop/Release compilation **passed** on [CI 42452468919](https://github.com/Necaladun/thinkerNeca/actions/runs/42452468919) at `be514ef`. These checks do not prove runtime behaviour. An exact *pre-Council saved game* and Windows in-game run remain needed before any headless fix or vote-parity acceptance.
+
+## AUTO-002 Council log review and safe-fix blocker (8 November 2026)
+
+**Source of evidence:** uploaded `ui_notices(1).jsonl`, 845 events over turns 80–117. 602 Council trace records, no `diplomacy_guard` records, `human_mask=00000000` and `owner=2` throughout sampled Council events. On turn 117, `call_council(actor=5)` enters with Governor `-1` and exits with Governor `7`, both with `pending=0`. The final event is an F10-origin `OPERATOR_STOP/save_dialog`. The reported popup required user input; whether the click altered the winning result is not known. These are actual Windows log observations, not CI assumptions.
+
+**Fix not safely implementable from available evidence:** native `call_council`/Council window both appear involved, and the Governor transition proves state updates may occur within the same native call. `src/engine.h` only provides function bindings and native `CouncWindow` fields, not a headless state machine; OpenSMACX only supplies vote totals/eligibility. A show-window no-op, skipped Council, global owner impersonation or arbitrary vote answer is rejected as unsafe. No gameplay-code change or compiled fix in this audit. Next stage: inspect/disassemble/trace the exact supported `terranx.exe` native Council entry/callers and compare vote/treasury/resolution state on a reproducible pre-Council save; retain ordinary human regression and all-AI reload tests. Until then Council unattended acceptance is **blocked**.
+
+## AUTO-002 external-stop and physical-hotkey CI checkpoint (8 November 2026)
+
+[Windows x86 Develop and Release CI run 42451218764](https://github.com/Necaladun/thinkerNeca/actions/runs/42451218764) **passed** at source head `fff9fef`. Both x86 cross-compilations, the new `tools/test_autosim_operator_control.py` structural contract, the existing Council/diplomacy regression, source checks and remaining tests succeeded. The Develop artifact `thinker-develop-win32` contains `thinker.dll` and `thinker.exe`. **No actual Windows runtime test of physical key polling, `autosim-stop.txt`, save/reload, or native Council state was performed by CI.**
+
+## AUTO-002 Council recurrence, hotkey input, and stop-file trial (8 November 2026)
+
+**User Windows finding:** the Council popup reappeared with the human-diplomacy-guard build. F9/F10 appeared unresponsive during continuous AI turns, but the user subsequently reported **F10 worked while the Council popup was open**, triggering the expected Save Game/Exit after that popup completed. Thus input can be captured and the turn-boundary action can execute, but availability is UI-state-dependent. Faster combat display is user-reported; unit-state/RNG parity remains unverified.
+
+**Source change (not yet Windows-tested):** `autosim_collect_queued_keys()` now also samples focus-gated `GetAsyncKeyState(VK_F9/VK_F10)` physical key-down edges during AI iteration. A new one-shot stop-file poll uses `GetModuleFileNameA(NULL)` for the executable directory, looks for `autosim-stop.txt`, attempts to delete it and queues the same `AUTOSIM_CTL_STOP` at the next **complete** all-faction boundary; it does not interrupt the native Council or force a partial-turn save. `tools/test_autosim_operator_control.py` checks guarded source routing only; the Windows behaviour is unverified.
+
+**Required Windows tests:** configure >100 AI turns, place `autosim-stop.txt` beside the executable during an unfocused run after a few complete turns and verify Save Game/menu on the next completed cycle; confirm file deletion, telemetry `EXTERNAL_STOP` event, human game ignored, partial-cycle load, saving/cancelling and reloading. Separately hold F9/F10 while game focused, verify F10 outranks F9 and a single F9 pause per press, and capture Council `council_trace`/`diplomacy_guard` events if a Council popup recurs. **Native Council session completion and diplomacy parity remain unresolved.**
+
+## AUTO-002 offscreen visual and fungus notice CI checkpoint (8 November 2026)
+
+[GitHub Actions Windows x86 Develop and Release run 42447573120](https://github.com/Necaladun/thinkerNeca/actions/runs/42447573120) **passed** at source head `d651cff`. Both native cross-builds passed; Develop also passed C++11 host policy and combat-damage tests, `tools/test_autosim_presentation_contract.py` checking movement, artillery loop preservation, native preference scopes and ecology notices, the probe UI source test, other terrain/INI/telemetry/doc tests and artifact packaging. The `thinker-develop-win32` artifact includes `thinker.dll` and `thinker.exe`. This establishes compile/structural consistency only; **there is no Windows gameplay run of these rendering changes**. Large-stack artillery, seen-vs-unseen simulation state/RNG equivalence and fungus ecology save/reload remain high-priority verification.
+
+## AUTO-002 simulation-only offscreen presentation and ecology notice (8 November 2026)
+
+**Implementation on unmerged `feature/auto-002-noninteractive-ui`; Windows test pending.** User's latest reported popup: *fungus grows near [base], forest destroyed*. `src/base.cpp::mod_base_ecology` emits the `FUNGUSGROWS2` notification (or `FUNGUSGROWS` without destroyed improvement) after `bit_set(BIT_FUNGUS)`, improvement removal and visibility sync. Both now use `autosim_notice_pop2`, suppressing only when `autosim_suppress_notices=1` and actual all-AI control is valid. Event RNG, clean-mineral modifier, terraforming damage and native-life follow-on remain unmodified. The related return-unused `FORESTGROWS`/`KELPGROWS` notices in `src/gameturn.cpp` now use the audited POP2/NetMsg wrappers for either `game_event_popup` configuration.
+
+**New fast-visual behavior under existing `autosim_fast_combat=1` (valid all-AI single-player only):** `src/gui_dialog.h::AutoScopedAutosimFastPrefs` additionally enables no-centre-on-units-with-orders and hide active goto path, and disables mouse edge scrolling, whole-unit blink, base names and base-production labels. `src/veh_action.cpp` preserves vision calculations and actual movement/stack/rotation bookkeeping, but bypasses the visible vehicle-scrolling/scooting/waiting code by following its existing offscreen presentation path for AI-only orders. `src/veh_combat.cpp` suppresses observed combat-interface rendering (including `CT_CAN_ARTY` per-defender animation) while preserving artillery attack loops, RNG rolls, weapon/defence computation, reactor scaling, per-unit HP caps, AI goals and state, stack kill processing, and normal final tile redraws. Attacker visibility mutations formerly embedded in the render branches are retained at their corresponding stages. Direct/duel combat uses the same non-observed presentation code, not a separate damage implementation. No `mod_battle_fight_2` early return added. Ordinary human and opt-out settings remain native. Original preferences are restored before autosave and Save Game.
+
+**Critical Windows regression:** load a late-turn save with a large bombardment stack and compare old vs new builds with the same save, faction/AI configurations and RNG state. Check attacker/defender HP, killed units, source/target unit orientation, alien artillery, base/bunker/open-sea limits, destruction/goal/visibility/treaty changes, exact combat outcome and next-turn actions. Confirm no repeated battle panels/explosions or camera pan during the simulated attack and higher throughput at 80+ turns. Test fungus conversion (Forest lost but fungus placed, clean minerals/eco effects still apply) with `autosim_suppress_notices=1` and `0`, both `game_event_popup` modes for forest/kelp, human-play baseline, F9/F10, autosaves, same-build reload, endgame/unknown modal safety. **Source and CI cannot establish native `veh_scoot` has no hidden side effects or that visual effects do not advance the game RNG; deterministic comparison remains essential.**
+
+## AUTO-002 observed-combat rendering bottleneck clarification (8 November 2026)
+
+**User's specific Windows observation:** the slowdown is *presenting* visible combat to the observer, especially ordinary artillery bombardment against large unit stacks; CPU time spent on other, unseen AI factions is not the complaint. The previous camera-movement-centric audit is a secondary hypothesis, not the primary reproduction target.
+
+**Source-confirmed amplification:** `src/veh_combat.cpp::mod_battle_fight_2` derives `render_battle` from whether attacker/defender is the observed `MapWin->cOwner` or omniscient/visible to that owner. It does **not** use `PREF_ADV_FAST_BATTLE_RESOLUTION` as an all-rendering-off switch. In the `combat_type == CT_CAN_ARTY` ordinary bombardment loop (`~1718–1818`), each eligible defender gets the actual artillery damage computation, caps and state mutation. Independently, when `render_battle` is set, **per defender**, `Console_focus`, `BattleWin_clear`, `StatusWin_draw` before/after, `boom` (sometimes), `draw_tile` and `reset_veh_draw` execute. The fast flag only bypasses the trailing `clock_wait(200)` when there is no pause. Thus large stacks multiply display work *within a single attack*, even at fast battle speed. `PREF_ADV_NO_CENTER_VEH_ORDERS` may reduce normal movement focusing, but does not solve this artillery presentation loop.
+
+**Recommended follow-up (not implemented):** an opt-in, all-AI-only **combat presentation suppression** path, starting with normal artillery: keep the full defender iteration, RNG, attack side effects, reactor scaling, caps, HP/state updates, destruction and after-action state; omit repeated battle-window/focus/explosion/individual-defender tile updates, optionally redraw the target once at the end. Audit UI-block-coupled nonvisual side effects before bypassing: e.g. `veh_atk->visibility |= (1 << faction_id_def)` currently sits inside the visual branch and `combat_type` is temporarily mutated there. Do **not** globally bypass `mod_battle_fight_2` or blindly set `render_battle=0` without verifying those effects. Direct combat and artillery duels have different presentation branches and should be tested separately. Validate with a fixed pre-bombard save against a large stack: same HP, survivors, morale, event state, RNG progression, terrain changes and save/reload, plus wall-clock time and rendered event counts.
+
+## AUTO-002 100+ turn Windows smoke and visual bottleneck audit (8 November 2026)
+
+**User-reported Windows Develop runtime:** with the AUTO-002 full-turn fast profile, simulation runs **substantially faster** and has reached **100+ consecutive AI-only turns with no blocking popup** in the current test. This is positive source-build runtime evidence for that tested path, not a claim that all native Planetary Council voting paths, normal-human preferences, endgame, every popup type or same-build save/reload have been exhaustively validated. The previously observed native Governor vote remains a separate reproduction/test concern, not automatically resolved.
+
+**Performance observation:** after approximately 80+ turns the visible/observed faction's increasingly numerous unit movements cause pronounced *display-bound* lag; other AI factions progressing without being watched do not show the same slowdown. This suggests a presentation/observer-camera bottleneck rather than proving AI computation is cheap at large unit counts. `src/veh_action.cpp::mod_veh_move` [movement path] sets `visual_tgl=1` for `MapWin->cOwner`; even if the fast profile clears `move_delay`, it can still call `Console_focus` if `PREF_ADV_NO_CENTER_VEH_ORDERS` is unset. The current fast profile does **not** set that flag. Source also calls `Console_cursor_next`, `veh_scoot`, `draw_tile` and, on a non-observed visible AI path, `clock_wait(!move_delay ? 5 : 100)`; other event paths call unconditional `Console_focus` and `draw_map`. Therefore no-centre should be tested first, but cannot eliminate all drawing by itself. `MPREF_ADV_ZOOM_BASE_NO_RECENTER_MAP` only concerns base zoom, not this movement-path camera focus.
+
+**Preference audit / proposed tests only (not implemented):** high-priority test `PREF_ADV_NO_CENTER_VEH_ORDERS` ON during all-AI fast profile; benchmark replay from the same save with fixed camera versus default, with identical game settings and unit counts. Secondary cosmetic candidates: clear `MPREF_MAP_SHOW_BASE_NAMES`, `MPREF_MAP_SHOW_PROD_WITH_BASE_NAMES`, `MPREF_AV_WHOLE_VEH_BLINKS`; set `MPREF_MAP_HIDE_ACTIVE_VEH_GOTO_PATH`; clear `PREF_BSC_MOUSE_EDGE_SCROLL_VIEW` if mouse scroll is encountered. Confirm whether their native use actually reduces cost before adding to default. Startup-only Thinker render options `render_high_detail=0`, `render_base_info=0`, `render_probe_labels=0` may reduce overlay/detail cost but materially reduce observability and should be independently benchmarked, **not** temporarily flipped in memory (hooks installed at startup). Audio/movie/fog/gameplay automation preferences are not suitable primary optimisations. If camera disabling is insufficient, profile visible movement `veh_scoot`, focus/redraw count and hardcoded waits before selective simulation-only rendering suppression. No code or user preferences altered by this audit.
+
+## AUTO-002 full-turn fast-presentation CI checkpoint (7 November 2026)
+
+[Windows x86 Develop + Release GitHub Actions run 42365101769](https://github.com/Necaladun/thinkerNeca/actions/runs/42365101769) **passed** at source head `b6e8a6f`. Develop/Release compilation, the C++11 host preference restoration suite (including nested full-turn guards), `tools/test_autosim_presentation_contract.py` (full-turn flags plus ordinary autosave boundary), probe UI contract and remaining CI checks passed. The downloadable Develop artifact `thinker-develop-win32` contains `thinker.dll` and `thinker.exe`. A prior run `42364984284` failed compilation because the old combat animation bypass still referenced `fast_autosim_combat`; restored the missing guard before the passing run. **No Windows game execution or autosave file round-trip was performed by CI.** The Council modal and 100+/200-turn unattended acceptance remain unresolved.
+
+## AUTO-002 full-turn fast-presentation implementation (7 November 2026)
+
+**User-approved settings:** Fast Battle Resolution ON; quick movement for enemy and allied units ON; Quick Move All Vehicles and Quick Move Vehicle Orders ON; Pause After Battles OFF; Map Animations OFF, **only** for eligible fully AI-controlled single-player simulations. Sound/music unchanged. Existing `autosim_fast_combat=1` option now enables the entire phase-scoped fast-presentation profile (historic option name retained); `0` opts out, `autosim_manual_turns=0` or any human control retains native settings.
+
+**Implementation (source only; Windows unverified):** `src/gui_dialog.h::AutoScopedAutosimFastPrefs` centralises exact named `PREF_*/MPREF_*` flags using existing `AutoScopedCombatPrefs` RAII. `src/gameturn.cpp` applies this to `turn_upkeep()` and `mod_enemy_turn()`, and to the processing body of `faction_upkeep()` with explicit scope exit **before** native `auto_save()`. `src/veh_combat.cpp` reuses the profile within combat, with nested state restored to its enclosing AI phase. The turn-boundary operator pause and `save_game(0)` paths remain outside the modified preference scopes. No changes were made to `src/savegame.cpp`, autosave interval, or the `PREF_BSC_AUTOSAVE_EACH_TURN` bit. During eligible all-AI sessions the existing `auto_save()` call is now requested if either the native preference is enabled **or** the simulation eligibility guard is active; normal human-play autosave preference remains authoritative. Native autosave write results still are not independently checked. User confirms ordinary yearly autosaves have been reliable and does not request dedicated AUTO-003 checkpoints now.
+
+**Verification required:** host nested/active/disabled preference tests and Windows x86 Develop/Release compilation, then native all-AI 20/100+ turns (visual speed and unchanged simulation outcomes, no map animations, same-build regular autosaves and reload). Check normal human play, opt-out, preferences after menu and after F9/F10, and verify files captured at autosave have original preferences. Nested or unanticipated native save calls outside `auto_save()` cannot be ruled out by source-contract tests. The unresolved Planetary Council modal still blocks guaranteed unattended 200-turn completion.
+
+## AUTO-002 fast preferences and autosave audit (7 November 2026)
+
+**Source inspection only; no runtime or configuration changes in this audit.** In `src/engine_enums.h`, map animation is `PREF_AV_MAP_ANIMATIONS=0x80` (set means enabled); full quick movement is `MPREF_ADV_QUICK_MOVE_ALL_VEH=0x80`; quick move for existing orders is `MPREF_ADV_QUICK_MOVE_VEH_ORDERS=0x40`; fast combat is `PREF_ADV_FAST_BATTLE_RESOLUTION=0x8`; pause after battles is `MPREF_ADV_PAUSE_AFTER_BATTLES=0x10`. `src/veh_combat.cpp::mod_battle_fight` temporarily enables fast battle and quick-all, clears slow enemy/ally movement and pause-after-battle only **within battle scope**, then restores preferences. No general-turn fast profile; map animations stay as the user configured. `src/config.cpp::default_prefs` enables map animations by default outside Laptop preferences; baseline defaults also enable autosaving, but saved `Alpha Centauri.ini` preferences can override defaults.
+
+**Autosaves:** `src/gameturn.cpp::faction_upkeep` invokes `auto_save()` for observed faction if `PREF_BSC_AUTOSAVE_EACH_TURN=0x2` is enabled, regardless of whether the observer is human. `docs/thinker.ini` configures `autosave_interval=1` and, with a positive interval, `src/patch.cpp` routes the native autosave routine to `src/savegame.cpp::mod_auto_save`. That routine writes `saves/auto/Autosave_<mission-year>.sav` at matching turn intervals, subject to PBEM/Ironman guards. It is **not** an AUTO-003 completed-all-faction checkpoint; it runs during observed-faction upkeep, can be absent if the preference is off, uses a shared path across campaigns, and ignores `mod_save_daemon`'s return status. `mod_save_daemon` opens the target via `fopen(...,"wb")`, writes the save and removes a file on detected error; existing parent directory and successful final disk write need inspection. A crash may leave a partial current-year file; older year-named autosaves should remain independent. Automated restore/restart lineage, failure detection and verified checkpoint rotation are **not implemented**. A loaded all-AI game starts a fresh in-memory `AutoTurnDriver.completed_turns` count; the requested N is not a persistent campaign goal.
+
+**Runtime acceptance still required:** with a disposable 20+ turn game, verify real preference bit values and unchanged saved `Alpha Centauri.ini`, distinguish full-turn quick movement from combat quick movement, test map animations off, confirm successive files under `saves/auto` are valid and same-build reloadable, check behavior with autosave preference disabled and absent/unwritable autosave folder. For AUTO-003, require explicitly enabled periodic complete-cycle checkpoints, distinct campaign/session lineage, checked write/rename results, last-good recovery and simulated crash/restart. No 200-turn crash recovery is currently established.
+
+## AUTO-002 probe notice CI checkpoint (7 November 2026)
+
+**Windows x86 cross-build:** [GitHub Actions run 42363509724](https://github.com/Necaladun/thinkerNeca/actions/runs/42363509724) at `366a57e` passed both Develop and Release, existing automated checks, and new `tools/test_autosim_probe_ui.py` structural contract for `src/probe.cpp`, `src/veh_action.cpp` and `src/faction.cpp`. Artifact `thinker-develop-win32` contains `thinker.dll` and `thinker.exe`. The final code was not run inside SMAC/X on Windows, and the Council session remains a known blocking modal; no zero-click, vote-outcome or save/reload success is inferred from CI.
+
+## AUTO-002 Council diplomacy defensive guard CI checkpoint (8 November 2026)
+
+[GitHub Actions Windows x86 Develop + Release run 42449885637](https://github.com/Necaladun/thinkerNeca/actions/runs/42449885637) **passed** at source head `9733ed5`. Develop/Release native cross-builds, `tools/test_autosim_council_diplomacy.py` (AI-pair route, guard-before-mutation, non-mutating Council trace) and retained host/source tests all passed. The `thinker-develop-win32` artifact includes `thinker.dll` and `thinker.exe`. This verifies compilation and source integration; **no Windows test of the Lal offer, any Council vote, diplomatic side effects or full-turn/save continuity was run by CI**. In-game reproduction remains necessary.
+
+## AUTO-002 human-diplomacy guard and Council trace source trial (8 November 2026)
+
+**Source changes, Windows runtime pending:** `src/faction_event.cpp::enemy_diplomacy` already handles nonhuman partners with AI-vs-AI `enemies_trade_tech`/`encounter` and treaty processing, then `continue`; the human-facing `communicate` path is on the other side of that condition. The two native `enemy_diplomacy` callsites remain unmodified. `src/faction_diplo.cpp::communicate` now fails closed on `autosim_control_active()` at entry, recording attempted human-dialog use in `ui_notices.jsonl` as `source=diplomacy_guard` / `label=communicate`, with actor, partner, observer, flag, human mask and `CouncilSessionPending`. This is not a replacement for any AI diplomacy or vote negotiation: an unexpected invocation exits without fabricated player input; the normal AI-vs-AI code still runs separately. Normal human games, noneligible simulations and the game-state/RNG code inside `communicate` are unchanged.
+
+**Diagnostic-only Council boundary:** `src/gameturn.cpp` logs `source=council_trace`, `label=call_council` with `enter`/`exit` before/after native AI Council calls when eligible and telemetry enabled. It captures actor, observer, human mask, pending status, Governor and observer proposal/vote state, without evaluating votes or adding RNG calls. Missing exit after a modal implies that the call is blocked within native Council processing, not that the source diplomacy guard failed. Existing Council resolution/vote menus and `buy_council_vote` remain unchanged. `tools/test_autosim_council_diplomacy.py` is a structural integration regression; even passing CI does not prove Lal's native offer is fixed.
+
+**Windows acceptance:** with `telemetry_enabled=1`, `autosim_manual_turns=N`, `autosim_suppress_notices=1`, capture `ui_notices.jsonl` while replaying Lal's pre-vote/bribery offer and Deirdre Governor election. If the modal still blocks, note whether `diplomacy_guard` appears, and whether the corresponding `council_trace enter` has a matching `exit`. Check known AI-to-AI pact/trade/council behaviour, resource and vote changes, RNG, human controls, save/reload and subsequent Council scheduling. **Do not declare zero-modal acceptance from a passing guard test alone.**
+
+## AUTO-002 Council vote-bribery and voting windows (8 November 2026)
+
+**Latest user-reported Windows blocker:** during all-AI unattended simulation, the Planetary Council modal reappeared and **Lal attempted to bribe the observed AI faction for its Council vote**, displaying a dialogue that required the operator to choose an answer. This is an actual **decision-returning** diplomacy interaction, not a cosmetic Council result, and is a second live reproduction beyond the earlier Deirdre-convened Governor vote. No version-specific claim beyond user-reported AUTO-002 testing; exact call stack, proposal, offered consideration and outcome have not yet been captured.
+
+**Source inspection:** `src/gameturn.cpp::faction_upkeep` invokes native `call_council(faction_id)` for all nonhuman factions on completed turns. `src/gameturn.cpp::control_turn` also contains `council(MapWin->cOwner,0,0)` conditional on `CouncilSessionPending`, but *that particular invocation is within the `is_human(current_id)` branch* for switched human players. It cannot on its own explain a Council window in a session with every `is_human` false. Native `call_council`, other native Council entrypoints, or unexpected ownership/control routing still need tracing. Do not assume the pending flag or Council computation can simply be skipped.
+
+**Bribery source:** `src/faction_diplo.cpp::make_a_proposal` handles `DiploProposalCouncilVote` using interactive `COUNCILMATTER`, `COUNCILVOTE`/`COUNCILVOTEGOV` menus, and calls native `buy_council_vote(faction_id, faction_id_2, proposal_id, voted_id)` (or a yes/no vote variant). Engine bindings include `council_get_vote(int,int,int)`, `council_action(int,int)`, `buy_council_vote(int,int,int,int)`. This establishes that Council vote bargaining has choice-dependent game-state handling; **it does not prove Lal's observed offer originated at this particular callsite**. The full native Council and vote-bribe UI/state path remains untraced.
+
+**Deeper source audit (8 November, no code fix):** `src/faction.cpp::is_human` tests `FactionStatus[0]` while `src/engine.cpp` aliases `CurrentPlayerFaction` to the observed local owner; they are separate identities after all-AI handover. `src/patch.cpp` reroutes two native `enemy_diplomacy` calls (`0x55FDBD`, `0x5603E7`) into `src/faction_diplo.cpp::communicate`, a human-facing negotiation handler without an entry-time human-control guard. That is a concrete **candidate** for owner-driven foreign diplomacy dialogs, although Lal's exact native call remains unproven. The native Council window's known struct includes `faction_vote[8]`, `faction_vote_count[8]`, `vote_faction_mask`, and `proposal_outcome`, so hiding it may also abandon live ballot/resolution state. Native `CouncWin_init/show/set_vote/make_resolution`, `council_get_vote/action`, and `buy_council_vote` are investigation boundaries; their signatures do not establish safe headless behaviour. Independent OpenSMACX only supplies comparable vote totals/candidate eligibility, not a complete Council solver. Trace source `call_council` and `communicate` around the modal before attempting a noninteractive fix; see [technical plan](technical/telemetry-automation.md#auto-002-planetary-council-and-vote-bargaining--source-audit-8-november-2026-unresolved).
+
+**Noninteractive acceptance, not yet implemented:** route the all-AI observer through the game's AI Council ballot/diplomatic bargaining semantics rather than producing human voting or vote-price/acceptance menus. Preserve proposal/election eligibility, each faction's votes, vote purchase offers/acceptance, any energy/technology/diplomatic side effects, governor/resolution/veto/Supreme Leader outcomes, pending-state cleanup, and save/reload. Verify two scripted/reproducible cases: Deirdre Governor Council and Lal offering the observer AI a vote bribe. Instrument native call stack/state and compare to otherwise equivalent AI-vs-AI paths before implementing. **Do not auto-accept, auto-decline, invent an AI choice, or suppress native `council()` until these semantics are established.** Existing passive Council outcome wrappers do not cover these interactions.
+
+## AUTO-002 Planetary Council modal blocker (7 November 2026)
+
+**User Windows report:** Lady Deirdre convened the Planetary Council for election of Planetary Governor. The convening announcement blocked all-AI simulation; after dismissal, the full voting window appeared, with Deirdre's vote already selected for herself. This is an observed native modal chain, **not** evidence all AI ballots or governor effects have been processed.
+
+**Source inspection (no correction yet):** `src/gameturn.cpp::faction_upkeep` invokes native `call_council(faction_id)` for AI participants; turn control invokes native `council(MapWin->cOwner, 0, 0)` while `*CouncilSessionPending` is true. Existing AUTO-002 covers the later `COUNCILHOT*` outcome notices. Engine bindings expose `call_council` at `0x52C880`, `council` at `0x428350`, and `council_get_vote`/`council_action` at `0x52BE60`/`0x52BF60`. Their behavior in the patched binary has not been independently traced.
+
+**Before changing UI:** determine whether native `council` computes/commits AI ballots and governor/proposal effects, or merely presents a resolved session. If it processes game state, implement and validate equivalent noninteractive AI handling, without auto-selecting human options. Test Governor election and at least one non-election resolution, veto/diplomatic victory conditions, pending-state cleanup, ordinary human Council, and same-build save/reload. **No Council suppression fix claimed; Windows blocker remains open.**
+
+## AUTO-002 probe-team presentation audit (7 November 2026)
+
+**New user-reported Windows blocker:** observed AI Chairman Yang infiltration of the data networks still opens a native notification. The prior probe pass covered 24 result-style `NetMsg_pop_2` calls but did not cover raw `NetMsg_pop(..., "DETECTINFILTRATE", ...)`. This is a **real observed missing suppression path**, not proof the new revision works.
+
+**Source correction on unmerged `feature/auto-002-noninteractive-ui` (not yet compiled or Windows-tested):** all 17 remaining return-unused `NetMsg_pop` sites in `src/probe.cpp` now use the existing all-AI-only notification wrapper. The intelligence-result `report_intel` panel, `SPYFOUND`/`SPYLOST` counter-espionage presentation, genetic-warfare and mind-control `popp_2` results, and five post-operation `X_pops` portrait reports are similarly bypassed and logged only during opt-in AUTO-002. Infiltration state changes, unit/base outcomes and diplomacy side effects remain in their original code paths. Four choice-returning `popp_2` frame/excuse calls and probe action menus stay native.
+
+**Cross-file follow-up:** `src/faction.cpp::set_treaty` also emitted return-unused `SPYRENEW` after infiltration status/expiry updates; `steal_tech` emitted return-unused `STOLETECH` before the unchanged `tech_achieved` path. Both now use the opt-in passive notification wrapper. Source-only pending Windows verification.
+
+**Additional observed-AI probe encounter paths in `src/veh_action.cpp`:** `PROBEPACTTEAM`, `PROBEPACT` and `ENEMYPROBE2` can ask for human permission merely because the AI is the observed `MapWin` owner. In opt-in all-AI mode, skip only that extra observer prompt and follow the already existing path used for a non-observed AI; record a structured UI notice. The `GOTMYPROBE`/`GOTYOURPROBE` result messages use the passive wrapper. Normal human-controlled games and disabled suppression preserve native prompts. `ENEMYPROBE` and other meaningful human decisions are not blindly answered.
+
+**Acceptance still required:** compile the new branch, verify actual Windows zero-click infiltration/Hunter-Seeker/spy loss/mind control/genetic warfare and AI probe-vs-probe encounters, compare faction intelligence/relations and unit/base state with a normal-path control, ensure no popup choices or preferences changed in human play; continue 20/100+ turns and F9/F10 checks. Source review is not in-game verification. This is separate from **BUG-001** probe/base-capture workaround.
+
+## AUTO-002 keyboard delivery and fast-combat follow-up (7 November 2026)
+
+**New Windows Develop finding (user-reported):** F9 and F10 work while the game is waiting for the first manual End Turn after Scenario Editor all-AI handover. Once continuous AI `control_turn()` starts, **F9, F10, Escape, Ctrl+Q and other keys do not respond**. This demonstrates the previous shortcut handler is not servicing queued Windows input during consecutive AI turns, **not** that the F9/F10 key bindings are invalid. Combat displays at ordinary/slow presentation speed; the previous AUTO-002 changes had not enabled native Fast Battle Resolution.
+
+**Source follow-up (not Windows-tested):** `autosim_collect_queued_keys()` consumes only pending `WM_KEYFIRST..WM_KEYLAST` messages on the game's UI thread during eligible all-AI simulation, queues **F9 = pause** and **F10 = stop**, and deliberately does not dispatch unrelated gameplay shortcuts mid-turn. It runs at full-cycle completion **and** periodically during `mod_enemy_turn` vehicle passes, so key messages can be retained despite native combat's `flush_input()`. No action occurs until the next complete turn boundary. Inactive/human games do not drain messages this way. **Open:** confirm the game's owning thread receives the events, focus during simulation, repeated-key behaviour, and at which exact turn queued requests are honoured.
+
+**Temporary fast combat:** adds `autosim_fast_combat=1` as an all-AI-only default (configurable `0` to retain normal combat display). During combat calculation `mod_battle_fight()` only, a scoped preference override temporarily enables `PREF_ADV_FAST_BATTLE_RESOLUTION` and quick unit movement, disables pause-after-battles and explicit nonquick friendly/enemy rendering, then restores the **exact original** `GamePreferences` and `GameMorePreferences` before returning. The core battle computations/damage/RNG and normal human mode are unchanged in source. The prior slow `veh_scoot` animation is also bypassed during eligible automation. Windows runtime and saved-preference restoration remain unverified.
+
+**CI confirmation:** [Windows x86 Develop/Release run 42362393860](https://github.com/Necaladun/thinkerNeca/actions/runs/42362393860) passed both configurations, C++11 AUTO policy and scoped preference restoration tests, telemetry/report tests, static checks and package artifact upload. No Windows game-runtime input or combat timing test was executed.
+
+**Next Windows acceptance:** test F9 after continuous AI starts, hold until the current full turn ends if necessary; verify prompt appears, Yes resumes and No saves/exits. Repeat F10 (without reaching turn cap), Save and Cancel routes, then load a saved game and ensure valid turn history. Test paused game and controls without `autosim_suppress_notices=1`. Compare the observed battle visual speed with `autosim_fast_combat=1` against `=0`, verify unit HP/combat outcomes follow same mechanics and that both preferences retain their prior values after a battle and save/reload. Test hotkeys before handover and human gameplay to ensure normal keyboard input is not drained.
+
+## AUTO-002 fourth popup pass — broad passive UI and turn-boundary controls (7 November 2026)
+
+**Additional user-reported Windows blockers:** foreign probe-team reports (including other factions' mind control), observed Gaia faction liberating a city followed by an unusable Base Control window, the Peacekeepers signing a Treaty of Friendship with the Gaians, a completed Secret Project movie and its follow-on Datalinks window. User replayed several turns and reports Book of Planet interludes no longer interrupt automation. This is **positive suppression smoke only**; native interlude-history flags have not been independently audited. User also requested pause and early end.
+
+**Fourth source pass on `feature/auto-002-noninteractive-ui` (unmerged, Windows tests pending):**
+- `base.cpp::mod_capture_base`: return-unused `LIBERATEBASE`/`SEIZEBASE` notices and Secret Project capture/loss notices bypassed in all-AI UI mode. After base ownership/base compute, the observed AI no longer executes `BaseWin_zoom()`; similar AI-observer upkeep zoom suppressed. The observed faction's HQ `ESCAPE` prompt follows the pre-existing unobserved AI default `relocate=true`, with the normal 1,000-credit/availability rules, instead of asking the human.
+- `probe.cpp`: all 24 source-checked return-unused `NetMsg_pop_2` post-action reports bypassed after normal probe decisions/results; `veh_combat.cpp` result reports likewise. **Choice-returning** probe or diplomatic dialogs are not globally suppressed.
+- `faction_event.cpp`: third-party pact/treaty/truce/war report presentation suppressed, while treaty changes continue in the same function. `faction_talk.cpp` only source-confirmed return-unused `MAKEPACT`/`HERESTHEMAP`/`MAKETREATY*`/`MAKETRUCE` announcements bypassed; real diplomatic choice-returning `X_dialog` sites remain native.
+- `base.cpp` skips `help_project(project_id)` Datalinks presentation after a Secret Project; `gui.cpp::mod_amovie_project` skips the source-controlled video player during all-AI opt-in only. The game/movie preferences are not changed or written.
+- `gameturn.cpp::random_events()` replaces 34 return-ignored `POP2` event displays with per-source suppression; event rolls, flags, resources, damage, and terrain processing remain in place. Council results `COUNCILHOT*` and sanctions-ending notices likewise bypass presentation only. The AI `call_council` and `council_votes` functions are untouched; actual AI voting and all council permutations remain to be runtime checked.
+- **New controls:** while a living observed all-AI single-player game is running with `autosim_manual_turns>0`, F9 queues **pause after completed turn**. At that boundary a Win32 Yes/No dialog offers **Yes = Resume**, **No = native Save Game then return to main menu**. F10 queues **Save Game then stop** at the next completed turn. Controls do not require `autosim_suppress_notices=1`; never interrupt an incomplete faction/combat/upkeep phase. Input processing latency and pause-button activation still need actual Windows checks.
+
+**Fourth-pass CI evidence:** [Windows build run 42361420209](https://github.com/Necaladun/thinkerNeca/actions/runs/42361420209) passed both Win32 Develop and Release cross-compilation, C++11 AUTO policy tests, Python campaign-report checks and repository static/document checks. The Develop artifact is `thinker-develop-win32`. CI does **not** exercise actual Windows modal flows, keyboard delivery, AI choices, or save/reload. The temporary feature-branch workflow trigger was removed afterward.
+
+**Acceptance for next Windows Develop test:** Use a disposable same-build save, unchanged native user preferences, telemetry enabled, `autosim_manual_turns=20` (then 100), `autosim_suppress_notices=1`. Verify 20 turns without modal clicks until the intended Save Game; confirm liberated-base windows, treaty announcements, foreign probe reports, projects/Datalinks/movies, and enabled random events no longer interrupt. Confirm real project ownership, capturing faction/base and probe outcomes, AI Council votes, event state and report row continuity. Press F9 while running, verify pause occurs *only* at a completed-turn boundary and Yes resumes, then exercise F9→No and F10 on separate runs with native Save/Cancel → menu. Load each saved game and ensure it continues. Test ordinary human play and `autosim_suppress_notices=0` (controls still work, UI remains native). Unknown modal diagnostics, all victory/credits paths, release/PRACX and 100+ no-click remain **WIP/unverified**.
+
+## AUTO-002 third popup pass — Windows feedback and source handling (7 November 2026)
+
+**Windows user report (Develop):** Four additional modal interruptions while continuing the Gaian all-AI simulation: native lifeforms spotted near Gaia's Landing, Secret Project completion, approaching perihelion, and a Book of Planet interlude. These are observed blockers, **not** four verified fixes. No new telemetry/CSV files were inspected in this turn.
+
+**Source separation and implementation on `feature/auto-002-noninteractive-ui`:** `veh_action.cpp` spotted-unit alerts (`ISLESPOTTED`, `WORMSSPOTTED`, `SPOTTED`, `SPOTTED0`), `veh_turn.cpp` native swarm notices and `gameturn.cpp` `XMINDWORMS` now route through guarded, return-ignored presentation helpers; spawning, visibility and unit state occur before the helper and remain unchanged. `base.cpp` suppresses only return-ignored `BasePop_exec_3` on the project-completion blurb; `SecretProjects[]`, project effects, milestone history and videos remain on their existing paths. `random_events` sets/clears `STATE_PERIHELION_ACTIVE` **before** the wrapped `PERIHELION`/`PERIHELIONENDS` presentation; neither event rule nor timing changes. Normal games and `autosim_suppress_notices=0` keep their original native dialogs.
+
+**Book of Planet is provisional:** The native `interlude()` implementation is in the executable, not this fork. Source interlude call sites in `base.cpp`, `tech.cpp`, `gameturn.cpp`, `faction_event.cpp` and `veh_combat.cpp` now invoke `autosim_interlude()`. When all-AI suppression is active, the wrapper calls the **original native routine** with `PREF_AV_INTERLUDES_DISABLED` set **temporarily in memory**, restores exact prior `GamePreferences` afterward, and logs both prior/new `GameInterludeState` values to `ui_notices.jsonl`. It does not edit INI preferences or save formats. Native interlude behaviour and history retention when the preference is temporarily set have **not** been established by Windows runtime; do not infer they are correct from compilation. Endgame `game.cpp` interludes remain native and outside this pass.
+
+**Build/static evidence:** [CI 42359983542](https://github.com/Necaladun/thinkerNeca/actions/runs/42359983542) passed Windows x86 Develop and Release cross-compilation, C++11 pure-policy/temporary-preference-restoration checks, existing Python telemetry report tests, and the repository's static checks. No SMAC/X runtime was executed; suppression completeness and interlude-state behaviour remain unverified.
+
+**Next Windows acceptance:** Try a disposable same-build 20-turn run, with native game preferences untouched and `telemetry_enabled=1`, `autosim_manual_turns=20`, `autosim_suppress_notices=1`. Report any modal that remains. Verify finished project genuinely exists in `SecretProjects`, native enemies/terraform/expansion continue normally, and perihelion effects activate/deactivate at the correct years. When an interlude would occur, verify **no modal**, no repeated story prompts, `GameInterludeState` transitions in `ui_notices.jsonl`, correct unchanged user preference after stop/reload, and game can save/reload/continue. Interlude history requires actual runtime comparison with a human/default-preference control if discrepancies occur. Then proceed to 100+ turns only if the short test is genuinely no-click.
+
+## AUTO-002 conservative noninteractive notifications — first source implementation (7 November 2026)
+
+**Branch:** `feature/auto-002-noninteractive-ui` is stacked on unmerged AUTO-001 and TEL-001. No PR or merge. Source adds `autosim_suppress_notices=0` default, opt-in `=1` after all playable human-control bits are cleared, valid living view owner, single-player and active `autosim_manual_turns>0`. Ordinary human turns, multiplayer and PBEM cannot activate the new suppression by policy. Game preferences are not changed.
+
+**What is specifically classified:** The owner-faction Unity pod / monolith `NetMsg_pop` calls in `src/veh.cpp` (callers ignore result); optional researched-tech presentation `NewTechWin_exec` and passive `BasePop_exec_3` in `tech_achieved`, plus source-owned acquisition/free-facility notices; selected one-way `popp` announcements (completed project, map reveal, ecology/council advisory, artifact study). `X_pop` exact whitelist handles `REACTORUPGRADE`, `THESECRET0/1`, `TREETIME` as information; `SOCIETY` and `ASKSEEDESIGN` return no optional human action instead of opening a decision UI. Existing AI `consider_designs`, `social_ai`, tech effects, pod rolls and reward state transitions remain in the source flow. No global native dialog hook or auto-click. Unclassified/interactive popups still present normally and may block.
+
+**Audit and output:** Each suppressed presentation/declined optional human action is appended as an independent `sessions/session-001/ui_notices.jsonl` record with source label, game turn and engine processing-faction context, not necessarily the notice recipient. The offline analyser writes `ui_notices.csv` and displays the records in HTML; older sessions without this file remain supported. This stream is not a committed-turn snapshot; its records can precede or follow the last completed snapshot.
+
+**CI evidence:** [CI 42356938677](https://github.com/Necaladun/thinkerNeca/actions/runs/42356938677) passed both Windows x86 Develop and Release cross-builds, including the expanded `test_autosim_policy.cpp` C++11 allowlist/guards and `test_campaign_report.py` CSV/HTML UI audit cases. Earlier CI attempt 42356806503 failed only from a missing `<initializer_list>` include in host tests; fixed before the successful run. **No actual SMAC/X runtime test was performed by CI.**
+
+**First AUTO-002 Windows Develop user smoke (7 November 2026):** User reports a 20-turn AI-only run completed and returned to the main menu with existing game preferences unchanged, but required dismissing a **Monument achievement** announcement (e.g., first prototype) and a **"Morgan authorized a Secret Project"** announcement. No 20-turn raw telemetry export has been inspected. This is positive native run/return evidence, **not** a zero-click pass. Source inspection identifies `monument(1)` (new-achievement UI after `Monuments[]` history write) and `BEGINPROJECT` (informational `popp` before `secret_project_intel` bit write); a separate new revision now bypasses only those presentation steps under the existing all-AI/UI opt-in guard, preserving underlying state. Also adds **native `save_game(0)` dialog at configured turn limit, then returns to menu on save or cancel**. These three changes are **not yet Windows-tested** and must not be counted as verified saved-game integrity.
+
+**Follow-up CI:** [CI 42358404736](https://github.com/Necaladun/thinkerNeca/actions/runs/42358404736) passed x86 Develop and Release cross-builds, expanded C++11 monument-classification host tests, Python report tests and repository static checks on the new save/monument/project code. This is **not** proof that the Save Game dialog works at the completed-cycle boundary or that a saved all-AI game reloads successfully.
+
+**Further Windows Develop user smoke (7 November 2026; same subsequent AUTO-002 build):** The native Save Game dialog opened at the configured stop, the user successfully saved and returned to the main menu. Loading that saved game restored the Gaians as the observed AI faction and **automated play continued**; the next simulation reached **MY 2140**, again presented Save Game and returned to menu. This is positive same-build game save/reload/continued-AI evidence at the AUTO-001/002 stop boundary; the actual save bytes and raw turn report were not independently checked, and Cancel remains untested. Remaining blocking popups, dismissed by user: `WORMCAPTURE` for newly captured mind worms and a spore launcher; `HASTY` warning for an observed AI attack at 2/3 movement; and `SPORESLAUNCHED` describing a farm destroyed by a spore launcher. The earlier Monument and Secret Project notices were not reported again, but their suppression/historical-state side effects were not independently audited.
+
+**Latest CI:** [run 42359230817](https://github.com/Necaladun/thinkerNeca/actions/runs/42359230817) passed Windows x86 Develop/Release compilation, C++11 hasty-branch policy tests and existing Python/source checks. Prior run 42359139748 failed at compilation because `src/veh_action.cpp` omitted `#include "autosim.h"`; the include was added before the successful run. This does not establish new Windows gameplay correctness.
+
+**Follow-up source fix now on same branch (not yet Windows-tested):** `veh_action.cpp` now wraps the **return-unused** `WORMCAPTURE` variants, native-life capture feedback and `SPORESLAUNCHED`/forest-loss presentation with existing opt-in `autosim_notice_popp`/`autosim_notice_netmsg`, leaving the capture and terrain mutation code intact. For the observed nonhuman-controlled AI faction, the `HASTY` human confirmation path now yields to the **existing AI half-movement cutoff** rather than blindly answering Yes; normal human and opt-out behaviour still uses the native prompt. Every suppression/AI-rule handoff is reported to `ui_notices.jsonl` while recording. A pure-policy C++11 test checks this guard; runtime effect still requires a Windows AI playthrough.
+
+**Next Windows acceptance:** Re-run 20 turns on the updated Develop build with the same user preferences and existing `telemetry_enabled=1`, `autosim_manual_turns=20`, `autosim_suppress_notices=1` settings. Do not dismiss notifications during simulated turns; capture exact residual blocker text if any. At turn cap verify a *native Save Game dialog* opens once, accepts a manually chosen filename, and (on save) produces a file that reloads and continues correctly with the same DLL. Independently repeat using Cancel and verify direct return to main menu with no new file. Check monument achievement history/replay still records the event and project-start intelligence still updates. Inspect `ui_notices.jsonl` for `MONUMENT_EVENT_<id>` and `BEGINPROJECT` entries, plus `TURN_LIMIT` save prompt; compare reporting against the saved turn. Only after these pass move to a 100+ turn no-click run.
+
+**Earlier acceptance plan (partly superseded by positive 20-turn user smoke):** Install matching Develop DLL/launcher from AUTO-002 build, keep game preferences unchanged, use a disposable save and `[thinker]` `telemetry_enabled=1`, `autosim_manual_turns=20`, `autosim_suppress_notices=1`. Manually hand all seven factions to AI. Attempt a complete 20-turn run with **zero clicks**; record any remaining modal's exact text/label and when it appeared, without indiscriminate accepting choices. Confirm 20 all-AI turns, closed session, menu return, `ui_notices.jsonl` and full report. Then test at least 100 turns with no input, including research, pods, projects, victory/endgame if reached. Compare relevant tech/reward snapshots with a control scenario where possible. Separate negative tests: `autosim_suppress_notices=0` still displays notices; remaining human `human=true` must leave all notices alone. Check return-to-menu and valid same-build save/reload. **Not acceptance until actually verified:** genuine unattended 100+ run, interlude/movie handling, unknown modal diagnostics/stop, full choice semantics, all victory paths, no RNG divergence.
+
+## AUTO-001 first manual all-AI driver — implementation and acceptance (7 November 2026)
+
+**Branch:** `feature/auto-001-manual-ai-turn-driver` (stacked on unmerged TEL-001, no PR). [CI run 42355116603](https://github.com/Necaladun/thinkerNeca/actions/runs/42355116603) **passed** both Windows x86 Develop and Release builds, host C++11 AUTO-001 guard/cycle-count tests and existing checks. CI only cross-compiles; it does not execute SMAC/X. `src/autosim.h` contains pure entry guards and completed-cycle counter, tested by the host C++11 `tools/test_autosim_policy.cpp`. The native `control_turn()` uses the unchanged AI path; it conditionally omits the between-turn native `Console_human_turn()` call only when all seven faction slots are AI-controlled, single-player, a living view owner is present and no endgame state is set. After `autosim_manual_turns` full cycles it sets `ControlTurnA=1` and `ControlTurnB=1` for the normal menu-return path. No forced game-state or save-format modifications. Config default: zero/off.
+
+**First Windows Develop runtime smoke — user-reported (7 November 2026):** User switched to another AI through the Scenario Editor handover, and the game advanced the configured 10 turns before automatically returning to the main menu. Multiple interactive popups (Unity pod results, discoveries/research and similar notifications) still required manual dismissal. This is **positive evidence for the native handover-compatible AI turn loop and stop-at-N menu return**. It is not a fully unattended test. **Uploaded report verification:** `campaign-20261107T082447Z-p17724-0 / session-001`, HTML `index.html` with CSV exports `factions.csv` and `bases.csv`. There are 11 consecutive completed-turn snapshots (turns 20–30, MY 2120–2130). Turn 20 records University `human=true`; turns 21–30 each record all seven factions `human=false`, validating ten consecutive all-AI snapshots after the handover. The session status is `closed`. Independent cross-checks: 77 faction CSV rows (seven each turn), 433 base rows; per-turn sum of faction bases/populations agrees with base CSV, world base count equals base rows, world vehicle count equals faction units plus native vehicles, and embedded HTML turn data agrees with faction CSV: zero reconciliation errors. Overall world change turn 20→30: 31→50 bases, 46→78 population, 114→172 vehicles. University change turn 20→30: 3→6 bases, 5→13 population, 8→18 units. This establishes AI-controlled state transitions and nontrivial normal-looking development, **not** causal proof of unmodified AI decisions or RNG equivalence. Popups are inputs for AUTO-002 classification, not an AUTO-001 completed automation claim.
+
+**Remaining Windows Develop acceptance:**
+
+1. Use a disposable recent saved game and back up DLL/exe. Set `telemetry_enabled=1`, `autosim_manual_turns=10` in local `[thinker]` overrides. Verify the flag is harmless during normal human play for at least one turn.
+2. Open Scenario Editor and use its **switch faction / keep AI control** path to hand off the formerly human faction; observe whether the runtime indeed clears the human-control bit. The implementation does **not** force-clear it. If the game remains human-controlled, do not claim the driver active; identify the exact native handover state.
+3. Verify at least ten full AI-only completed cycles without input *unless an unclassified modal blocks* (the latter is AUTO-002). Generate the campaign report and check all factions' `human` fields are false on participating turns, including the previously human faction; verify actual AI expansion/production/units.
+4. Verify exactly ten counted full post-handover cycles, consecutive mission years, and clean return to the main menu; check that any ordinary autosave is valid **if it was enabled**, rather than assuming a save at the stop. If loaded mid-turn, the first partial cycle must not count.
+5. Verify `autosim_manual_turns=0` keeps ordinary human-turn behaviour; human-control bit remaining set must prevent the auto fast path. Multiplayer/PBEM are guarded in policy, not runtime-tested. Check `debug.txt` remains separate and normal.
+6. Repeat from a loaded saved game using the same binary and inspect reporter state. Record popups, victory dialogs and animation stalls separately for AUTO-002.
+
+**Not verified until Windows test:** the Scenario Editor's exact handover semantics, native UI callbacks when skipping `Console_human_turn()`, speed/progress, serialised game state, end-of-turn modal coverage, and in-game cap/menu return. Compile or host policy test success cannot establish these.
+
+## TEL-001 — first recorder/analyser code, unmerged branch (7 November 2026)
+
+**Branch:** `feature/tel-001-recorder-foundation`, no PR. **CI:** [run 42350976871](https://github.com/Necaladun/thinkerNeca/actions/runs/42350976871), Develop and Release x86 cross-compiles **passed**. The Develop job also ran `python -m py_compile tools/campaign_report.py tools/test_campaign_report.py` and `python tools/test_campaign_report.py` successfully on synthetic data; the game was **not** executed by CI.
+
+Source implementation: opt-in `telemetry_enabled=0` default, separate `campaigns/` folder, unique new campaign/session, manifest and config/executable fingerprints, completed-faction-cycle `turns.jsonl` and `bases.jsonl`, committed-turn `status.json`. Independent `tools/campaign_report.py` generates an offline local HTML chart and faction/base CSV exports. Recorder never calls gameplay RNG or writes through legacy `debug.txt`; source inspection is not proof of runtime neutrality.
+
+**Initial Windows Develop evidence (user run):** user generated `index.html`, `factions.csv`, and `bases.csv` from a session labelled `closed`, with 11 completed faction cycles (MY 2101–2111). Independent inspection of the uploaded exports found 77 faction rows (7 factions on each turn), 136 base rows, consecutive turns, no duplicate records, matching HTML/CSV data, and consistency between base/population totals and faction records and between native-plus-faction units and world vehicle totals. Game world grew from 7 to 16 bases and 51 to 78 vehicles. This demonstrates first actual game recording, normal session close, and offline report generation, **not** exhaustive correct gameplay or save/reload. **Second Windows Develop session, user-reported save/reload (MY 2112–2119):** distinct campaign ID `campaign-20261107T074822Z-p39608-0`, starting turn 12, `closed` status, eight consecutive snapshots, 56 faction rows and 180 base rows. Independent checks of the uploaded HTML and both CSVs found no missing or duplicate turns, all seven factions represented each turn, and zero mismatches among faction/base population, world-base totals and native-plus-faction vehicle totals. All 16 bases recorded at MY 2111 persist at MY 2112 with identical names, coordinates and owners; research targets and accumulated progress also continue. Together the two sessions cover MY 2101–2119 without overlap. This is **positive Windows evidence for save/reload/continue**, with game execution reported by the user and state continuity independently supported by exports; it is not a deterministic control-run or verified automatic campaign lineage. **Still pending:** unchanged gameplay/RNG, write-failure paths, early victory/incomplete turns, `debug.txt` regression and long-game overhead. Menu-loaded saves have no reliable `source_save` identification in this first slice; loading a save currently starts a new campaign folder rather than automatically resuming an earlier one. In-progress or incomplete terminal turn snapshots and AI decision/event streams are not yet implemented. See [TEL-001](WORK-QUEUE.md).
+
+## TEL-001 GUI campaign picker — source/test scope (7 November 2026)
+
+The unmerged TEL-001 branch adds `tools/Campaign Analyzer.pyw`, intended to sit next to `tools/campaign_report.py` in the installed game's `campaigns/` folder. A Tkinter picker lists each campaign/session, player faction, MY span, colony/unit totals, status and update time. It can regenerate/open a report, open an existing report or open the campaign folder. The CLI report path remains supported.
+
+**Synthetic acceptance:** Python syntax check, preview of human and year/turn metadata, last-committed-turn filtering, truncated JSONL tail, missing/invalid metadata and empty sessions. **Windows user smoke (7 November 2026):** user reports the installed GUI works correctly, after copying the launcher and backend to the game `campaigns/` folder. This establishes general Windows GUI launch/use, not a comprehensive test of every picker control or malformed-recording path. No new native game hooks are involved.
+
 ## PR #4 closeout report and user-selected deferrals — 7 November 2026
 
 **Further user clarification:** the earlier repeated Windows Develop gameplay tests already used **3/4/4 nutrient/mineral/energy limits throughout**, including save → quit → reload → turn advance. The user also inspected **multiple fresh map seeds for geological deposit sizes and mineral-resource overlaps** and saw no Nessus Canyon. These count as the requested *qualitative* checks and **do not need another manual run solely because per-seed measurements were not retained**. Canyon absence itself is not sufficient to test the removal, as the old `canyon=0` was already the default; the generator/parser/yield removal and reserved-slot invariant are independently source/CI-checked.
@@ -252,3 +697,414 @@ Record the exact unit prototypes, reactors, morale, tile, year, attack method, e
 [PR #4 Windows workflow](https://github.com/Necaladun/thinkerNeca/blob/feature/minor-terrain-generation-migration/.github/workflows/build-windows.yml): Develop and Release compilation (separate jobs); synthetic tests for the local-input [sprite atlas builder](technical/sprite-atlas.md), old legacy placeholder and source masks; source/INI/slot-10/Mesa contracts and synthetic save reader. **The artifact distributes DLL and EXE only**, not user/original-game art or the old placeholder PCX.
 
 Record the commit, effective INI including overrides, map/save coordinates and year, screenshot, PCX source and `minor_terrain_render.log` when investigating remaining problems.
+
+
+## AUTO-002 native Council headless implementation — 8 Nov 2026
+
+**On unmerged draft PR #11; no Windows game acceptance at implementation.**
+The uploaded 32-bit `terranx.exe` was statically disassembled. The guarded
+native calls are `0x4284A9`/`0x428542` (Council announcements),
+`0x428115`/`0x42828A` (human vote-sale prompt),
+`0x4284CA` (CouncWin_init tracing), and the six-byte virtual Council
+modal call at `0x4282F2`. The installer checks all sites before writing any.
+A mismatch leaves native Council unchanged. Eligibility requires positive
+all-AI simulation turns, suppression enabled, single-player, zero human bits,
+living observer and ongoing game. Native human and opt-out paths delegate.
+
+**Windows acceptance:** using `Autosave_2181(1).sav` and the same
+`terranx.exe`, run all-AI/telemetry with suppression. Before touching any
+Council modal collect `council.jsonl`; check paired
+`call_council` and `CouncWin_init` entry/exit and either
+`headless_native_resolution` or a documented `modal_fallback`.
+Confirm native Governor and per-faction ballot values, energy/tech balance,
+session progress for at least five subsequent turns and same-build SAV
+reload. Later reproduce Lal's interactive vote bribe; ensure there is no
+fabricated payment or tech gift. Repeat with normal-human and suppression-off
+settings, other Council proposals, veto, Supreme Leader and repeat elections.
+The headless path currently only attempts Governor elections and **may still
+encounter presentation inside native resolution**. A passing CI build is
+not sufficient to claim correctness, parity or absence of future blockers.
+
+
+### AUTO-002 Council patch-startup regression (8 November 2026)
+
+**Actual user Windows result:** CI-green trial `d539c7d1` aborted at
+game startup with a generic EXE-version patch error near
+`0x004282F2`. No Council runtime evidence was gathered from that DLL.
+The attached `terranx(5).exe` was inspected using PE32 objdump: the
+native virtual call at `0x4282F2` is `FF 90 E4 00 00 00` (indirect
+call via vtable), not a direct or FF15 call supported by `write_call`.
+The new patch uses a byte-verified six-byte `write_bytes` replacement
+(`E8 rel32 90`) and structural regression explicitly forbids
+`write_call(0x4282F2)`.
+
+Static disassembly also shows `CouncWin_init` can call
+`CouncWin_set_vote` at `0x4282DD` *before* the modal call following
+an accepted native vote-buy offer. The former headless wrapper might replay
+the vote. The corrected wrapper distinguishes already-resolved outcome,
+existing unresolved observed ballot (native fallback), and missing observed
+ballot. In the latter case only, it computes the observed faction's
+`council_get_vote` result and passes it once to native
+`CouncWin_set_vote`, then checks whether native resolution completed.
+Test actual Windows **startup first**, then MY2181 no-click Council,
+Governor/ballots/credits, ordinary player voting, unexpected modal fallback,
+longer AI continuation and same-build save/reload. CI cannot prove these.
+
+
+### AUTO-002C MY 2195 all-AI Governor election reproduction — 8 Nov
+
+**Observed in-game with Council build bba52299:** first Council election
+triggered after Gaia's Stepdaughters completed the Empath Guild in MY2195,
+during faction 1's upkeep. The uploaded `council.jsonl` contains 1,508
+events for MY2101–2195: 1,505 routine call_council records and
+`notice_suppressed: CALLSCOUNCIL`, `CouncWin_init: enter arg1=0 arg2=1`,
+`modal_fallback: observed_vote_recorded_but_unresolved` at MY2195;
+there is no CouncWin_init exit event before the user copied logs.
+All-AI mask 0, observer=1, Governor=-1. `ui_notices` confirms
+`empathGuild` movie/help and `COUNCILOPEN` were suppressed on the
+same turn. Uploaded `Autosave_2194.sav` and `Autosave_2195.sav` are
+pre/during-turn replay assets; do not infer Council outcomes from them.
+
+**Native source/binary finding:** `CouncWin_init` at
+`0x4278E6..0x427974` precomputes `faction_vote[8]` for
+all nonhuman factions using native `council_get_vote`, three passes.
+The prior wrapper incorrectly interpreted nonzero observed ballot as an
+unresolved anomaly. The single-player `CouncWin_set_vote` path calls
+`CouncWin_make_resolution(win,1)`; this returns 0 without processing if
+any living faction's ballot is 0, or completes/tallies the vote and sets
+nonzero outcome. The revised experimental hook calls
+`CouncWin_make_resolution(win,1)` once on Governor-only all-AI
+elections and falls back to the native modal on incomplete state.
+It does NOT call `council_get_vote` or `CouncWin_set_vote` again.
+Test startup, no-click MY2195 resolution, ballot totals, final Governor,
+subsequent AI turns, same-build reload, ordinary human Councils, repeat
+elections, vote-buying offers and other Council proposals. CI success is
+not gameplay acceptance.
+
+
+### AUTO-002 user smoke: Council succeeded; operator keys not observed — 8 Nov 2026
+
+**Actual Windows test of `ba5c6d82`:** `council(1).jsonl`
+(first records MY2194, last MY2212) records MY2195 Governor election:
+`notice_suppressed CALLSCOUNCIL`, native
+`headless_native_ballots` `votes=-3,1,-3,-3,-3,1,-3,7`,
+`headless_native_resolution native_make_resolution=1 outcome=1
+governor=1 pending=0`, `CouncWin_init exit`, and
+`notice_suppressed GOVERNOR`. Native Council UI flashed and closed
+automatically. Governor remained 1 through subsequent recorded turns.
+This validates the first Governor election *for this save* only.
+
+**Separate regression / open cause:** user attempted F9/F10 during the
+continued all-AI session, but it advanced more than 10 years; user
+terminated process externally. In `ui_notices(9).jsonl`, only
+`autosim STARTUP`/`SETTINGS`/`confirmed` appear; neither
+`OPERATOR_STOP`, `PAUSE`, `TURN_LIMIT` nor `SAVED` was emitted.
+Code samples physical keys only while the game process owns foreground,
+and keyboard polling/ModWinProc previously recognised only
+`WM_KEYDOWN`, not `WM_SYSKEYDOWN` (used by Windows for F10).
+Follow-up source now recognises both message classes and logs
+`autosim_input` physical/queued/winproc latches and
+`BOUNDARY_REQUEST` consumption. Need Windows evidence distinguishing
+F9 focus, quick tap timing, F10 system-message handling and game-native
+modal capture. Verify `autosim-stop.txt` (game EXE directory) triggers
+Save Game -> menu after a completed faction cycle with the game
+out of foreground. Do not treat source structural tests as runtime proof.
+
+
+### AUTO-002C all-proposals headless Council trial — 8 November 2026
+
+**Implementation on PR #11, native Windows gameplay not yet validated for
+non-Governor proposals.** The previous `ba5c6d82` MY2195 Governor election
+is user-tested, with native resolution=1, Governor faction 1, and AI
+continuation. New source widens its valid `CouncilProposal` IDs to all
+stock 0–9. Static binary inspection of the uploaded `terranx.exe` shows
+`CouncWin_init` computes nonhuman ballots without testing whether the
+proposal is Governor; `CouncWin_make_resolution` has different election,
+ordinary-motion and veto branches and calls the native Council action.
+Unknown proposal IDs and zero/incomplete native ballots retain the native
+window. `council.jsonl` before/after records now include proposal name,
+weighted ballots, pass-count delta, GameState/VictoryType snapshot.
+
+**Acceptance still open:** for each stock proposal family confirm no-click
+vote and correct winner/pass/fail/veto; inspect ProposalPassCount, trade-
+pact/Charter/sea-level side effects, Council eligibility/cooldowns, real
+vote bribery/credit/tech transfers, repeated elections and same-build
+save/reload. In particular Supreme Leader may declare native victory and
+stop at existing endgame UI; this is **not a voting failure** and victory
+handler changes are expressly postponed. Verify normal-human/opt-out and
+unknown-state fallback. Passing x86 CI establishes compilation and source
+contracts only, not Council correctness.
+
+
+## AUTO-LAUNCH Stage A — Windows pre-game launcher (8 November 2026)
+
+**Source on draft PR #11; WinForms/gameplay Windows acceptance pending.**
+`Run Automation.bat` launches built-in Windows PowerShell WinForms,
+not another game executable. It offers native New Game or direct load of
+an existing .sav, 1–100000 AI turns, campaign display name, telemetry,
+audited notice suppression and fast presentation. Defaults are in
+`automation.ini`; a separately created immutable per-launch profile lives
+in `automation/profiles/`. The same thinker.exe/terranx.exe pair inherits
+only the run-profile environment variable; the DLL validates the profile,
+rejects unknown keys, and disables legacy automation INI flags in an
+ordinary thinker.exe launch. The profile file is fingerprinted in the
+session manifest. A bad automation SAV exits without silently generating
+a different game. Explicit launcher options override saved-campaign
+sidecar options after a user approves rejoining telemetry.
+
+**Windows acceptance still required:** pre-game GUI display and input;
+paths with spaces, new and existing save, all-AI startup confirmation,
+manual handover from a human save, F9/F10/stop-file controls, ordinary
+human thinker.exe startup and its save/preferences, inaccessible/corrupt
+SAV fail-closed behaviour, name/INI profile persistence, and session
+manifest/profile fingerprint. The CI PowerShell `-SelfTest` checks INI
+roundtrip/unique snapshot without opening GUI, not WinForms display or
+actual game environment propagation. Stage B save routing/ZIP, Stage C
+automatic new world and multi-run scheduling, terminal victory processing
+and observed-faction handover on elimination are **not implemented**.
+
+
+## AUTO-NULL / AUTO-NEW — Windows acceptance checkpoint (8 November 2026)
+
+**Source audit and Windows CI, not game runtime:** draft PR #11 adds
+seven x86 native drawing-entry gates with exact supported-executable
+prologue preflights and a preserved executable gateway per entry. The
+gates skip map/tile drawing *only* when an all-AI Null Rendering phase
+is active; they do not replace AI algorithms, unit visibility or
+`synch_bit`/fog state. Unknown render preimage disables Null Rendering
+rather than applying partial hooks. Avoid gating `do_all_draws`:
+the native routine contains task/event-loop work and must keep pumping.
+A source test checks boundaries and controls. Windows run, comparison
+against fast mode and native game-state parity remain required.
+
+**Console monitor:** per-run `automation/profiles/<id>.ini.status` updated
+at phase/faction/turn transitions, while `*.command` conveys SHOW,
+NULL, STOP or PAUSE to the next processed phase. PowerShell remains
+running after the short-lived Thinker launcher exits and resolves the
+actual terranx process ID from the game's status. A threshold of
+30–60 sec (45 default) with no *observed phase change* raises a warning,
+not proof of a freeze and NEVER terminates the process. G opens the
+game window; R requests a render restoration and exposes the window;
+N restores Null; P screenshots the current native window; S/Space
+request stop/pause at a completed cycle; Q closes only the console.
+If the game main thread is already blocked, the render command cannot
+be consumed until it resumes; the window/screenshot may contain a stale
+or blank image. Unknown `X_pop` paths restore native presentation
+before displaying the modal, but unaudited native/NetMsg paths remain
+possible (user specifically observed an orbital/satellite interception
+failure popup). Do NOT claim full popup coverage.
+
+**New Game:** launcher tab selects difficulty, map size, ocean/erosion/
+cloud/native-life and initial observer. Native `map_menu(1)` invokes
+`size_of_planet`, `custom_planet` and quick `config_game(1)`; code
+clears the human mask before `setup_game` so the observed faction
+uses normal AI starting-pod allocation and skips the human-only
+`planetfall`. It suppresses the quick-start preferences writes,
+does not enter Scenario Editor/ALL mode and checks living view owner,
+zero human bits and no editor/omniscient flags before simulation.
+The validated launcher click replaces the in-game START dialog only
+for generated new worlds. **High-risk Windows acceptance:** inspect
+all factions' starting pods/bases, difficulty/credits/tech, non-observer
+parity, map seed and settings; first turn, 100-turn run, F10, saves,
+same-build reload, normal thinker.exe unchanged. The explicit faction
+roster and fixed seed are not yet available in this GUI. Native world
+creation can still have untested UI coupling despite compiling.
+
+
+### AUTO-LAUNCH premature console exit — diagnostic correction (8 Nov 2026)
+
+**Windows user-reported:** choosing both Load SAV and New Game showed a console
+that closed without useful explanation and produced no new campaign.
+Review of code established: the batch automatically exits after PowerShell
+returns; the previous monitor did not preserve a diagnostic transcript,
+and `telemetry_begin_session()` creates `campaigns/` only after game
+initialisation. Absence of a campaign therefore supports an *early exit*,
+but is NOT evidence by itself of a game renderer or generator bug.
+
+Draft PR #11 now has unconditional batch exit-code/pause; independent
+timestamped `automation/logs/launcher-*.log` started before the GUI,
+run-profile, thinker.exe and terranx PID diagnostics; and full
+PowerShell exception/stack output. If thinker.exe exits without a
+terranx PID handoff, the monitor explains that specifically.
+A `windows-latest` CI job executes Windows PowerShell 5.1 GUI
+control construction with `-GuiSelfTest` without needing a game
+binary; this does NOT run WinForms ShowDialog or SMAC/X itself.
+
+**Open acceptance:** capture the user's next Windows diagnostic log;
+determine whether failure was launcher, injection, DLL profile
+validation, game setup or native renderer; verify Load SAV and New Game
+start and create campaign telemetry when enabled; normal thinker.exe
+continues unchanged. Preserve any relevant `debug.txt` from the
+installation. No diagnosis of the original early termination yet.
+
+
+### AUTO-NULL early native exit — 9 November 2026
+
+**User's two real Windows launch logs (new and loaded SAV):** both
+PowerShell WinForms and `thinker.exe` started successfully, a child
+`terranx.exe` PID was written, then the process exited before the
+first `<profile>.status` heartbeat or `telemetry_begin_session`
+(the latter is why no campaign directory was created). Exact game
+exit code unavailable in the monitor log. Both launches used the
+current Null Rendering-default launcher unless the user changed its
+presentation option; the run profile was not uploaded.
+
+**Confirmed source-level defect, strong candidate for both crashes:**
+`patch_setup` previously called `VirtualProtect(AC_IMAGE_BASE,...,
+PAGE_EXECUTE_READ)` and *afterwards* called
+`autosim_install_null_render_hooks()`. That function uses
+`write_jump` to write directly into the game image without changing
+page protection. If native prologue preflight passed (as checked against
+the uploaded stock `terranx.exe`), this write can trigger an access
+violation before the first game frame. Moved the guarded hook install
+**before** read/execute protection is restored, and added a regression
+asserting the page-protection order. This is source diagnosis plus native
+binary disassembly, **not yet a Windows runtime correction**. Require
+new user test for loading a SAV in Null and Fast modes, New Game,
+status/telemetry, monitor and normal human startup. Do not merge pending
+actual Windows confirmation and all other native acceptance.
+
+
+### AUTO-002 initial automatic New Game Windows acceptance and follow-up (9 Nov)
+
+**User-reported Windows passes:** the explicit automation launcher creates a
+new game and enters all-AI progression without in-game setup or human action.
+A late-game loaded SAV also progressed MY2341–2354 with the external monitor
+reporting `null`, and with a substantial subjective speed improvement. The
+loaded game's partial visual output is not a claim of complete rendering
+elimination. No deterministic state or AI visibility comparison yet.
+
+**User-reported failures:** the new game displayed full graphics, console
+R/N/Q commands were inaccessible until switching focus away from SMAC,
+and Save & Exit started *another* new game instead of stopping. Source
+shows `ControlTurnB=1` returns to the outer game loop, which still had
+`autosim_auto_new_game=true`; a fix now exits launcher-origin game
+execution after `control_turn()`. The X_pop/X_pops wrappers were setting
+`autosim_null_phase=false` to show an actual native popup but never
+restored it after the popup returned; seven wrappers now scope restoration
+using RAII, without altering native choices or suppression policy.
+Per-run status exposes `configured_render`, `null_phase`,
+`null_override` and effective `render`. The external monitor attempts
+to foreground its console once on first live AI processing, but Windows
+foreground policy can deny this and manual Alt+Tab remains the fallback.
+All corrective changes are **source/CI only until next Windows run**.
+
+**Next native checks:** create new game with Presentation explicitly Null,
+verify status `configured_render=2 render=null` across turns, trigger
+known and unexpected popups and check the phase is restored, test R/N
+with console focused and verify status transitions, press Save & Exit
+and ensure the game exits with no automatic new map, inspect named SAV
+and session closure, reload using the same build. Then recheck ordinary
+human `thinker.exe` and loaded SAV, and inspect data parity when available.
+
+
+### AUTO-NULL: new-game Null setting and console controls confirmed (9 Nov 2026)
+
+User-provided 100-turn `launcher-20261109-003711-5794f310.log`:
+new game progressed MY2102–MY2200 with `configured=2`;
+`R` queued at turn 20 changed live status to `restored` by turn 23;
+`N` queued at turn 40 changed it back to `null` by turn 42;
+more R/N changes were reflected again through turn 80. Thus actual
+control-file propagation and native toggles worked despite the user
+seeing **no apparent graphical difference** and continued complete map
+rendering. The monitor's 45-second warning occurred at the known
+operator-dialog boundary because the user deliberately took a break;
+this was genuine lack of progress and should **not** be silenced.
+
+Source examination: the existing seven detours gate map/tile draws but
+`Win_update_screen` at 0x5F7320 is another native presentation path
+that walks Windows and copies backing buffers. Raw uploaded stock
+`terranx.exe` binary: 0x5F7320 begins exactly
+`A1 30 7B 9B 00` (mov eax, [0x9B7B30]), a complete five-byte
+instruction suitable for trampoline preservation. Draft PR #11 now
+preflights and detours that entry as an eighth gate and records
+cumulative actual `draw_skipped/draw_forwarded` and
+`screen_skipped/screen_forwarded` counts into the live run-profile
+`.status` and external console. `do_all_draws` and message processing
+remain native. This is **source/binary analysis, not Windows acceptance**
+of the eighth detour or AI-state parity. A screen-present pass may
+perform GUI-specific bookkeeping, so test stalls/UI restoration/menus
+as well as visual suppression, not just turn throughput.
+
+Next Windows acceptance: new game and existing SAV with Null enabled,
+five completed turns, verify nonzero skipped counts, determine whether
+the screen actually stops refreshing, R to resume and N to suppress
+again, operator dialog still renders and idle warning remains, Save &
+Exit does not silently launch a new game, AI state/visibility and
+same-build save/reload. If skipped counts remain zero or the display
+still animates, inspect native callers and alternative present paths
+rather than altering fog-of-war or AI view.
+
+## AUTO-OBS Stage 1 — observer-neutrality validation plan (9 November 2026)
+
+**Evidence:** source inspection only (draft PR #11); no gameplay code modifications, build, controlled runtime A/B or same-build reload test performed in this audit. See \`project/technical/telemetry-automation.md\` OBS-01–14 for source locations and risk classification. Confirmed source branches are **not** proof that each is reachable in active Windows unattended play.
+
+1. **Start invariants:** on explicit New Game, each faction slot 1–7 is AI controlled (human bitmask 0), every faction uses computer allocation and Thinker/AI turn driver, and the selected observer remains valid. On loaded saves, record and validate the preexisting mask separately; do not claim automatic AI handover if any human bit remains.
+2. **Rules at creation:** with the same fixed seed, roster, faction identities and explicit game options, vary only the observer, including alien versus non-alien. Compare \`GameRules\`, blind research, Intense Rivalry, map/world flags and RNG state **before** faction setup. OBS-01 predicts different flags in the present source; do not treat different seeds/maps as evidence.
+3. **Same-save control:** fork a single fresh same-build save with identical game world and AI state, choose two different **living** observer factions, ensure no human bits are introduced, run an identical number of complete cycles. Trace per-faction \`faction_upkeep\` and \`mod_enemy_turn\` begin/end, selected research, orders, cargo disembark/wake, base capture, first Mind Worm and monolith use. Record RNG state and phase timing for *every* event, not sampled console lines.
+4. **Compare actual simulation:** normalized per-turn world hash (units, bases, flags, tech, credits, diplomacy, Council/victory, RNG), excluding only proven presentation-only data. On first divergence, save a before/after reproduction and identify the responsible callsite. Do not mask unexpectedly divergent faction intel/story/game flags without classification.
+5. **Elimination/victory:** eliminate current observer while at least two factions remain, verify it is an ordinary faction defeat and simulation continues with another observer; separately test actual economic/diplomatic/conquest/alien/transcendence/time-limit victory. Preserve terminal outcome winner attribution rather than observer-relative \`VIC_*_LOSS\` labels.
+6. **Regression:** ordinary human (including human Progenitor), suppression off, different difficulty levels including below \`limit_project_start\`, stable same-build save/reload, and low-risk source/static tests. Native Windows x86 and loaded runtime hooks require actual in-game evidence.
+
+No measured A/B results have been obtained. A compile or source contract passing will not settle whether observer changes the simulation.
+
+## AUTO-OBS Stage 2 — zero-human rules acceptance (9 November 2026)
+
+**Evidence:** source audit only on draft PR #11; no new gameplay edits, builds, native Windows comparative tests or verified installed INI override. Technical findings and classification are `project/technical/telemetry-automation.md` ZH-01–12.
+
+1. **Two legitimate presets:** at global difficulty index 3 (Librarian) and 5 (Transcend), record `human_mask`, every faction's `diff_level`, `cost_factor`, revised AI tech cost, content-pop allowance, AI bonus support and actual facility maintenance. Expected distributed-profile baseline: respective cost factors 10/7; tech factors 100%/76%; extra support 0/+1; maintenance refunds 0 / 2/3; content-pop AI allowance 3/3. Faction traits/SE bonuses can change totals independently; verify `thinker_user.ini` overrides if present.
+2. **No-human expansion:** with distributed `expansion_limit=50`, `expansion_autoscale=1`, demonstrate new colony eligibility at 49+pods and non-eligibility at 50+pods for all AI factions. Use a separate human-present reference that exceeds 50 bases to confirm the original human-relative scale path. This is a design decision, not a promised fix.
+3. **Size-one base capture:** normal military capture, probe capture, recapture and objective exception scenarios with size-one population; compare zero-human `FactionStatus[0]` to human-visible/human-not-visible references and verify captured-versus-destroyed outcomes. Do not conflate casualties caused earlier during combat with the final capture path.
+4. **All-AI diplomacy and near-victory:** trace `climactic_battle`, `at_climax`, `great_satan` and actual victory flags for near Corner Market, Supreme Leader and Ascent. Source predicts human-threat response functions stay off even if an AI actually wins. No blanket new AI strategy behaviour is approved yet.
+5. **Human-labelled flags:** inspect `PFLAG_EXT_SHAMELESS_BETRAY_HUMANS` assignment and use across newly generated Librarian/Transcend worlds, and `PFLAG_TEAM_UP_VS_HUMAN`/`PFLAG_COOP_WITH_HUMAN` after actual human→AI control transfer and same-build save/reload. Isolate any stale human-only assumption; do not infer the observed AI gets a human flag.
+6. **Invariants:** all seven AI slots receive the intended global-difficulty class without an observer-only bonus, while genuine faction characteristics and native life remain distinct. Test identical save with two different observers, normal human game and suppression-off mode. The alien-observer global-rules mutation OBS-01 and Stage-1 game-state/RNG risks must be corrected/tested separately before declaring full neutrality.
+
+**Scope:** focus game automation acceptance on Librarian and Transcend. Below-Librarian `limit_project_start` / zero-human prerequisite issue remains documented but deferred. Special single-human scenario victory rules are not a fresh-game acceptance target.
+
+## AUTO-OBS Stage 3 — implementation acceptance and evidence (9 November 2026)
+
+**State:** implementation on draft PR #11; source contracts and CI cannot establish Windows game correctness. No new Windows in-game Stage-3 acceptance or same-build save/reload has been performed.
+
+1. **Profile and expansion:** GUI defaults must emit explicit `unlimited_expansion=1`, and old profiles must fall back to 0. Verify eligibility at 49/50/51 bases+colony units with toggle on/off and both Librarian/Transcend. Scenario no-colony and engine-wide base limit remain, while ordinary human games and distributed Thinker INI remain unchanged.
+2. **Observer neutrality:** run identical same-SAV zero-human A/B with two different living observers (including aliens), compare `GameRules`, shared RNG state, research choice order, cargo/monolith, Mind Worm and project-intel flags, captures and diplomatic/victory state. Locate first divergence, not just differences in final outcome. Native untouched callsites remain unproven.
+3. **Observer elimination:** eliminate the watched AI at multiple phases. Native faction death should complete and camera should move to next living slot 1–7 without changing human mask or ending world. Test last-humanless survivor, no survivors, surrendered allies, post-elimination continuation and reload.
+4. **Pact popup:** create and end pact through `pact_ends` and native `enemies_unpact`. Both unit withdrawals and pact-state changes must remain; no `ENDPACT1/2/3` screen in launcher AI mode even with notice suppression disabled. Normal human pact screens remain.
+5. **Victory and outcome:** test conquest solo/coalition, Governor/Supreme Leader, Corner Market, Ascent, alien Subspace and time-limit. Confirm `result.json` status/reason, raw type, survivor and winner evidence, initial/final observer, last committed versus terminal turn, partial cycle; no blocking endgame screens or second game on exit.
+6. **SAV/telemetry integrity:** no final save is attempted mid-faction, since safe native serializer state at that boundary is not proven. The result must say `not_attempted_partial_cycle` and never invent a completed turn. Previously completed `turns.jsonl`/`bases.jsonl` and autosaves remain valid; confirm same-build ordinary save/reload.
+7. **Regressions:** vanilla normal-human and human Progenitor, loaded simulation, three render modes, suppressed-notices off, x86 Develop and Release, performance timings in actual engine milliseconds, and game progression beyond 50 bases.
+
+**Source coverage:** new `tools/test_autosim_stage3.py` and updated launcher, pact and Mind Worm tests run with Windows CI. Only native Windows evidence can close in-game acceptance.
+
+## AUTO-OBS victory-pause follow-up — native acceptance (9 November 2026)
+
+**User Windows acceptance update (9 November 2026, later draft PR #11 build):** the victory pause appeared as intended after an economic victory; the operator could select Continue and subsequent play worked in the tested session; a save loaded successfully and returned to the victory state. This is **reported actual Windows runtime evidence**, not merely compilation. Exact binary SHA, number of post-victory cycles, save origin/name, and whether resumed-from-save play continued afterward were not supplied, so do not claim those separately tested. Earlier University → Morgan → Peacekeepers camera handovers remain independent prior-build user reports. The reported successful reload narrows, but does not eliminate, the mid-cycle SAV/load risk across other win types and situations. The unverified matrix items below still apply.
+
+
+
+**Prior-build Windows observation (user report, not new build verification):** genuine Hive economic victory hit MY2304 turn 204 (SAV at MY2303 had `corner_market_turn=204`), and automated controller exited without prompting. Observed faction handover was reported as University → Morgan in MY2254, then Morgan → Peacekeepers in MY2261; no human-control bits. The MY2303 autosave is a preceding-turn recovery point, **not** a terminal checkpoint.
+
+**New source implementation:** explicit Victory pause modal, preserved outcome, transactional Save & Exit/Save & Continue, Continue AI past victory, Take Control, Exit without Save, append-only `victories.jsonl`, and launcher terminal-state awareness. Native economic-victory pause, operator continuation and save-to-victory reload have now been user-tested in one Windows session; other options, win types, and longer continuation remain untested.
+
+1. **Reproduce Hive Corner Market:** start from MY2303 SAV under same build if source/loaded-save invariants permit; trigger economic win at MY2304. Game must remain open in modal showing true winner, victory kind, year and retained observer. No spurious `GAMEOVERMAN`, no background progress, no driver exit before explicit choice. Close/Escape must not silently dismiss mandatory terminal pause.
+2. **Check saves:** Save & Exit writes uniquely named SAV atomically and records path in `result.json`; failed name/IO/overwrite must leave victory modal and prior file untouched. A reported victory-state save loaded and returned to the victory; verify its exact saved-game path/build SHA, what happens upon choosing Continue after **reload**, and other mid-cycle terminal conditions before classifying all victory saves safe. Also test Save & Continue, reload the produced checkpoint, and compare first full-cycle state; test choice with telemetry disabled. Do not label this safe solely because a SAV was written.
+3. **Continue AI:** Continue AI clears only termination control flags, preserves native winner history, writes one victory event and resets new turn quota at next full-cycle boundary, then processes at least two additional turns without reopening the same economic win. Inspect `turns.jsonl` numbering and initial `result.json`; `victories.jsonl` remains append-only. A *second* actual later victory should append a second event, update latest result and pause again.
+4. **Take Control:** after victory, restore human control of a living camera faction; no duplicated faction upkeep or automatic new game, and normal single-player console must resume. After extinction (no living factions), continuation actions must be hidden.
+5. **Other victory types:** conquest/coalition, Supreme Leader, alien Subspace, Transcendence and time-limit. Specifically, continuing after retirement must not re-trigger an identical time-limit pause every following year. Confirm winner attribution can be `unresolved` rather than guessed.
+6. **Console input:** in a live simulation with console focused, `N` sends `NULL` (re-enables Null Rendering), `R` sends `SHOW` (restores rendering), `Space` sends `PAUSE` (AI pauses at next completed full cycle). `N` does *not* pause AI. Compare `null_phase`, `null_override`, `render` and screen/draw skip counters in monitor status before/after commands; no false 45-second stall warning while victory dialog is intentionally open.
+7. **Regression:** standard human games, no-launcher sessions, loaded SAV, suppression off, user-requested ordinary pause at complete turn, stage-3 pact/observer behaviour, x86 Develop and Release, and same-build save/reload. Source-only contract checks must not be presented as game validation.
+
+## AUTO-LOG — unified launcher, timed AI turns, campaign SAV archives (9 November 2026)
+
+**Implementation status:** source changes on unmerged draft PR #11; Windows build/static checks are not gameplay verification. The user's existing long-world run uses an earlier build and cannot verify these changes retrospectively.
+
+1. **Profile isolation:** defaults have `timing_enabled=1`, `archive_interval=25`, seven unique vanilla faction IDs. Windows PowerShell 5.1 `-SelfTest` round-trips every field; `-GuiSelfTest` constructs all six tabs and seven roster selectors. Profiles without new keys retain unchanged native roster and no added archive/timing overhead. Ordinary Thinker without launcher remains untouched, and normal INI files are never rewritten.
+2. **Roster:** generate games with all seven original factions, all seven SMAX factions and a mixed roster; confirm distinct slot-to-MFaction filename/search-key mapping, actual art and ability/AI rules, zero human bits, and same observer regardless of roster. Reject duplicates before launching. SMAX-only factions in original-game mode must fail visibly. Loading a SAV with different factions must not mutate its saved roster or faction identity.
+3. **Clock integrity:** `timings.jsonl` every world upkeep, faction upkeep and AI turn, and full-cycle durations; compare against external elapsed timer with logging on/off. UTC millisecond timestamps are monotonic-enough for chronology but wall-clock may jump; `elapsed_ms` uses tick differences. Include tiny/huge worlds and high unit count, check upper-tail latency, time in Council/UI, overall throughput and IO time. Never confuse cumulative nested phase timings with CPU time.
+4. **Separate event streams:** `ui_notices.jsonl`, `council.jsonl` include UTC timestamps with correct turn/year/faction. `manifest.json` records actual roster source filenames, difficulty, profiles and config fingerprints. `turns.jsonl`, `bases.jsonl`, `result.json` remain backward-readable; no fake completed turn for a terminal victory.
+5. **Full-cycle SAV:** at 0/5/25 cadence, assert only whole-cycle checkpoints are written to `campaigns/<id>/sessions/session-NNN/saves/`, filenames uniquely tied to turn/year and listed in `checkpoints.jsonl` with fingerprints; no automatic mid-faction save. Load a checkpoint in the *same* Develop build and continue 2+ turns. Ordinary native `saves/auto` and named manual saves remain unchanged. Named operator saves and their sidecars are copied to the session archive. Ensure failures do not damage prior SAVs; verify Ironman has `skipped_ironman_rng` and no extra `game_srand`.
+6. **ZIP + integrated reports (supersedes separate Python GUI):** install Develop artifact over game without losing campaigns; open the **same launcher's** `Campaign tools & archive` tab, select/filter a specific session and generate/open `index.html`, `timings.csv`, `checkpoints.csv`; open existing report, change campaign root, export ZIP, extract elsewhere and verify manifests, report and SAV checksums. Check missing Python, missing/malformed campaigns, multiple sessions, canceled ZIP exporter, ZIP destination inside source, existing ZIP replacement and active-session warning. ZIP/report functions must not modify recorder source streams or stop game.
+7. **Long-run confidence:** 500+ turns on huge world with many units, archive every 25 turns, monitor actual SAV byte growth and CPU/disk overhead. Check no slow IO/corrupt file effects at turn boundary, no false UI hang, stable observer reassignment, economic/other victories and pause/continue, and same-world A/B RNG comparisons with/without timings/checkpoints.
+8. **Human regression:** all automation flags off, human game and normal saves unchanged; Develop/Release x86 compile and actual Windows gameplay distinct. SMAC-only setting continues rejecting SMAX roster explicitly rather than silently choosing replacements.
+
+**Evidence labels:** CI = compilation/structural/PowerShell GUI construction; source = path inspection; synthetic = fake JSONL test; user Windows = running actual game, with build SHA when known. Do not close AUTO-LOG until appropriate native acceptance evidence exists.
+

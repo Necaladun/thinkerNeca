@@ -1,5 +1,6 @@
 
 #include "veh_combat.h"
+#include "autosim.h"
 #include "artillery_damage.h"
 
 
@@ -1087,7 +1088,7 @@ void __cdecl planet_busting(int veh_id, int tx, int ty) {
         parse_says(3, Bases[base_id].name, -1, -1);
         int dist = map_range(Bases[base_id].x, Bases[base_id].y, tx, ty);
         const char* img = (dist > reactor_range) ? "astp_sm.pcx" : "baseobl_sm.pcx";
-        popp(ScriptFile, "PLANETBUSTER", 0, img, 0);
+        autosim_notice_popp(ScriptFile, "PLANETBUSTER", img);
     }
     for (int i = 0; i < blast_range; i++) {
         int nx = wrap(tx + TableOffsetX[i]);
@@ -1422,6 +1423,13 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
         }
         return value;
     }
+    // Preserve fast presentation for fights invoked outside normal AI order
+    // processing. Nested scopes restore the encompassing phase's preference
+    // state rather than disabling quick movement after a battle.
+    // Also used below by the existing scoped veh_scoot animation skip.
+    const bool fast_autosim_combat = autosim_fast_combat_active();
+    AutoScopedAutosimFastPrefs fast_presentation;
+
     // Fix: original code used DIPLO_COMMLINK instead of DIPLO_TRUCE to break_treaty
     if (is_human(faction_id_atk)
     && (*VehAttackFlags & 1)
@@ -1703,6 +1711,14 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
     } else if (*GamePreferences & PREF_BSC_DONT_QUICK_MOVE_ENEMY_VEH) {
         render_battle |= render_tile;
     }
+    // AUTO-002: this AI-only mode follows the already-existing non-observed
+    // combat presentation path. The full combat/damage/state code still runs.
+    // Visibility updates were historically embedded inside render_battle;
+    // preserve those separately at their original per-defender timing below.
+    const bool suppress_combat_presentation = fast_autosim_combat && render_battle;
+    if (suppress_combat_presentation) {
+        render_battle = 0;
+    }
     assert(veh_atk->x != veh_def->x || veh_atk->y != veh_def->y);
     assert(veh_atk->faction_id != veh_def->faction_id);
     assert(veh_atk->is_probe() || veh_def->is_artifact() || at_war(faction_id_atk, faction_id_def));
@@ -1745,6 +1761,11 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                 const int damage_limit = artillery_damage_floor(
                     veh_def->max_hitpoints(), reactor_scale, max_damage_percent);
                 damage_value = max(0, min(damage_value, veh_def->cur_hitpoints() - damage_limit));
+                if (suppress_combat_presentation) {
+                    // Original per-defender render path exposed the attacker
+                    // to the target faction before damage was applied.
+                    veh_atk->visibility |= (1 << faction_id_def);
+                }
                 if (render_battle) {
                     combat_type = 0;
                     *VehDrawAttackID = veh_id_atk;
@@ -1765,7 +1786,13 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                         combat_type = CT_CAN_ARTY;
                     }
                 }
+                const int defender_hp_before = veh_def->cur_hitpoints();
                 veh_def->damage_taken += damage_value;
+                telemetry_combat_exchange(veh_id_atk, veh_id_def, faction_id_def, "artillery",
+                    combat_type, offense_out, defense_out,
+                    veh_atk->cur_hitpoints(), defender_hp_before,
+                    veh_atk->cur_hitpoints(), veh_def->cur_hitpoints(),
+                    false, false);
                 veh_def->state |= VSTATE_HAS_MOVED;
                 if (veh_def->is_former()) {
                     veh_def->movement_turns = 0;
@@ -1817,6 +1844,10 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
     if (combat_type) {
         add_goal(faction_id_def, AI_GOAL_PREV_DEFEND, 2, tx, ty, -1);
     }
+    if (suppress_combat_presentation) {
+        // The normal render path updates defender knowledge here.
+        veh_atk->visibility |= (1 << faction_id_def);
+    }
     if (render_battle) {
         if (*MultiplayerActive && BaseWin->zoom_active) {
             render_base = 1;
@@ -1834,7 +1865,7 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
         StatusWin_draw(StatusWin, veh_id_atk, veh_id_def, offense_out, defense_out, combat_type);
         StatusWin->iface_state = 1;
         flush_input();
-        if (!shift_key_down() && !(combat_type & CT_CAN_ARTY)) {
+        if (!shift_key_down() && !fast_autosim_combat && !(combat_type & CT_CAN_ARTY)) {
             veh_scoot(veh_id_atk, x, y, offset, 1);
         }
         stack_put(veh_id_atk, x, y);
@@ -1939,6 +1970,9 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
                             } else {
                                 veh->home_base_id = iter_base_id;
                             }
+                            // Both owner and new home-base association are settled.
+                            telemetry_unit_owner_changed(iter_veh_id, capture_id,
+                                veh_atk->faction_id, "marine_detachment");
                             debug("battle_fight detach %s -> %s\n", veh_atk->name(), veh->name());
                             veh_skip(iter_veh_id);
                             iter_veh_id = veh->next_veh_id_stack;
@@ -2017,6 +2051,12 @@ int __cdecl mod_battle_fight_2(int veh_id_atk, int offset, int tx, int ty, int t
     int veh_def_last_hp = veh_def->cur_hitpoints();
     bool atk_alive = veh_atk_last_hp > 0;
     bool def_alive = veh_def_last_hp > 0;
+    // Log the resolved HP exchange BEFORE stack/base cleanup reindexes units.
+    // Victories and captures remain separately authoritative native events.
+    telemetry_combat_exchange(veh_id_atk, veh_id_def, faction_id_def, "direct_or_duel",
+        combat_type, offense_out, defense_out,
+        veh_atk_hp, veh_def_hp, veh_atk_last_hp, veh_def_last_hp,
+        def_has_moved != 0, marine_detach != 0);
 
     if (render_battle || render_tile) {
         draw_tile_fixup_2(x, y, tx, ty, 2, 2);
@@ -2408,24 +2448,24 @@ END_BATTLE:
     case 1:
         parse_says(0, m_atk->adj_name_faction, -1, -1);
         parse_says(1, get_noun(faction_id_def), -1, -1);
-        NetMsg_pop_2("VENDETTAREPORT", 0);
+        autosim_notice_netmsg2("VENDETTAREPORT", 0);
         break;
     case 2:
         parse_says(0, m_atk->adj_name_faction, -1, -1);
         parse_says(1, get_noun(faction_id_def), -1, -1);
-        NetMsg_pop_2("PACTATTACKED", 0);
+        autosim_notice_netmsg2("PACTATTACKED", 0);
         break;
     case 3:
         parse_says(0, get_noun(faction_id_atk), -1, -1);
         parse_says(1, get_noun(faction_id_def), -1, -1);
-        NetMsg_pop_2("PACTATTACKING", 0);
+        autosim_notice_netmsg2("PACTATTACKING", 0);
         break;
     }
     // Fix: avoid using expired pointers for vehicles
     unit_atk->combat_factions |= (1 << faction_id_def);
     unit_def->combat_factions |= (1 << faction_id_atk);
     if (interlude_base_attack) {
-        interlude(0, 0, 1, 0);
+        autosim_interlude(0, 0, 1, 0);
     }
     if (!atk_alive) {
         return 0;

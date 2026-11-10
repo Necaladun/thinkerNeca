@@ -1,5 +1,128 @@
 
 #include "gameturn.h"
+#include "autosim.h"
+#include "autosim_control.h"
+
+// Native Council setup and resolution remain unchanged. These hooks observe
+// the existing resolved ballots only; execution diagnostics are separate
+// automation notices. No AI voting function is invoked by telemetry.
+static void autosim_trace_council_call(const char* phase, int faction_id) {
+    if (!strcmp(phase, "enter")) telemetry_council_call_enter(faction_id);
+    else telemetry_council_call_leave();
+}
+
+void __thiscall autosim_trace_CouncWin_init(CouncWindow* win,
+    int faction_id, int faction_id_2) {
+    const int previous_governor = *GovernorFaction;
+    const unsigned previous_game_state = (unsigned)*GameState;
+    int passes_before[PROP_REINSTATE_UN_CHARTER + 1];
+    for (int i = 0; i <= PROP_REINSTATE_UN_CHARTER; ++i)
+        passes_before[i] = ProposalPassCount[i];
+    CouncWin_init(win, faction_id, faction_id_2);
+    telemetry_council_initialized(win, faction_id, faction_id_2);
+    if (win->proposal_type >= PROP_ELECT_PLANETARY_GOVERNOR
+    && win->proposal_type <= PROP_REINSTATE_UN_CHARTER
+    && win->proposal_outcome != 0) {
+        telemetry_council_resolved(win, 0, passes_before[win->proposal_type],
+            previous_governor, previous_game_state);
+    }
+}
+
+int __cdecl autosim_council_announcement(const char* filename, const char* label,
+    int a3, const char* pcx, fp_none callback) {
+    // These two exact native popp() sites discard the return value.
+    if (autosim_ui_active() && label &&
+        (!strcmp(label, "CALLSCOUNCIL") || !strcmp(label, "GOVERNOR"))) {
+        telemetry_record_council_event("notice_suppressed", MapWin->cOwner, label);
+        return 0;
+    }
+    if (conf.telemetry_enabled)
+        telemetry_record_council_event("notice_native", MapWin->cOwner, label);
+    return popp(filename, label, a3, pcx, callback);
+}
+
+int __cdecl autosim_council_human_vote_offer(const char* label, int flags,
+    Sprite* portrait, fp_none callback) {
+    // The native Council screen offers to buy the observed HUMAN's ballot.
+    // In an all-AI game there is no player to sell their vote. Omit that
+    // human-specific proposal; do not grant tech or transfer credits.
+    if (autosim_ui_active() && label &&
+        (!strcmp(label, "VOTEFORME") || !strcmp(label, "VOTEFORMETECH"))) {
+        telemetry_record_council_event("human_only_offer_omitted",
+            MapWin->cOwner, label);
+        return 0;
+    }
+    if (conf.telemetry_enabled)
+        telemetry_record_council_event("vote_offer_native_enter", MapWin->cOwner, label);
+    const int choice = X_pops_11(label, flags, portrait, callback);
+    if (conf.telemetry_enabled) {
+        char response[96];
+        snprintf(response, sizeof(response), "%s response=%d", label ? label : "", choice);
+        telemetry_record_council_event("vote_offer_native_exit", MapWin->cOwner, response);
+    }
+    return choice;
+}
+
+// Replace only the exact native six-byte CouncWindow virtual modal execution
+// call. Native CouncWin_init already computes all AI ballots, including the
+// observed AI, for every standard Council proposal. Reuse native
+// make_resolution without recasting votes; this preserves native election
+// thresholds, policy effects, vetoes and Supreme Leader decisions.
+// Unknown proposals/incomplete ballots retain the original modal window.
+int __thiscall autosim_council_modal_or_resolve(CouncWindow* win,
+    int a2, void* a3, void* a4) {
+    typedef int(__thiscall *NativeModal)(CouncWindow*, int, void*, void*);
+    NativeModal original = (NativeModal)(*(void***)win)[0xE4 / sizeof(void*)];
+    const int owner = MapWin->cOwner;
+    const int proposal = win->proposal_type;
+    // Observe outcomes from the native interactive modal as well. It is
+    // always the original call; telemetry does not alter voting or rendering.
+    if (!autosim_ui_active()) {
+        const int before = proposal >= PROP_ELECT_PLANETARY_GOVERNOR
+            && proposal <= PROP_REINSTATE_UN_CHARTER ? ProposalPassCount[proposal] : -1;
+        const int governor = *GovernorFaction;
+        const unsigned game_state = (unsigned)*GameState;
+        const int result = original(win, a2, a3, a4);
+        telemetry_council_resolved(win, result, before, governor, game_state);
+        return result;
+    }
+    if (owner <= 0 || owner >= MaxPlayerNum
+    || proposal < PROP_ELECT_PLANETARY_GOVERNOR
+    || proposal > PROP_REINSTATE_UN_CHARTER
+    || FactionStatus[0] || *MultiplayerActive || *PbemActive) {
+        char reason[128];
+        snprintf(reason, sizeof(reason),
+            "proposal=%d owner=%d human_mask=%08X multiplayer=%d pbem=%d",
+            proposal, owner, (unsigned)FactionStatus[0],
+            *MultiplayerActive, *PbemActive);
+        telemetry_record_council_event("modal_fallback", owner, reason);
+        const int result = original(win, a2, a3, a4);
+        return result;
+    }
+    // Native CouncWin_init already computes all nonhuman ballots. Do not
+    // call council_get_vote or CouncWin_set_vote again; the existing native
+    // resolution implements elections, vetoes and actual Council effects.
+    if (win->proposal_outcome != 0) {
+        return 0;
+    }
+    const int previous_passes = ProposalPassCount[proposal];
+    const int previous_governor = *GovernorFaction;
+    const unsigned previous_game_state = (unsigned)*GameState;
+    const int resolved = CouncWin_make_resolution(win, 1);
+    telemetry_council_resolved(win, resolved, previous_passes,
+        previous_governor, previous_game_state);
+    if (!resolved || win->proposal_outcome == 0) {
+        // Native returned incomplete. Preserve real modal; never invent a
+        // ballot, election, veto or outcome.
+        telemetry_record_council_event("modal_fallback", owner,
+            "native_resolution_incomplete");
+        const int result = original(win, a2, a3, a4);
+        telemetry_council_resolved(win, result, previous_passes,
+            previous_governor, previous_game_state);
+        return result;
+    }
+    return 0;
+}
 
 fp_1int sub_51E530 = (fp_1int)0x51E530;
 
@@ -21,10 +144,34 @@ void __cdecl control_turn() {
     int current_id = 0;
     int load_iter = 0;
     int skip_human_turn = 0;
+    AutoTurnDriver auto_driver;
+    TelemetryPhaseStamp cycle_timing;
+    int total_autosim_turns = 0;
+    int segment_start_year = *CurrentMissionYear;
+    int segment_start_bases = *BaseCount;
+    int segment_start_units = *VehCount;
+    bool segment_started = false;
+    bool startup_confirmed = autosim_auto_new_game; // validated launcher click replaces redundant in-game Start
+    // A game loaded mid-cycle resumes remaining factions first.
+    bool first_cycle_partial = (*ControlTurnMove != 0);
     RECT rc;
     Popup cur_popup;
     Popup_ctor(&cur_popup);
-    auto guard = cleanup_handler([&] { Popup_dtor(&cur_popup); });
+    auto guard = cleanup_handler([&] {
+        autosim_null_render_suppress(false);
+        autosim_monitor_progress("turn_driver_exit", 0);
+        Popup_dtor(&cur_popup);
+    });
+    // A manually saved terminal victory may be loaded before the regular
+    // zero-human preflight. Offer that saved outcome's control menu again,
+    // rather than falling into a non-existent human console or auto-exiting.
+    // Reloading mid-cycle is still provisional pending native Windows tests.
+    if (autosim_session_active() && (*GameState & STATE_GAME_DONE)
+    && !(*GameState & STATE_FINAL_SCORE_DONE)) {
+        telemetry_record_ui_notice("autosim", "LOADED_VICTORY",
+            "reopen_terminal_control");
+        if (end_of_game(0)) return;
+    }
     if (!*CurrentTurn && !*ControlTurnMove && is_human(MapWin->cOwner) && !*PbemActive) {
         crash_landing(MapWin->cOwner);
     }
@@ -32,12 +179,87 @@ void __cdecl control_turn() {
         draw_map(1);
     }
     *dword_93A940 = 1;
-    if (*ControlTurnMove && !is_human(MapWin->cOwner)) {
+    // The manual AI handover keeps the original view owner. Do not enter
+    // the native human console if all factions have already been handed off.
+    auto autosim_ready = [&]() {
+        const int owner = MapWin->cOwner;
+        return autosim_launcher_active && auto_turn_eligible(conf.autosim_manual_turns,
+            (unsigned)FactionStatus[0], *MultiplayerActive != 0,
+            *PbemActive != 0, (*GameState & STATE_GAME_DONE) != 0,
+            owner, owner >= 1 && owner < MaxPlayerNum && is_alive(owner));
+    };
+    // Any fresh/loaded single-player game with zero human factions must
+    // reach an operator confirmation, even if thinker.ini has auto turns=0
+    // or this was a plain native autosave without a campaign sidecar.
+    // Never fall into a native human console with nobody human-controlled.
+    auto autosim_preflight_ready = [&]() {
+        const int owner = MapWin->cOwner;
+        return autosim_launcher_active
+            && ((unsigned)FactionStatus[0] & 0xFEu) == 0
+            && !*MultiplayerActive && !*PbemActive
+            && !(*GameState & STATE_GAME_DONE)
+            && owner >= 1 && owner < MaxPlayerNum && is_alive(owner);
+    };
+    if (*ControlTurnMove && !is_human(MapWin->cOwner)
+    && !autosim_ready() && !autosim_preflight_ready()) {
         Console_human_turn(MapWin);
     }
     bool run_upkeep = true;
     while (1) {
         debug("control_turn %d %d %d\n", *CurrentTurn, current_id, MapWin->cOwner);
+        if (current_id == 0) cycle_timing = telemetry_phase_begin();
+        // New/reloaded all-AI games must be explicitly confirmed before any
+        // further AI processing. This is before upkeep and faction actions,
+        // not inside a native UI/combat callback. A mid-cycle reload still
+        // excludes its first partial cycle from the requested turn count.
+        if (autosim_preflight_ready() && !startup_confirmed) {
+            AutosimDialogState preflight;
+            autosim_fill_dialog_state(&preflight, AUTOSIM_DIALOG_STARTUP);
+            telemetry_record_ui_notice("autosim", "STARTUP", "preflight");
+            for (;;) {
+                const AutosimDialogChoice answer = autosim_show_control_dialog(&preflight);
+                if (answer == AUTOSIM_DIALOG_START) {
+                    if (!autosim_apply_dialog_options(preflight)) {
+                        MessageBoxA(*phWnd,
+                            "Could not update campaign metadata. Check campaigns/ permissions.",
+                            "thinkerNeca Simulation Control", MB_OK | MB_ICONWARNING);
+                        continue;
+                    }
+                    startup_confirmed = true;
+                    telemetry_record_ui_notice("autosim", "STARTUP", "confirmed");
+                    break;
+                }
+                if (answer == AUTOSIM_DIALOG_TAKE_CONTROL
+                || answer == AUTOSIM_DIALOG_FAILED) {
+                    // Fail closed: restore ordinary human control rather than
+                    // silently advancing all-AI turns with no consent.
+                    set_human(MapWin->cOwner, true);
+                    telemetry_record_ui_notice("autosim", "STARTUP",
+                        answer == AUTOSIM_DIALOG_FAILED
+                        ? "dialog_failed_human_control" : "declined_human_control");
+                    break;
+                }
+            }
+        }
+        if (!autosim_ready()) startup_confirmed = false;
+        // Start with actual AI processing, not the startup-confirmation
+        // dialog or map setup. This also stops when control is handed back.
+        telemetry_run_clock_set_active(autosim_ready());
+        autosim_null_render_suppress(autosim_ready());
+        autosim_monitor_progress("cycle_start", 0);
+        // Capture a baseline as soon as the user has handed the last human
+        // faction to AI. An initially partial loaded cycle is not counted.
+        if (autosim_ready()) {
+            if (!segment_started) {
+                segment_started = true;
+                segment_start_year = *CurrentMissionYear;
+                segment_start_bases = *BaseCount;
+                segment_start_units = *VehCount;
+            }
+        } else if (segment_started) {
+            segment_started = false;
+            total_autosim_turns = 0;
+        }
         if (run_upkeep) {
             if (!*PbemActive) {
                 MessageWin_clear(MessageWin);
@@ -46,7 +268,13 @@ void __cdecl control_turn() {
                 rankings(1);
             } else {
                 *ControlTurnC = 1;
-                turn_upkeep();
+                {
+                    AutoScopedAutosimFastPrefs fast_presentation;
+                    autosim_monitor_progress("turn_upkeep", 0);
+                    const TelemetryPhaseStamp upkeep_timing = telemetry_phase_begin();
+                    turn_upkeep();
+                    telemetry_phase_end(upkeep_timing, "world_upkeep", 0);
+                }
                 if (end_of_game(1)) {
                     return;
                 }
@@ -255,20 +483,20 @@ void __cdecl control_turn() {
                             parse_says(3, get_noun(*GovernorFaction), -1, -1);
                         }
                         if (CouncilVoteState[MapWin->cOwner] == 1) {
-                            popp(ScriptFile, "COUNCILHOTGOVWIN", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTGOVWIN", "council_sm.pcx");
                         } else if (*GovernorFaction > 0) {
-                            popp(ScriptFile, "COUNCILHOTGOVLOSE", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTGOVLOSE", "council_sm.pcx");
                         } else {
-                            popp(ScriptFile, "COUNCILHOTGOVNONE", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTGOVNONE", "council_sm.pcx");
                         }
                     } else if (CouncilVoteState[MapWin->cOwner] != 1) {
                         if (CouncilVoteState[MapWin->cOwner] == -2) {
-                            popp(ScriptFile, "COUNCILHOTVETO", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTVETO", "council_sm.pcx");
                         } else {
-                            popp(ScriptFile, "COUNCILHOTFAIL", 0, "council_sm.pcx", 0);
+                            autosim_notice_popp(ScriptFile, "COUNCILHOTFAIL", "council_sm.pcx");
                         }
                     } else {
-                        popp(ScriptFile, "COUNCILHOTPASS", 0, "council_sm.pcx", 0);
+                        autosim_notice_popp(ScriptFile, "COUNCILHOTPASS", "council_sm.pcx");
                     }
                     clear_council_notify(MapWin->cOwner);
                 }
@@ -278,7 +506,10 @@ void __cdecl control_turn() {
             }
             if (!*ControlTurnMove || (*PbemActive && (*GameMoreRules & MRULES_UNK_40))) {
                 *ControlTurnC = 1;
+                autosim_monitor_progress("faction_upkeep", current_id);
+                const TelemetryPhaseStamp upkeep_timing = telemetry_phase_begin();
                 faction_upkeep(current_id);
+                telemetry_phase_end(upkeep_timing, "faction_upkeep", current_id);
                 if (end_of_game(0)) {
                     return;
                 }
@@ -297,7 +528,12 @@ void __cdecl control_turn() {
                     }
                 }
             } else {
+                AutoScopedAutosimFastPrefs fast_presentation;
+                autosim_monitor_progress("ai_turn", current_id);
+                const TelemetryPhaseStamp turn_timing = telemetry_phase_begin();
                 mod_enemy_turn(current_id);
+                telemetry_phase_end(turn_timing, "ai_turn", current_id);
+                autosim_monitor_progress("ai_turn_complete", current_id);
             }
             if (!restart) {
                 *ControlTurnMove = 0;
@@ -307,7 +543,158 @@ void __cdecl control_turn() {
             }
         }
         if (++current_id >= 8) {
-            if (!skip_human_turn) {
+            // No normal Win32 message pump runs during continuous all-AI
+            // turns. Collect pending F9/F10 without dispatching gameplay
+            // input; consume only after this entire cycle has completed.
+            autosim_collect_queued_keys();
+            // A file command bypasses the native keyboard/event pump.
+            // Like F10 it is only acted on after a complete faction cycle.
+            if (!first_cycle_partial) {
+                autosim_collect_stop_file();
+            }
+            // All faction phases have completed for this turn. Never open
+            // a modal control window or perform a manual save mid-faction.
+            telemetry_phase_end(cycle_timing, "full_faction_cycle", 0);
+            telemetry_record_completed_turn();
+            autosim_monitor_progress("turn_completed", 0);
+            // A loaded game can finish its first partial faction cycle
+            // without executing the earlier factions. Never archive that
+            // incomplete world state as a whole-cycle checkpoint.
+            if (!first_cycle_partial) {
+                telemetry_archive_completed_turn();
+            }
+            if (autosim_take_post_victory_segment_reset()) {
+                // The operator explicitly elected to keep simulating after
+                // an actual victory. Start their new turn quota at this
+                // first fully completed cycle (no mid-upkeep counter reset).
+                auto_driver.completed_turns = 0;
+                segment_start_year = *CurrentMissionYear;
+                segment_start_bases = *BaseCount;
+                segment_start_units = *VehCount;
+                telemetry_record_ui_notice("autosim", "VICTORY",
+                    "new_ai_segment_at_full_cycle_boundary");
+            }
+            const bool full_cycle = !first_cycle_partial;
+            const bool eligible = autosim_ready();
+            const AutoCycleAction action = auto_driver.on_cycle(
+                conf.autosim_manual_turns, eligible, full_cycle);
+            if (eligible && full_cycle) ++total_autosim_turns;
+            first_cycle_partial = false;
+            const AutosimControlRequest request = autosim_take_control_request();
+            if (request != AUTOSIM_CTL_NONE) {
+                char action[96];
+                snprintf(action, sizeof(action), "request=%d eligible=%d full_cycle=%d",
+                    (int)request, eligible ? 1 : 0, full_cycle ? 1 : 0);
+                telemetry_record_ui_notice("autosim_input", "BOUNDARY_REQUEST", action);
+            }
+            const bool operator_stop = eligible && request == AUTOSIM_CTL_STOP;
+            const bool operator_pause = eligible && request == AUTOSIM_CTL_PAUSE;
+            const bool operator_menu = eligible && request == AUTOSIM_CTL_MENU;
+            bool switched_to_manual = false;
+            if (eligible && (action == AUTO_CYCLE_STOP || operator_stop
+            || operator_pause || operator_menu)) {
+                telemetry_record_ui_notice("autosim",
+                    action == AUTO_CYCLE_STOP ? "TURN_LIMIT" :
+                    operator_stop ? "OPERATOR_STOP" :
+                    operator_menu ? "OPERATOR_MENU" : "PAUSE",
+                    "control_dialog");
+                // Neither the quota/pause dialog nor save/menu interaction
+                // is simulation processing time. Resume next AI cycle.
+                telemetry_run_clock_set_active(false);
+                autosim_null_render_suppress(false);
+                autosim_monitor_progress("operator_dialog", 0);
+                draw_map(1);
+                AutosimDialogState dialog;
+                autosim_fill_dialog_state(&dialog, AUTOSIM_DIALOG_RUNNING);
+                dialog.completed_segment = auto_driver.completed_turns;
+                dialog.completed_total = total_autosim_turns;
+                dialog.start_year = segment_start_year;
+                dialog.start_bases = segment_start_bases;
+                dialog.start_units = segment_start_units;
+                dialog.allow_resume =
+                    (operator_pause || operator_menu) && action == AUTO_CYCLE_ADVANCE;
+                for (;;) {
+                    const AutosimDialogChoice selection = autosim_show_control_dialog(&dialog);
+                    if (selection == AUTOSIM_DIALOG_FAILED) {
+                        // Unavailable standard controls: retain the prior
+                        // native Save Game -> menu path rather than auto-advance.
+                        telemetry_record_ui_notice("autosim", "CONTROL_DIALOG_ERROR",
+                            "native_save_fallback");
+                        save_game(0);
+                        *ControlTurnA = 1;
+                        *ControlTurnB = 1;
+                        return;
+                    }
+                    if (selection == AUTOSIM_DIALOG_RESUME) {
+                        telemetry_record_ui_notice("autosim", "CONTROL",
+                            "resume_without_save");
+                        break;
+                    }
+                    if (!autosim_apply_dialog_options(dialog)) {
+                        MessageBoxA(*phWnd,
+                            "Could not write the campaign name. Check campaigns/ permissions.",
+                            "thinkerNeca Simulation Control", MB_OK | MB_ICONWARNING);
+                        continue;
+                    }
+                    if (selection == AUTOSIM_DIALOG_TAKE_CONTROL) {
+                        // A completed full turn has just ended. Changing the
+                        // human bit here makes the NEXT turn use native upkeep
+                        // and Console_human_turn, rather than replaying upkeep.
+                        telemetry_record_ui_notice("autosim", "CONTROL",
+                            "handover_to_human_next_turn");
+                        set_human(MapWin->cOwner, true);
+                        switched_to_manual = true;
+                        break;
+                    }
+                    if (selection == AUTOSIM_DIALOG_CONTINUE) {
+                        // New segment without a save, explicitly requested
+                        // from the unified operator menu at a full boundary.
+                        auto_driver.completed_turns = 0;
+                        segment_start_year = *CurrentMissionYear;
+                        segment_start_bases = *BaseCount;
+                        segment_start_units = *VehCount;
+                        telemetry_record_ui_notice("autosim", "CONTROL",
+                            "continue_without_save_new_segment");
+                        break;
+                    }
+                    if (selection == AUTOSIM_DIALOG_SAVE_CONTINUE
+                    || selection == AUTOSIM_DIALOG_SAVE_EXIT) {
+                        std::string path;
+                        std::string error;
+                        if (!autosim_save_named(dialog.save_name, &path, &error)) {
+                            MessageBoxA(*phWnd, error.c_str(),
+                                "thinkerNeca Save Game", MB_OK | MB_ICONWARNING);
+                            continue;
+                        }
+                        if (!telemetry_record_named_save(path.c_str())) {
+                            MessageBoxA(*phWnd,
+                                "Save succeeded, but its campaign-link sidecar could not be"
+                                " written. Loading it later will create a new telemetry campaign.",
+                                "thinkerNeca Campaign", MB_OK | MB_ICONWARNING);
+                        }
+                        telemetry_archive_named_save(path.c_str());
+                        telemetry_record_ui_notice("autosim", "SAVED",
+                            path.c_str());
+                        if (selection == AUTOSIM_DIALOG_SAVE_EXIT) {
+                            *ControlTurnA = 1;
+                            *ControlTurnB = 1;
+                            return;
+                        }
+                        // New user-selected segment, same running game and
+                        // telemetry session. Never count the first partial
+                        // cycle on reload as a fresh completed turn.
+                        auto_driver.completed_turns = 0;
+                        conf.autosim_manual_turns = dialog.additional_turns;
+                        segment_start_year = *CurrentMissionYear;
+                        segment_start_bases = *BaseCount;
+                        segment_start_units = *VehCount;
+                        telemetry_record_ui_notice("autosim", "CONTROL",
+                            "save_and_continue_new_segment");
+                        break;
+                    }
+                }
+            }
+            if (!skip_human_turn && !autosim_ready() && !switched_to_manual) {
                 Console_human_turn(MapWin);
             }
             if (*ControlTurnA) {
@@ -964,7 +1351,7 @@ void __cdecl random_events(int flag) {
         }
         *SunspotDuration = max(*SunspotDuration, -1000) - 1;
         if (!*SunspotDuration) {
-            POP2("NOMORESPOTS", "space_sm.pcx", -1);
+            autosim_notice_pop2("NOMORESPOTS", "space_sm.pcx", -1);
         }
         for (int i = 1; i < MaxPlayerNum; i++) {
             for (int j = 1; j < MaxPlayerNum; j++) {
@@ -975,7 +1362,7 @@ void __cdecl random_events(int flag) {
             }
         }
         if (*DustCloudDuration > 0 && !--(*DustCloudDuration)) {
-            POP2("NOMOREDUST", "stars_sm.pcx", -1);
+            autosim_notice_pop2("NOMOREDUST", "stars_sm.pcx", -1);
         }
         for (int i = *BaseCount - 1; i >= 0; --i) {
             BASE* base = &Bases[i];
@@ -991,13 +1378,13 @@ void __cdecl random_events(int flag) {
         }
         if (*GameState & STATE_PERIHELION_ACTIVE && !((game_year(*CurrentTurn) - 2180) % 80)) {
             *GameState &= ~STATE_PERIHELION_ACTIVE;
-            POP2("PERIHELIONENDS", "stars_sm.pcx", -1);
+            autosim_notice_pop2("PERIHELIONENDS", "stars_sm.pcx", -1);
             return;
         }
         if (!(conf.skip_random_events & 1) && *CurrentTurn > 50) {
             if (!((game_year(*CurrentTurn) - 2160) % 80)) {
                 *GameState |= STATE_PERIHELION_ACTIVE;
-                POP2("PERIHELION", "heat_sm.pcx", -1);
+                autosim_notice_pop2("PERIHELION", "heat_sm.pcx", -1);
                 return;
             }
         }
@@ -1040,7 +1427,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("BUMPER", "bump_sm.pcx", base_id);
+                autosim_notice_pop2("BUMPER", "bump_sm.pcx", base_id);
             }
         }
         return;
@@ -1052,9 +1439,9 @@ void __cdecl random_events(int flag) {
             }
             if (is_player || *PbemActive) {
                 if (!is_alien(faction_id)) {
-                    POP2("FAMINE", "starv_sm.pcx", base_id);
+                    autosim_notice_pop2("FAMINE", "starv_sm.pcx", base_id);
                 } else {
-                    POP2("FAMINE", "al_starv_sm.pcx", base_id);
+                    autosim_notice_pop2("FAMINE", "al_starv_sm.pcx", base_id);
                 }
             }
         }
@@ -1068,7 +1455,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("INDUSTRY", "indbm_sm.pcx", base_id);
+                autosim_notice_pop2("INDUSTRY", "indbm_sm.pcx", base_id);
             }
         }
         return;
@@ -1079,7 +1466,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("BUST", "genwarning_sm.pcx", base_id);
+                autosim_notice_pop2("BUST", "genwarning_sm.pcx", base_id);
             }
         }
         return;
@@ -1092,7 +1479,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("HEATWAVE", "heat_sm.pcx", base_id);
+                autosim_notice_pop2("HEATWAVE", "heat_sm.pcx", base_id);
             }
         }
         return;
@@ -1103,7 +1490,7 @@ void __cdecl random_events(int flag) {
                 base->random_event_turns = conf.base_event_turns;
             }
             if (is_player || *PbemActive) {
-                POP2("CLOUDCOVER", "cloud_sm.pcx", base_id);
+                autosim_notice_pop2("CLOUDCOVER", "cloud_sm.pcx", base_id);
             }
         }
         return;
@@ -1119,9 +1506,9 @@ void __cdecl random_events(int flag) {
             }
             if (is_player) {
                 Console_focus(MapWin, base->x, base->y, *CurrentPlayerFaction);
-                POP2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
+                autosim_notice_pop2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
             } else if (*PbemActive) {
-                POP2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
+                autosim_notice_pop2("PROMETHEUS1", "biohazd_sm.pcx", base_id);
             }
             return;
         }
@@ -1156,7 +1543,7 @@ void __cdecl random_events(int flag) {
                     }
                 }
                 if (base_id_tgt >= 0) {
-                    POP2("PROMETHEUS0", "biohazd_sm.pcx", base_id_tgt);
+                    autosim_notice_pop2("PROMETHEUS0", "biohazd_sm.pcx", base_id_tgt);
                 }
             }
             return;
@@ -1170,9 +1557,9 @@ void __cdecl random_events(int flag) {
         }
         if (is_player) {
             Console_focus(MapWin, base->x, base->y, *CurrentPlayerFaction);
-            POP2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
+            autosim_notice_pop2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
         } else if (*PbemActive) {
-            POP2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
+            autosim_notice_pop2("PROMETHEUS2", "biohazd_sm.pcx", base_id);
         }
         return;
     case 7:
@@ -1225,7 +1612,7 @@ void __cdecl random_events(int flag) {
                             if (!shift_key_down() && !*MultiplayerActive) {
                                 clock_wait(100);
                             }
-                            POP2("PETERSOUT", resource_icon(value, ocean, 0), -1);
+                            autosim_notice_pop2("PETERSOUT", resource_icon(value, ocean, 0), -1);
                         }
                     }
                 } else if (!value) { // Fix: always check that no resource exists before
@@ -1252,7 +1639,7 @@ void __cdecl random_events(int flag) {
                             }
                         }
                         parse_says(1, ResName[value - 1].name_plural, -1, -1);
-                        POP2("NEWRESOURCE", resource_icon(value, ocean, 1), -1);
+                        autosim_notice_pop2("NEWRESOURCE", resource_icon(value, ocean, 1), -1);
                     }
                 }
             }
@@ -1263,16 +1650,19 @@ void __cdecl random_events(int flag) {
             bool found = 0;
             for (int i = 1; i < MaxPlayerNum; i++) {
                 if (Factions[i].satellites_energy || Factions[i].satellites_ODP) {
+                    const int lost_energy = Factions[i].satellites_energy;
+                    const int lost_odp = Factions[i].satellites_ODP;
                     Factions[i].satellites_energy = 0;
                     Factions[i].satellites_ODP = 0;
+                    telemetry_orbit_environment_loss(i, "solar_storm", 0, lost_energy, lost_odp);
                     found = 1;
                 }
             }
             *SolarFlaresEvent = 1;
             if (found) {
-                POP2("SOLARSTORM", "sun_sm.pcx", -1);
+                autosim_notice_pop2("SOLARSTORM", "sun_sm.pcx", -1);
             } else {
-                POP2("SOLARFLARE", "heat_sm.pcx", -1);
+                autosim_notice_pop2("SOLARFLARE", "heat_sm.pcx", -1);
             }
         }
         return;
@@ -1281,12 +1671,14 @@ void __cdecl random_events(int flag) {
             bool found = 0;
             for (int i = 1; i < MaxPlayerNum; i++) {
                 if (Factions[i].satellites_mineral) {
+                    const int lost_mineral = Factions[i].satellites_mineral;
                     Factions[i].satellites_mineral = 0;
+                    telemetry_orbit_environment_loss(i, "asteroid", lost_mineral, 0, 0);
                     found = 1;
                 }
             }
             if (found) {
-                POP2("ASTEROID", "astm_sm.pcx", -1);
+                autosim_notice_pop2("ASTEROID", "astm_sm.pcx", -1);
             }
         }
         return;
@@ -1295,7 +1687,7 @@ void __cdecl random_events(int flag) {
         && (*SunspotDuration <= -80 || *CurrentTurn < 80 || !map_rand.get(0, 3))) {
             *SunspotDuration = map_rand.get(0, 11) + 10;
             parse_num(0, 20);
-            POP2("SUNSPOTS", "solar_sm.pcx", -1);
+            autosim_notice_pop2("SUNSPOTS", "solar_sm.pcx", -1);
         }
         return;
     case 12:
@@ -1307,10 +1699,10 @@ void __cdecl random_events(int flag) {
                 if (is_player) {
                     parse_num(0, plr->energy_credits);
                     Console_update_data(MapWin, 0);
-                    POP2("INFLATION", "genwarning_sm.pcx", -1);
+                    autosim_notice_pop2("INFLATION", "genwarning_sm.pcx", -1);
                 } else if (*PbemActive) {
                     parse_num(0, plr->energy_credits);
-                    POP2("INFLATION", "genwarning_sm.pcx", -1 - faction_id);
+                    autosim_notice_pop2("INFLATION", "genwarning_sm.pcx", -1 - faction_id);
                 }
             }
         } else if (plr->ranking <= 4 && plr->energy_credits <= 500) {
@@ -1318,7 +1710,7 @@ void __cdecl random_events(int flag) {
             if (is_player) {
                 parse_num(0, plr->energy_credits);
                 Console_update_data(MapWin, 0);
-                POP2("ENERGYBOOM", "markbm_sm.pcx", -1);
+                autosim_notice_pop2("ENERGYBOOM", "markbm_sm.pcx", -1);
             }
         }
         return;
@@ -1355,7 +1747,7 @@ void __cdecl random_events(int flag) {
                 }
             }
             if (show_event) {
-                POP2("HAIL", "hail_sm.pcx", base_id);
+                autosim_notice_pop2("HAIL", "hail_sm.pcx", base_id);
             }
         }
         return;
@@ -1415,7 +1807,7 @@ void __cdecl random_events(int flag) {
             draw_map(1);
         }
         *DustCloudDuration = 10;
-        popp(ScriptFile, "BIGFATVOLCANO", 0, "volc_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "BIGFATVOLCANO", "volc_sm.pcx");
         return;
     case 15:
         if (*PbemActive || *CurrentTurn < 75 || *GameState & STATE_IS_SCENARIO
@@ -1465,7 +1857,7 @@ void __cdecl random_events(int flag) {
             draw_map(1);
         }
         *DustCloudDuration = 10;
-        popp(ScriptFile, "EATTHIS", 0, "astp_sm.pcx", 0);
+        autosim_notice_popp(ScriptFile, "EATTHIS", "astp_sm.pcx");
         return;
     case 16:
         if (has_tech(Facility[FAC_BIOLOGY_LAB].preq_tech, faction_id)) {
@@ -1508,7 +1900,7 @@ void __cdecl random_events(int flag) {
                         }
                     }
                     if (is_player || *PbemActive) {
-                        POP2(has_lab ? "BLIGHT1" : "BLIGHT", "biohazd_sm.pcx", base_id);
+                        autosim_notice_pop2(has_lab ? "BLIGHT1" : "BLIGHT", "biohazd_sm.pcx", base_id);
                     }
                 }
             }
@@ -1558,7 +1950,7 @@ void __cdecl random_events(int flag) {
                     }
                 }
                 if (is_player || *PbemActive) {
-                    POP2(has_bank ? "SURGE1" : "SURGE", "markbm_sm.pcx", base_id);
+                    autosim_notice_pop2(has_bank ? "SURGE1" : "SURGE", "markbm_sm.pcx", base_id);
                 }
             }
         }
@@ -1572,7 +1964,7 @@ void __cdecl random_events(int flag) {
                         Console_focus(MapWin, base->x, base->y, faction_id);
                     }
                     if (is_player || *PbemActive) {
-                        POP2("NETBONUS", "markbm_sm.pcx", base_id);
+                        autosim_notice_pop2("NETBONUS", "markbm_sm.pcx", base_id);
                     }
                 } else if (plr->ranking >= (*CurrentTurn >= 150) + 4) {
                     plr->tech_accumulated = 0;
@@ -1581,7 +1973,7 @@ void __cdecl random_events(int flag) {
                         Console_focus(MapWin, base->x, base->y, faction_id);
                     }
                     if (is_player || *PbemActive) {
-                        POP2("NETCRASH", "netcr_sm.pcx", base_id);
+                        autosim_notice_pop2("NETCRASH", "netcr_sm.pcx", base_id);
                     }
                 }
             }
@@ -1605,9 +1997,9 @@ void __cdecl random_events(int flag) {
                     }
                     if (is_player || *PbemActive) {
                         if (!is_alien(faction_id)) {
-                            POP2("CRECHE1", "pop_sm.pcx", base_id);
+                            autosim_notice_pop2("CRECHE1", "pop_sm.pcx", base_id);
                         } else {
-                            POP2("CRECHE1", "al_pop_sm.pcx", base_id);
+                            autosim_notice_pop2("CRECHE1", "al_pop_sm.pcx", base_id);
                         }
                     }
                 }
@@ -1618,9 +2010,9 @@ void __cdecl random_events(int flag) {
                 }
                 if (is_player || *PbemActive) {
                     if (!is_alien(faction_id)) {
-                        POP2("CRECHE", "pop_sm.pcx", base_id);
+                        autosim_notice_pop2("CRECHE", "pop_sm.pcx", base_id);
                     } else {
-                        POP2("CRECHE", "al_pop_sm.pcx", base_id);
+                        autosim_notice_pop2("CRECHE", "al_pop_sm.pcx", base_id);
                     }
                 }
             }
@@ -1659,7 +2051,7 @@ void __cdecl random_events(int flag) {
             }
             if (show_event) {
                 // Added event icon since previously there was none defined
-                POP2("KELPWIPE", "kelp_sm.pcx", is_player ? base_id : -1);
+                autosim_notice_pop2("KELPWIPE", "kelp_sm.pcx", is_player ? base_id : -1);
             }
         }
         return;
@@ -1696,7 +2088,7 @@ void __cdecl random_events(int flag) {
             }
             if (show_event) {
                 // Added event icon since previously there was none defined
-                POP2("PLATFORMWIPE", "subbase_sm.pcx", is_player ? base_id : -1);
+                autosim_notice_pop2("PLATFORMWIPE", "subbase_sm.pcx", is_player ? base_id : -1);
             }
         }
         return;
@@ -1761,21 +2153,22 @@ void __cdecl alien_fauna() {
                             || (*BaseFindDist > 3 && whose_territory(player_id, tx, ty, 0, 0) != player_id)) {
                                 draw_tiles(tx, ty, 2);
                             } else {
-                                if (!mod_MapWin_focus(MapWinPtr[0], tx, ty)) {
+                                if (autosim_fast_combat_active()
+                                    || !mod_MapWin_focus(MapWinPtr[0], tx, ty)) {
                                     draw_tiles(tx, ty, 2);
                                 }
                                 parse_says(0, Bases[base_id].name, -1, -1);
                                 if (conf.game_event_popup) {
                                     if (is_sea) {
-                                        POP2("KELPGROWS", "kelp_sm.pcx", -1);
+                                        autosim_notice_pop2("KELPGROWS", "kelp_sm.pcx", -1);
                                     } else {
-                                        POP2("FORESTGROWS", "forgr_sm.pcx", -1);
+                                        autosim_notice_pop2("FORESTGROWS", "forgr_sm.pcx", -1);
                                     }
                                 } else {
                                     if (is_sea) {
-                                        NetMsg_pop(NetMsg, "KELPGROWS", 5000, 0, "kelp_sm.pcx");
+                                        autosim_notice_netmsg(NetMsg, "KELPGROWS", 5000, 0, "kelp_sm.pcx");
                                     } else {
-                                        NetMsg_pop(NetMsg, "FORESTGROWS", 5000, 0, "forgr_sm.pcx");
+                                        autosim_notice_netmsg(NetMsg, "FORESTGROWS", 5000, 0, "forgr_sm.pcx");
                                     }
                                 }
                             }
@@ -1978,7 +2371,7 @@ void __cdecl alien_fauna() {
                 draw_tiles(base->x, base->y, 2);
             }
             parse_says(0, base->name, -1, -1);
-            NetMsg_pop(NetMsg, "XMINDWORMS", -5000, 0, "mindworm_sm.pcx");
+            autosim_notice_netmsg(NetMsg, "XMINDWORMS", -5000, 0, "mindworm_sm.pcx");
         }
     }
 }
@@ -2069,9 +2462,9 @@ void __cdecl turn_upkeep() {
             world_climate();
             draw_map(1);
             if (alt_val > 0) {
-                popp(ScriptFile, "SEARISING", 0, "searis_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "SEARISING", "searis_sm.pcx");
             } else {
-                popp(ScriptFile, "SEAFALLING", 0, "seafal_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "SEAFALLING", "seafal_sm.pcx");
             }
         }
     }
@@ -2098,8 +2491,8 @@ void __cdecl turn_upkeep() {
             }
         }
         if (aliens_arrive) {
-            popp(ScriptFile, "ALIENSARRIVE", 0, "al_land_sm.pcx", 0);
-            interlude(21, 0, 1, 0);
+            autosim_notice_popp(ScriptFile, "ALIENSARRIVE", "al_land_sm.pcx");
+            autosim_interlude(21, 0, 1, 0);
         }
     }
     int caretake_id = 0;
@@ -2140,15 +2533,15 @@ void __cdecl turn_upkeep() {
     }
     random_events(0);
     if (*CurrentTurn == 75 && has_tech(Facility[FAC_BIOLOGY_LAB].preq_tech, *CurrentPlayerFaction)) {
-        interlude(1, 0, 1, 0);
+        autosim_interlude(1, 0, 1, 0);
     }
-    if (voice_of_planet()) {
+    if (voice_of_planet() && is_human(*CurrentPlayerFaction)) {
         Faction& plr = Factions[*CurrentPlayerFaction];
         if (!(plr.player_flags & PFLAG_UNK_2000)) {
             plr.player_flags |= PFLAG_UNK_2000;
             parse_says(0, get_title(*CurrentPlayerFaction), -1, -1);
             parse_says(1, get_name(*CurrentPlayerFaction), -1, -1);
-            popp(ScriptFile, "ASCENT", 0, "asctran_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "ASCENT", "asctran_sm.pcx");
         }
     }
     if ((*CurrentTurn & 3) == 1) {
@@ -2161,7 +2554,12 @@ void __cdecl faction_upkeep(int faction_id) {
     Faction* f = &Factions[faction_id];
     debug("faction_upkeep %d %d\n", *CurrentTurn, faction_id);
 
+    // Keep the game's normal save/undo setup outside presentation overrides.
     init_save_game(faction_id);
+    // Process AI faction actions with fast visuals, restoring preferences
+    // before the existing ordinary autosave at the bottom of this function.
+    {
+        AutoScopedAutosimFastPrefs fast_presentation;
     plans_upkeep(faction_id);
     reset_netmsg_status();
     *ControlUpkeepA = 1;
@@ -2201,7 +2599,7 @@ void __cdecl faction_upkeep(int faction_id) {
                 parse_says(2, get_noun(faction_id), -1, -1);
                 parse_says(3, get_adjective(faction_id), -1, -1);
                 ParseNumTable[0] = game_year(f->corner_market_turn);
-                popp(ScriptFile, "CORNERWARNING", 0, "econwin_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "CORNERWARNING", "econwin_sm.pcx");
             }
         }
     }
@@ -2233,13 +2631,21 @@ void __cdecl faction_upkeep(int faction_id) {
         && !(*GameState & (STATE_COUNCIL_HAS_CONVENED | STATE_DISPLAYED_COUNCIL_AVAIL_MSG))
         && can_call_council(faction_id, 0) && !(*GameState & STATE_GAME_DONE)) {
             *GameState |= STATE_DISPLAYED_COUNCIL_AVAIL_MSG;
-            popp(ScriptFile, "COUNCILOPEN", 0, "council_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "COUNCILOPEN", "council_sm.pcx");
         }
         if (!is_human(faction_id)) {
+            autosim_trace_council_call("enter", faction_id);
             call_council(faction_id);
+            autosim_trace_council_call("exit", faction_id);
         }
     }
-    if (!*MultiplayerActive && *GamePreferences & PREF_BSC_AUTOSAVE_EACH_TURN
+    } // Restore all preference bits before the ordinary autosave call.
+    // AUTO-002 uses the *existing* autosave naming, interval and write path.
+    // Ensure an unattended all-AI run continues autosaving even when the
+    // operator disabled that preference for ordinary human play. The native
+    // preference flag itself is never changed or serialized differently.
+    if (!*MultiplayerActive
+    && ((*GamePreferences & PREF_BSC_AUTOSAVE_EACH_TURN) || autosim_control_active())
     && faction_id == MapWin->cOwner) {
         auto_save();
     }
@@ -2493,9 +2899,9 @@ void __cdecl production_phase(int faction_id) {
             f->sanction_turns--;
             if (!f->sanction_turns && faction_id == MapWin->cOwner) {
                 if (!is_alien(faction_id)) {
-                    popp(ScriptFile, "SANCTIONSEND", 0, "council_sm.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "SANCTIONSEND", "council_sm.pcx");
                 } else {
-                    popp(ScriptFile, "SANCTIONSENDALIEN", 0, "Alopdir.pcx", 0);
+                    autosim_notice_popp(ScriptFile, "SANCTIONSENDALIEN", "Alopdir.pcx");
                 }
             }
         }

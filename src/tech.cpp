@@ -672,7 +672,7 @@ int __cdecl tech_advance(int faction_id) {
                 }
             }
         }
-        if ((*MultiplayerActive || faction_id == MapWin->cOwner)
+        if ((*MultiplayerActive || (faction_id == MapWin->cOwner && is_human(faction_id)))
         && !*SkipTechScreenA && !*SkipTechScreenB && plr->tech_research_id < 0) {
             plr->tech_research_id = mod_tech_selection(faction_id);
         }
@@ -779,8 +779,13 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
     }
     plr->tech_trade_source[tech_id] = faction_id_2 <= 0 ? 0 : faction_id_2;
     int is_first = TechOwners[tech_id] == 0;
+    const bool already_owned = (TechOwners[tech_id] & bm_fac) != 0;
     TechOwners[tech_id] |= (1 << faction_id);
     ++plr->tech_achieved;
+    // This applies only to real technology IDs; tech_achieved also handles
+    // maps, comm frequencies and prototype transfers in earlier branches.
+    telemetry_research_acquired(faction_id, tech_id, faction_id_2,
+        already_owned, is_share);
     if (!*CurrentTurn || *SkipTechScreenA) {
         return;
     }
@@ -906,12 +911,20 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
         if (faction_id == MapWin->cOwner) {
             if (*MultiplayerActive && (*DiploWinState || *DiploWinCommlink || *ControlWaitLoop)) {
                 parse_says(0, Tech[tech_id].name, -1, -1);
-                NetMsg_pop(NetMsg, "TECHOBTAINED", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "TECHOBTAINED", 5000, 0, 0);
             } else {
-                NewTechWin_exec(NewTechWin, tech_id, faction_id_2);
+                if (autosim_ui_active()) {
+                    telemetry_record_ui_notice("new_tech_window", Tech[tech_id].name, "suppressed_notice");
+                } else {
+                    NewTechWin_exec(NewTechWin, tech_id, faction_id_2);
+                }
             }
         } else if (!*MultiplayerActive) {
-            BasePop_exec_3(&cur_popup, 0, 0);
+            if (autosim_ui_active()) {
+                telemetry_record_ui_notice("tech_popup", Tech[tech_id].name, "suppressed_notice");
+            } else {
+                BasePop_exec_3(&cur_popup, 0, 0);
+            }
         }
     }
     int has_freefac = 0;
@@ -927,7 +940,7 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
             if (faction_id == MapWin->cOwner) {
                 parse_says(0, Tech[tech_id].name, -1, -1);
                 parse_says(1, Facility[fac->faction_bonus_val1[i]].name, -1, -1);
-                NetMsg_pop(NetMsg, "FREEFACTECH", -5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "FREEFACTECH", -5000, 0, 0);
             }
         }
     }
@@ -940,7 +953,7 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
         && faction_id == MapWin->cOwner) {
             parse_says(0, Tech[tech_id].name, -1, -1);
             parse_says(1, Ability[fac->faction_bonus_val1[i]].name, -1, -1);
-            NetMsg_pop(NetMsg, "FREEABILTECH", -5000, 0, 0);
+            autosim_notice_netmsg(NetMsg, "FREEABILTECH", -5000, 0, 0);
         }
     }
     if (Tech[tech_id].flags & TFLAG_SECRETS) {
@@ -1006,8 +1019,8 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
     }
     // Modify diplomacy to skip social engineering choices dialog SOCIETY
     // while DiploWinState is active, otherwise use the previous conditions.
-    if (faction_id == MapWin->cOwner && plr->diff_level > 1
-    && !*MultiplayerActive && !*DiploWinState) {
+    if (faction_id == MapWin->cOwner && is_human(faction_id)
+    && plr->diff_level > 1 && !*MultiplayerActive && !*DiploWinState) {
         for (int sf = 0; sf < 4; ++sf) {
             for (int sm = 0; sm < 4; ++sm) {
                 if (tech_id == SocialField[sf].soc_preq_tech[sm] && society_avail(sf, sm, faction_id)) {
@@ -1039,7 +1052,7 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
         plr->player_flags |= PFLAG_MAP_REVEALED;
         if (*CurrentTurn && faction_id == MapWin->cOwner) {
             parse_says(0, Tech[tech_id].name, -1, -1);
-            popp(ScriptFile, "SEEMAP2", 0, "native_sm.pcx", 0);
+            autosim_notice_popp(ScriptFile, "SEEMAP2", "native_sm.pcx");
             draw_map(1);
             set_dirty();
             GraphicWin_redraw(WorldWin);
@@ -1052,10 +1065,10 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
     tech_effects(faction_id);
     if (faction_id == MapWin->cOwner) {
         if (tech_id == Facility[FAC_BIOLOGY_LAB].preq_tech) {
-            interlude(1, 0, 1, 0);
+            autosim_interlude(1, 0, 1, 0);
         }
         if (tech_id == TECH_CentMed) {
-            interlude(2, 0, 1, 0);
+            autosim_interlude(2, 0, 1, 0);
         }
         if (project_base(FAC_VOICE_OF_PLANET) != SP_Unbuilt && faction_id > 0
         && Tech[TECH_HAL9000].preq_tech1 >= -1
@@ -1064,8 +1077,8 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
             && (Tech[TECH_Matter].preq_tech2 >= -1 || Tech[TECH_Matter].preq_tech1 == -1)) {
                 if (tech_owner(TECH_HAL9000, faction_id)
                 && tech_owner(TECH_Matter, faction_id)) {
-                    interlude(15, 0, 1, 0);
-                    interlude(16, 0, 0, 0);
+                    autosim_interlude(15, 0, 1, 0);
+                    autosim_interlude(16, 0, 0, 0);
                 }
             }
         }
@@ -1073,7 +1086,7 @@ void __cdecl tech_achieved(int faction_id, int tech_id, int faction_id_2, int is
             for (int i = 1; i < MaxPlayerNum; ++i) {
                 if (faction_id != i && !MFactions[i].is_alien()
                 && (plr->diplo_status[i] & DIPLO_COMMLINK)) {
-                    interlude(36, 0, 1, 0);
+                    autosim_interlude(36, 0, 1, 0);
                 }
             }
         }

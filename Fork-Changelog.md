@@ -1,6 +1,98 @@
 # thinkerNeca — fork changelog
 
+## Unmerged TEL-ORBIT — defer routine orbital inventories until first satellite (9 November 2026)
+
+- Stop writing all-zero `orbit.jsonl` inventory snapshots on every pre-spaceflight turn. The first satellite launch emits an immediate inventory baseline; existing satellite stock in a loaded save activates the session-start snapshot. Continue completed-turn inventories after activation, even if all satellites are subsequently lost. Underlying launch, attack, environmental-loss and UI-suppression paths are untouched. Source regression added; runtime acceptance pending.
+
+## Unmerged AUTO-LAUNCH — campaign-name folders and pause-excluded run duration (9 November 2026)
+
+- New campaigns use `<sanitized campaign display name>-YYYYMMDD-HHMMSS` (local timestamp, collision suffix) instead of observed-faction/MY folder names. Existing campaign-link sidecars and session identities remain compatible and immutable.
+- Record active all-AI wall-clock duration for the running process, excluding startup confirmation and operator controls, freezing at the exact native victory boundary *before* the post-victory UI/save, and resuming only after an explicit continue. In-game victory/turn-limit controls, status/result JSON and the integrated campaign report display the duration; old sessions without the metric remain readable. Source/synthetic tests added; no Windows runtime timing validation yet.
+
+## Unmerged TEL-LOG-01 — Council political and Secret Project event histories (9 November 2026)
+
+- Replaced the high-volume Council native execution trace with `council.jsonl` gameplay records for real proposals, native faction ballot arrays and raw resolutions. Linked meeting IDs and ballot-level raw codes/weights are machine-readable; the motion proposer and each AI motive remain explicitly unverified, while the convening faction is recorded where the native `call_council` caller is known. No re-evaluation of votes, native hook/preflight change, modal fallback change or suppression behavior change.
+- The existing `ui_notices.jsonl` is automation diagnostics, not political/economic history: retained meaningful Council suppression/guard notices, dropped per-turn call traces, and moved the UI diagnostics table behind a collapsed section in the Campaign Analyzer.
+- Added `projects.jsonl` with a verified `SecretProjects[]` completion hook and non-mutating queue-transition observations (`started`, `changed`, `abandoned`, `interrupted`) at `mod_base_change` plus full-cycle reconciliation for direct native queue modifications and base ownership/loss. Events identify faction, base name/coordinates and project, without claiming AI motivation or silently reinterpreting existing queues at session start.
+- One-window Campaign Analyzer now exports `council_meetings.csv`, `council_ballots.csv`, `projects.csv` and displays the histories. Legacy `council.jsonl` debugging records remain readable but are never presented as real motions. Added synthetic reader and source contracts to CI; actual Windows Council/project and same-build save/reload verification remains pending.
+
+## Unmerged AUTO-LAUNCH — native new-game world and custom-rule controls (9 November 2026)
+
+- Expanded the single WinForms Automation Launcher with **Very Huge** (the sixth native 80×160 preset), direct **Custom Map** native X/Y dimensions (16–512), the stock **Map of Planet** and **Huge Map of Planet** files, and the existing generated-world climate controls. Fixed-map selections use the game's original map loader rather than random map generation and fail clearly when the requested file is absent.
+- Added the **Game rules & victory** tab: all standard Custom Game Rules checkboxes (including five victory/cooperative toggles, inverted Unity Survey availability, Tech Stagnation, Blind Research, Spoils of War, Time Warp, Bell Curve, Ironman and other stock choices), plus random leader personalities/agendas. Optional per-run override of the native low-16-bit rule mask and those two `GameState` flags; stock defaults can be restored with one control.
+- `autosim_apply_launch_profile` validates extended world/rule fields. Old profiles retain their previous generated map/installed rules; normal launches, existing SAVs, game INIs, multiplayer and save formats are unchanged. Added source contracts and expanded Windows WinForms GUI smoke. Actual native world generation, rule effects, very large custom map performance and same-build save/reload remain unverified.
+
+## Unmerged AUTO-002/TEL-ORBIT — active orbital popup suppression and basic event ledger (9 November 2026)
+
+- Corrected the initial, **ineffective** hook at original EXE callsite `0x4CF70F`: `patch.cpp` already replaces the native `action_sat_attack` at `0x4CF480` with C++ `basewin.cpp::action_sat_attack`. The four passive C++ hit/miss `popp` calls now use the existing `autosim_notice_popp` wrapper in eligible all-AI suppression mode. Removed the unreachable EXE hook and its wrapper; normal human/opt-out presentation, attack RNG, satellite counts and Geosynchronous effects remain unchanged.
+- Added telemetry-only per-session `orbit.jsonl`: actual satellite launches, executed AI orbital strike decision inputs and inventory-derived outcome, solar-storm/asteroid losses, and faction orbital inventories at session start/completed turn. The stream is independent of popup suppression and uses the existing recorder's flush/error/session lifecycle.
+- The initial event-stream build passed CI at `d13c734`, but a subsequent Windows report confirmed the old result-popup hook was unreachable. The corrected source route requires new PR-head CI and Windows gameplay confirmation, including state parity and save/reload. Detailed orbital AI and missile-interception logging is deferred.
+
+## Unmerged AUTO-LAUNCH — single launcher with integrated campaign reports (9 November 2026)
+
+- The existing `Run Automation.bat` / PowerShell WinForms launcher now includes the former Campaign Analyzer GUI functions directly in its `Campaign tools & archive` tab: browse/refresh/filter session metadata, inspect recording details, generate/open HTML and CSV reports, open existing reports or campaign folders, export ZIP and access launcher logs. No secondary Tkinter window is launched.
+- Kept the proven `tools/campaign_report.py` standard-library report engine as a **headless** subprocess, adding read-only `--scan-json` for session metadata; generation semantics and output formats stay unchanged. The legacy `Campaign Analyzer.pyw` remains in the repository but is no longer packaged by CI.
+- Added synthetic report CLI regression and Windows PowerShell 5.1 report-bridge and GUI construction smoke checks; actual installed Windows interaction with the new integrated tab remains to be verified. Normal simulation launcher profiles, monitor and native game files are not rewritten.
+
+## Unmerged AUTO-LOG — comprehensive automation launcher and campaign archive (9 November 2026)
+
+- Draft PR #11 adds explicit new-game selection of all seven native faction slots from fourteen SMAC/X stock factions; old profiles retain existing faction setup and loading a SAV cannot change its roster.
+- Adds run-profile-only timing and checkpoint cadence controls (default on and every 25 complete turns, respectively, in new launcher profiles; old profiles default off), separate UTC-ms native phase `timings.jsonl` and checkpoint `checkpoints.jsonl`, and UTC stamps on passive notices/Council events. Ironman checkpoints skip the native serializer because it can alter the RNG.
+- New full-cycle native SAV checkpoint copies live within the campaign/session archive, independent of native autosaves, with fingerprint, failure status and campaign-link metadata. Operator-named saves are additionally copied there.
+- Adds Launcher `Faction roster` and `Campaign tools & archive` tabs, with the latter now embedding session-aware report controls and whole-campaign ZIP export rather than launching a separate Tkinter analyzer. The Python report engine remains headless; HTML/CSV exports include phase timings and SAV indices, with older sessions still readable.
+- Compilation, synthetic reporting, Windows PowerShell GUI smoke and same-build SAV reload for these additions still require verification. Do not treat the earlier economic-victory Windows result as verification of these new features.
+
+## Unmerged AUTO-OBS Stage 3 — observer-neutral all-AI simulation (9 November 2026)
+
+- Draft PR #11 source implementation adds launcher-selectable `unlimited_expansion` bypass for AI colony quotas during explicitly eligible all-AI sessions. It uses the independent Automation Launcher profile (default enabled for new profiles), not distributed `thinker.ini` or ordinary-game settings.
+- Targeted player/observer parity changes cover alien-observer world rules, AI research timing, cargo orders, monolith, Mind Worm/story flags and project intel; an eliminated AI observer is automatically reassigned to a surviving AI without ending the world.
+- Native `pact_ends` retains treaty removal and both forced pact unit withdrawals but omits passive `ENDPACT1/2/3` modal screens for the all-AI session. 
+- World terminal states produce `result.json` with raw victory, evidence-backed winner, observer transition and partial-turn status. A subsequent Windows test reached Hive economic victory in MY2304; the original version exited immediately. The revised draft **pauses at actual victory** for Save & Exit, Save & Continue, Continue AI (experimental post-victory sandbox), Take Control or Exit without Save, with append-only `victories.jsonl`. User-requested terminal SAV uses the existing transactional serializer but can be mid-cycle, so **same-build reload is unverified**. Native score/replay/credits remain bypassed in all-AI mode.
+- Source contracts and Windows CI build checks are not gameplay acceptance. Pending same-save RNG parity, native observer handover, real victory scenarios, same-build SAV reload and performance/balance testing. Not merged.
+
+## Unmerged AUTO-NULL / AUTO-NEW experimental simulation features (8 November 2026)
+
+- Draft PR #11 adds tabbed pre-game automation setup (approximately 1.5x previous size), optional native map/tile Null Rendering gates, lightweight PowerShell progress monitor with warning/recovery commands, and profile-driven native no-menu New Game initialization with all factions under AI control from initial setup. This changes no native save format or ordinary game setup and leaves campaign-owned SAV/ZIP, terminal victory/report and batch cycling for separate work. Source/CI only; **Windows game validation pending**.
+
+
+## Unmerged AUTO-LAUNCH Stage A — isolated automation launcher (8 November 2026)
+
+- Adds a separate `Run Automation.bat` + PowerShell WinForms pre-game setup for new/native setup or loading an existing SAV, campaign naming and turn/telemetry/notice/fast settings. GUI defaults go to a separate `automation.ini`; an immutable run-profile INI is passed through the original `thinker.exe` to `terranx.exe` via inherited process environment. Normal game launches now ignore legacy automation toggles in the Thinker INIs. Profile provenance is fingerprinted in session manifests. Stage B campaign-owned saves/ZIP, Stage C automatic new games/batching, victory finalisation and observer replacement remain deferred. Windows game validation pending.
+
 This is the **fork's change history**, separate from Induktio's upstream [Thinker release changelog](Changelog.md). Record meaningful work when it lands or is substantively tested; Git commits and PRs remain the exact history. **Unreleased** means present on a draft/unmerged branch, not a shipped release.
+
+## Unmerged AUTO-002 — editable simulation control and campaign naming (8 November 2026)
+
+- Source implementation: native Win32 **Simulation Control** at complete AI turn cap and F9/F10/stop file: summary of full turns/years/colonies/units, user-entered 1–100000 additional turns, editable telemetry name and SAV basename, Save & Continue, Save & Exit, and next-turn observed-faction human takeover. The existing patched `mod_save_daemon` serializer writes to a temp SAV, then commits the requested name only after successful serialization. Failed/cancelled saves leave controls open.
+- TEL-001 naming/lineage: readable new campaign folder IDs and independently editable display names, surfaced in HTML and Tkinter analyzer; named-save `.autosim-campaign` sidecar with file fingerprint offers explicit rejoin on native reload with a new session number. Other saves create new campaigns; original SAV format unchanged. [Windows x86 Develop/Release CI 42454429090](https://github.com/Necaladun/thinkerNeca/actions/runs/42454429090) passed at `09cd616e` (including new source/synthetic tests); **unmerged, native Windows simulation/save/reload/manual-control testing outstanding.**
+
+## Unmerged AUTO-002 — verified-binary native Council window diagnostics (8 November 2026)
+
+- Verified user's patched `terranx.exe` hash against earlier installed binary and disassembled native Council chain, ballot and Governor-resolution handling. Added optional telemetry-only `CouncWin_init` entry/exit logging, including proposal, vote mask, ballot selections and weights, with exact-original-callsite check and matching `__thiscall` forwarding. Does **not** suppress Council UI or make any decision. Develop/Release x86 CI at `be514ef` [run 42452468919](https://github.com/Necaladun/thinkerNeca/actions/runs/42452468919) passed; native runtime is unverified. Project notice IDs confirm the logged Empath Guild finished on turn 97 and Council election on turn 117, not the same turn. Pre-Council save is still required to isolate modal safely.
+
+## Unmerged AUTO-002 — physical F9/F10 fallback and external stop file (8 November 2026)
+
+- Adds focus-gated `GetAsyncKeyState` edge sampling alongside queued keyboard polling during all-AI simulations. Supports a one-shot `autosim-stop.txt` file beside the game executable that requests the existing Save Game → menu action at the next completed full turn, then attempts to delete the file. Native Council modals and normal human games are not changed. User reports F10 was accepted during Council popup in a prior build, and combat visuals are faster. [Develop/Release Win32 CI 42451218764 passed at `fff9fef`](https://github.com/Necaladun/thinkerNeca/actions/runs/42451218764); neither new control is Windows-tested yet.
+
+## Unmerged AUTO-002 — defensive diplomacy guard and Council diagnostics (8 November 2026)
+
+- The existing `enemy_diplomacy` source already routes AI-to-AI participants through AI trade/encounter/treaty logic, not interactive `communicate`. Added a fail-closed `autosim_control_active()` entry guard only to the human-oriented `communicate` handler; unexpected all-AI calls are logged to `ui_notices.jsonl` with `diplomacy_guard` and cause no fabricated choice. Added non-mutating `call_council` entry/exit diagnostics for telemetry-enabled AI-only sessions and source-level regression checks. [Windows x86 Develop/Release compilation and source/host checks passed at `9733ed5` (run 42449885637)](https://github.com/Necaladun/thinkerNeca/actions/runs/42449885637). **Windows validation and Lal's actual native Council/bribery caller remain outstanding; not a proven unattended Council fix.**
+
+## Unmerged AUTO-002 — offscreen combat, movement and fungus notices (8 November 2026)
+
+- Experimental AI-only fast-presentation follow-up on `feature/auto-002-noninteractive-ui`: disable observer camera recentering, cursor/scoot animation, repeated battle window and per-defender artillery explosion rendering via existing offscreen movement/combat presentation paths. Retain actual move/AI/combat/RNG/HP/visibility/state processing; world tile updates continue. Scoped native preferences hide go-to paths, unit blink, base/production labels and edge scroll only during all-AI processing, then restore exact original values before autosave and normal human play. `FUNGUSGROWS`/`FUNGUSGROWS2` and forest/kelp growth reports use existing source-audited passive notice suppression without skipping ecology changes. [Windows x86 Develop/Release compilation and host/source checks passed at `d651cff` (run 42447573120)](https://github.com/Necaladun/thinkerNeca/actions/runs/42447573120). **Windows late-turn, artillery-stack, ecology and RNG-equivalence tests outstanding.**
+
+## Unmerged AUTO-002 — full-turn fast presentation (7 November 2026)
+
+- Reuses the existing `autosim_fast_combat=1` option for fast battle resolution, quick allied/enemy/all-unit/order movement, no pause after combat and no Map Animations during all-AI turn processing (upkeep, faction phase, AI unit moves, fights). Preferences are temporarily scoped and restored before autosave and manual Save Game. Native autosave implementation and filename/interval are unchanged; eligible all-AI simulations now request the native autosave even if the saved checkbox was disabled. Additional crash checkpoints are deferred by user. [Windows x86 Develop/Release compilation and source/host checks passed at `b6e8a6f` (run 42365101769)](https://github.com/Necaladun/thinkerNeca/actions/runs/42365101769); **not yet Windows-runtime verified**. Native Planetary Council modal remains a separate AUTO-002 blocker.
+
+## Unmerged AUTO-002 — Council modal blocker (7 November 2026)
+
+- Windows user report: a Deirdre-called Governor election opens a convening popup and native Council voting window despite all factions being AI. Only result notices were already suppressed. Source traced native `call_council` and pending `council` entrypoints; voting/finalization semantics remain unverified. **No code fix yet**: cannot safely skip a potentially gameplay-processing Council call or auto-confirm ballots. Noninteractive AI Council execution and Windows acceptance remain AUTO-002 work.
+
+## Unmerged AUTO-002 — probe notification audit (7 November 2026)
+
+- An observed-AI `DETECTINFILTRATE` popup exposed a gap beyond the earlier 24 `NetMsg_pop_2` result wrappers. On `feature/auto-002-noninteractive-ui`, classified and wrapped all remaining return-unused `src/probe.cpp` NetMsg, counter-spy, genetic/mind-control and portrait reports; suppress only the optional on-success intelligence panel. Observed-AI `PROBEPACT*`/`ENEMYPROBE2` human prompts now take the normal unobserved-AI path in opt-in simulation; passive probe clash alerts are wrapped. Choice-returning human dialogs and game state remain intact by source intent. **Source-only; Windows build, simulation and unchanged state/choices require verification.** Separate from BUG-001.
 
 ## Merged PR #10 — artillery reactor and fractional weak hits (7 November 2026)
 

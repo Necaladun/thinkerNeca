@@ -4,6 +4,7 @@
 #include "patchveh.h"
 #include "savegame.h"
 #include "jungle_hook_preflight.h"
+#include "autosim_render.h"
 
 
 // From the user's supported terranx.exe inspection:
@@ -801,6 +802,10 @@ bool patch_setup(Config* cf) {
     write_jump(0x55BB30, (int)set_treaty);
     write_jump(0x55BBA0, (int)set_agenda);
     write_jump(0x55BC00, (int)spying);
+    // Native third-party pact dissolution otherwise bypasses the existing
+    // ENEMYPACTENDS all-AI notice guard in faction_event.cpp. Use that
+    // source-equivalent routine; retain both factions' treaty-bit updates.
+    write_jump(0x55CE20, (int)enemies_unpact);
     write_jump(0x55D430, (int)enemies_trade_tech);
     write_jump(0x55D760, (int)enemies_treaty);
     write_jump(0x55E370, (int)encounter);
@@ -897,6 +902,12 @@ bool patch_setup(Config* cf) {
     write_jump(0x5BF010, (int)is_sensor);
     write_jump(0x5BF1F0, (int)has_abil);
     write_jump(0x5BF310, (int)X_pop);
+    // Native satellite results may use alternate portrait/popup variants.
+    // Exact-label filtering is inside the wrappers; all other labels and
+    // human/opt-out routes retain their native calls.
+    write_jump(0x5BF330, (int)X_pop_2);
+    write_jump(0x5BF5D0, (int)X_pops);
+    write_jump(0x5BF7D0, (int)X_pops_11);
     write_jump(0x5C03D0, (int)veh_init);
     write_jump(0x5C08C0, (int)veh_kill);
     write_jump(0x5C0B00, (int)kill);
@@ -1227,6 +1238,48 @@ bool patch_setup(Config* cf) {
     write_call(0x5BCC70, (int)mod_wants_to_attack); // tech_val
     write_call(0x5BCC85, (int)mod_wants_to_attack); // tech_val
     write_call(0x427F4A, (int)diplomacy_check); // CouncWin::init
+    // Native Council-only hooks: exact x86 post-Scient callsite preflight
+    // before any write. Unknown executables retain native Council behaviour.
+    // Runtime eligibility is checked in each wrapper, including setup-armed
+    // sessions where autosim_manual_turns was initially zero in the INI.
+    auto council_native_call = [](uintptr_t site, uintptr_t target) {
+        if (*(const uint8_t*)site != 0xE8) return false;
+        const int32_t displacement = *(const int32_t*)(site + 1);
+        return (uintptr_t)(site + 5 + displacement) == target;
+    };
+    const uint8_t* council_modal = (const uint8_t*)0x4282F2;
+    const bool council_known =
+        council_native_call(0x4284CA, 0x427230)
+        && council_native_call(0x4284A9, 0x48C0A0)
+        && council_native_call(0x428542, 0x48C0A0)
+        && council_native_call(0x428115, 0x5BF7D0)
+        && council_native_call(0x42828A, 0x5BF7D0)
+        && council_modal[0] == 0xFF
+        && council_modal[1] == 0x90
+        && council_modal[2] == 0xE4
+        && council_modal[3] == 0x00
+        && council_modal[4] == 0x00
+        && council_modal[5] == 0x00;
+    if (council_known) {
+        write_call(0x4284CA, (int)autosim_trace_CouncWin_init);
+        write_call(0x4284A9, (int)autosim_council_announcement);
+        write_call(0x428542, (int)autosim_council_announcement);
+        write_call(0x428115, (int)autosim_council_human_vote_offer);
+        write_call(0x42828A, (int)autosim_council_human_vote_offer);
+        // 0x4282F2 is an *indirect six-byte virtual call*
+        // (FF 90 E4 00 00 00), not a direct E8 call. write_call()
+        // explicitly rejects FF 90 and causes the "incorrect game version"
+        // fatal startup error. Replace all six verified bytes atomically
+        // with E8 rel32 / 90, preserving the call's stack/thiscall ABI.
+        const byte old_modal[6] = {0xFF, 0x90, 0xE4, 0, 0, 0};
+        byte new_modal[6] = {0xE8, 0, 0, 0, 0, 0x90};
+        const int32_t modal_disp =
+            (int32_t)autosim_council_modal_or_resolve - 0x4282F2 - 5;
+        memcpy(new_modal + 1, &modal_disp, sizeof(modal_disp));
+        write_bytes(0x4282F2, old_modal, new_modal, sizeof(old_modal));
+    } else {
+        OutputDebugStringA("thinkerNeca AUTO-002: Council hooks skipped (native preflight mismatch)\n");
+    }
     write_call(0x43F2F4, (int)diplomacy_check); // DiploPop::start
     write_call(0x4A2589, (int)diplomacy_check); // ReportWin::draw_intel
     write_call(0x4A26CE, (int)diplomacy_check); // ReportWin::draw_intel
@@ -2114,6 +2167,17 @@ bool patch_setup(Config* cf) {
     }
     */
 
+    // AUTO-NULL native entrypoint detours MUST be installed while the
+    // executable image is still writable. write_jump() writes E9+rel32
+    // directly and does not call VirtualProtect on its own. Placing this
+    // after PAGE_EXECUTE_READ caused an access violation in DLL startup
+    // before a SAV or new-game profile could reach telemetry.
+    if (cf->autosim_render_mode == 2 && autosim_launcher_active) {
+        if (!autosim_install_null_render_hooks()) {
+            cf->autosim_render_mode = 1; // fail safe: fast, not half-patched
+            OutputDebugStringA("thinkerNeca: Null Rendering unavailable; fast presentation active\n");
+        }
+    }
     if (!VirtualProtect(AC_IMAGE_BASE, AC_IMAGE_LEN, PAGE_EXECUTE_READ, &attrs)) {
         return false;
     }

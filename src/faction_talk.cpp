@@ -237,13 +237,22 @@ int __cdecl pact_withdraw(int faction_id, int faction_id_2) {
 }
 
 void __cdecl pact_ends(int faction_id, int faction_id_2) {
-    Popup cur_popup;
-    Popup_ctor(&cur_popup);
-    auto guard = cleanup_handler([&] { Popup_dtor(&cur_popup); });
     *DiploSecondFaction = faction_id_2;
     treaty_off(faction_id, faction_id_2, DIPLO_PACT);
     int moved_1 = pact_withdraw(faction_id, faction_id_2);
     int moved_2 = pact_withdraw(faction_id_2, faction_id);
+    // The ENDPACT1/2/3 screens are passive reports. Keep pact status
+    // dissolution and both factions' forced unit withdrawals above.
+    // Suppress these screens even if the operator enabled other notices:
+    // they use a separate native modal path and require user input.
+    if (autosim_session_active()) {
+        telemetry_record_ui_notice("diplomacy", "ENDPACT1/2/3",
+            "pact_and_withdrawal_completed_no_modal");
+        return;
+    }
+    Popup cur_popup;
+    Popup_ctor(&cur_popup);
+    auto guard = cleanup_handler([&] { Popup_dtor(&cur_popup); });
     draw_map(1);
     int num;
     if (faction_id == MapWin->cOwner) {
@@ -294,10 +303,10 @@ void __cdecl pact_of_brotherhood(int faction_id, int faction_id_2) {
     parse_says(3, get_pact(faction_id), -1, -1);
     parse_says(4, get_phrase(faction_id, 0), -1, -1);
     parse_says(5, get_phrase(faction_id_2, 0), -1, -1);
-    X_dialog("MAKEPACT", faction_id_2);
+    autosim_notice_dialog("MAKEPACT", faction_id_2);
     net_maps(faction_id, faction_id_2, 1);
     parse_says(0, get_pact(faction_id), -1, -1);
-    X_dialog("HERESTHEMAP", faction_id_2);
+    autosim_notice_dialog("HERESTHEMAP", faction_id_2);
     scan_prototypes(faction_id, faction_id_2);
     mention_prototypes(faction_id, faction_id_2);
     if ((*DiffLevel <= 1 || tut_check2(0x1000)) && !*MultiplayerActive) {
@@ -327,7 +336,7 @@ void __cdecl make_treaty(int faction_id, int faction_id_2) {
     parse_says(6, get_noun_phrase(faction_id, 9), -1, -1);
     parse_says(7, get_noun_phrase(faction_id_2, 9), -1, -1);
     snprintf(StrBuffer, StrBufLen, "MAKETREATY%d", random_val(0, 2));
-    X_dialog(StrBuffer, faction_id_2);
+    autosim_notice_dialog(StrBuffer, faction_id_2);
     if ((*DiffLevel <= 1 || tut_check2(0x800)) && !*MultiplayerActive) {
         parse_says(0, get_noun(faction_id_2), -1, -1);
         X_pop_2(TutorFile, "COMMERCE", 0);
@@ -354,7 +363,7 @@ void __cdecl pledge_truce(int faction_id, int faction_id_2, int flag) {
         parse_says(3, get_title(faction_id_2), -1, -1);
         parse_says(4, get_name(faction_id_2), -1, -1);
         parse_says(5, get_noun(faction_id_2), -1, -1);
-        X_dialog("MAKETRUCE", faction_id_2);
+        autosim_notice_dialog("MAKETRUCE", faction_id_2);
     }
 }
 

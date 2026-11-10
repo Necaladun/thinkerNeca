@@ -134,7 +134,7 @@ int __cdecl mod_base_hurry() {
             && has_treaty(b->faction_id, MapWin->cOwner, DIPLO_COMMLINK)) {
                 parse_says(0, MFactions[b->faction_id].adj_name_faction, -1, -1);
                 parse_says(1, Facility[-t].name, -1, -1);
-                popp(ScriptFile, "DONEPROJECT", 0, "secproj_sm.pcx", 0);
+                autosim_notice_popp(ScriptFile, "DONEPROJECT", "secproj_sm.pcx");
             }
             return 1;
         }

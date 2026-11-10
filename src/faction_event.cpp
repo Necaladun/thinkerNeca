@@ -27,7 +27,7 @@ void __cdecl pact_attacks(int faction_id_1, int faction_id_2) {
     parse_says(2, get_noun(faction_id_1), -1, -1);
     parse_says(3, get_he_she(faction_id_1, 0), -1, -1);
     parse_says(4, get_noun(faction_id_2), -1, -1);
-    mod_NetMsg_pop(NetMsg, "PACTATTACKS", 5000, 0, 0);
+    autosim_notice_diplomacy(NetMsg, "PACTATTACKS", 5000, 0, 0);
 }
 
 void __cdecl pact_unpact(int faction_id_1, int faction_id_2) {
@@ -40,7 +40,7 @@ void __cdecl pact_unpact(int faction_id_1, int faction_id_2) {
     parse_says(6, get_title(faction_id_2), -1, -1);
     parse_says(7, get_name(faction_id_2), -1, -1);
     parse_says(8, get_noun(faction_id_2), -1, -1);
-    mod_NetMsg_pop(NetMsg, "PACTUNPACT", 5000, 0, 0);
+    autosim_notice_diplomacy(NetMsg, "PACTUNPACT", 5000, 0, 0);
 }
 
 void __cdecl pact_truce(int faction_id_1, int faction_id_2) {
@@ -51,7 +51,7 @@ void __cdecl pact_truce(int faction_id_1, int faction_id_2) {
     parse_says(4, get_title(faction_id_2), -1, -1);
     parse_says(5, get_name(faction_id_2), -1, -1);
     parse_says(6, get_noun(faction_id_2), -1, -1);
-    mod_NetMsg_pop(NetMsg, "PACTTRUCE", 5000, 0, 0);
+    autosim_notice_diplomacy(NetMsg, "PACTTRUCE", 5000, 0, 0);
 }
 
 void __cdecl pact_treaty(int faction_id_1, int faction_id_2) {
@@ -60,7 +60,7 @@ void __cdecl pact_treaty(int faction_id_1, int faction_id_2) {
     parse_says(2, get_noun(faction_id_1), -1, -1);
     parse_says(3, get_he_she(faction_id_1, 0), -1, -1);
     parse_says(4, get_noun(faction_id_2), -1, -1);
-    mod_NetMsg_pop(NetMsg, "PACTTREATY", 5000, 0, 0);
+    autosim_notice_diplomacy(NetMsg, "PACTTREATY", 5000, 0, 0);
 }
 
 void __cdecl enemies_war(int faction_id_1, int faction_id_2) {
@@ -78,7 +78,7 @@ void __cdecl enemies_war(int faction_id_1, int faction_id_2) {
     || (*GameState & STATE_OMNISCIENT_VIEW)) {
         parse_says(0, get_noun(faction_id_1), -1, -1);
         parse_says(1, get_noun(faction_id_2), -1, -1);
-        mod_NetMsg_pop(NetMsg, "ENEMYWAR", 5000, 0, 0);
+        autosim_notice_diplomacy(NetMsg, "ENEMYWAR", 5000, 0, 0);
     }
     treaty_on(faction_id_1, faction_id_2, DIPLO_VENDETTA);
     if (!(plr1.diplo_status[faction_id_2] & DIPLO_UNK_40000000)) {
@@ -122,7 +122,7 @@ void __cdecl enemies_unpact(int faction_id_1, int faction_id_2) {
             parse_says(0, get_noun(faction_id_1), -1, -1);
             parse_says(1, get_noun(faction_id_2), -1, -1);
             parse_says(2, get_pact_hood(faction_id_1, faction_id_2), -1, -1);
-            mod_NetMsg_pop(NetMsg, "ENEMYPACTENDS", 5000, 0, 0);
+            autosim_notice_diplomacy(NetMsg, "ENEMYPACTENDS", 5000, 0, 0);
         }
         plr1.diplo_status[faction_id_2] &= ~(DIPLO_UNK_1000000|DIPLO_UNK_100000|DIPLO_PACT);
         plr2.diplo_status[faction_id_1] &= ~(DIPLO_UNK_1000000|DIPLO_UNK_100000|DIPLO_PACT);
@@ -141,7 +141,7 @@ void __cdecl enemies_team_up(int faction_id_1, int faction_id_2, int faction_id_
             }
             if (faction_id_3 == player_id) {
                 parse_says(0, get_noun(faction_id_1), -1, -1);
-                mod_NetMsg_pop(NetMsg, "TEAM", 5000, 0, 0);
+                autosim_notice_diplomacy(NetMsg, "TEAM", 5000, 0, 0);
             }
             Factions[faction_id_3].diplo_spoke[faction_id_2] = *CurrentTurn;
             Factions[faction_id_3].diplo_spoke[faction_id_1] = *CurrentTurn;
@@ -235,7 +235,7 @@ void __cdecl enemies_treaty(int faction_id_1, int faction_id_2, int trade_tech) 
             || (*GameState & STATE_OMNISCIENT_VIEW)) {
                 parse_says(0, get_noun(faction_id_1), -1, -1);
                 parse_says(1, get_noun(faction_id_2), -1, -1);
-                mod_NetMsg_pop(NetMsg, "ENEMYTRUCE", 5000, 0, 0);
+                autosim_notice_diplomacy(NetMsg, "ENEMYTRUCE", 5000, 0, 0);
             }
             treaty_on(faction_id_1, faction_id_2, DIPLO_TRUCE);
             return;
@@ -250,7 +250,7 @@ void __cdecl enemies_treaty(int faction_id_1, int faction_id_2, int trade_tech) 
         || (*GameState & STATE_OMNISCIENT_VIEW)) {
             parse_says(0, get_noun(faction_id_1), -1, -1);
             parse_says(1, get_noun(faction_id_2), -1, -1);
-            mod_NetMsg_pop(NetMsg, "ENEMYTREATY", 5000, 0, 0);
+            autosim_notice_diplomacy(NetMsg, "ENEMYTREATY", 5000, 0, 0);
         }
         treaty_on(faction_id_1, faction_id_2, DIPLO_TREATY);
         return;
@@ -321,7 +321,7 @@ void __cdecl enemies_treaty(int faction_id_1, int faction_id_2, int trade_tech) 
             suffix = "1";
         }
         snprintf(StrBuffer, StrBufLen, "ENEMIESTEAMUP%s", suffix);
-        mod_NetMsg_pop(NetMsg, StrBuffer, 5000, 0, 0);
+        autosim_notice_diplomacy(NetMsg, StrBuffer, 5000, 0, 0);
     }
 }
 
@@ -348,14 +348,14 @@ void __cdecl comm_check(int faction_id_1, int faction_id_2) {
                 parse_says(0, get_title(faction_id_2), -1, -1);
                 parse_says(1, get_name(faction_id_2), -1, -1);
                 parse_says(2, get_noun(faction_id_2), -1, -1);
-                NetMsg_pop(NetMsg, "NETMET", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "NETMET", 5000, 0, 0);
             }
             if (faction_id_2 == player_id
             && !(Factions[faction_id_1].diplo_status[faction_id_2] & DIPLO_UNK_8000000)) {
                 parse_says(0, get_title(faction_id_1), -1, -1);
                 parse_says(1, get_name(faction_id_1), -1, -1);
                 parse_says(2, get_noun(faction_id_1), -1, -1);
-                NetMsg_pop(NetMsg, "NETMET", 5000, 0, 0);
+                autosim_notice_netmsg(NetMsg, "NETMET", 5000, 0, 0);
             }
         } else {
             DiploStateA[faction_id_2] |= DST_UNK_1;
@@ -394,10 +394,10 @@ void __cdecl encounter(int faction_id_1, int faction_id_2, int x, int y, int fun
     if (!faction_id_2) {
         if (faction_id_1 == MapWin->cOwner && MFactions[faction_id_1].is_alien()) {
             if (fungal_tower) {
-                interlude(44, 0, 1, 0);
+                autosim_interlude(44, 0, 1, 0);
             }
             if (native_unit) {
-                interlude(43, 0, 1, 0);
+                autosim_interlude(43, 0, 1, 0);
             }
         }
         return;
@@ -409,17 +409,17 @@ void __cdecl encounter(int faction_id_1, int faction_id_2, int x, int y, int fun
         }
         if (!_stricmp(MFactions[faction_id_1].search_key, "CARETAKE")) {
             if (faction_id_1 == MapWin->cOwner) {
-                interlude(39, 0, 1, 0);
+                autosim_interlude(39, 0, 1, 0);
             }
             if (faction_id_2 == MapWin->cOwner) {
-                interlude(40, 0, 1, 0);
+                autosim_interlude(40, 0, 1, 0);
             }
         } else {
             if (faction_id_1 == MapWin->cOwner) {
-                interlude(40, 0, 1, 0);
+                autosim_interlude(40, 0, 1, 0);
             }
             if (faction_id_2 == MapWin->cOwner) {
-                interlude(39, 0, 1, 0);
+                autosim_interlude(39, 0, 1, 0);
             }
         }
         return;
@@ -431,18 +431,18 @@ void __cdecl encounter(int faction_id_1, int faction_id_2, int x, int y, int fun
                 treaty_on(faction_id_1, faction_id_2, DIPLO_UNK_40000000);
             }
             if (faction_id_1 == MapWin->cOwner) {
-                interlude(34, 0, 1, 0);
+                autosim_interlude(34, 0, 1, 0);
             }
             if (faction_id_2 == MapWin->cOwner) {
-                interlude(22, 0, 1, 0);
+                autosim_interlude(22, 0, 1, 0);
             }
             return;
         }
         if (faction_id_1 == MapWin->cOwner) {
-            interlude(35, 0, 1, 0);
+            autosim_interlude(35, 0, 1, 0);
         }
         if (faction_id_2 == MapWin->cOwner) {
-            interlude(23, 0, 1, 0);
+            autosim_interlude(23, 0, 1, 0);
         }
     }
     if (MFactions[faction_id_2].is_alien()) {
@@ -452,18 +452,18 @@ void __cdecl encounter(int faction_id_1, int faction_id_2, int x, int y, int fun
                 treaty_on(faction_id_1, faction_id_2, DIPLO_UNK_40000000);
             }
             if (faction_id_1 == MapWin->cOwner) {
-                interlude(22, 0, 1, 0);
+                autosim_interlude(22, 0, 1, 0);
             }
             if (faction_id_2 == MapWin->cOwner) {
-                interlude(34, 0, 1, 0);
+                autosim_interlude(34, 0, 1, 0);
             }
             return;
         }
         if (faction_id_1 == MapWin->cOwner) {
-            interlude(23, 0, 1, 0);
+            autosim_interlude(23, 0, 1, 0);
         }
         if (faction_id_2 == MapWin->cOwner) {
-            interlude(35, 0, 1, 0);
+            autosim_interlude(35, 0, 1, 0);
         }
     }
     if (*SunspotDuration <= 0) {
@@ -974,7 +974,32 @@ void __cdecl enemy_diplomacy(int faction_id) {
                     continue;
                 }
             }
+            // Native satellite combat must run once, unchanged. Log state on
+            // each side so an interrupted observer popup can be identified
+            // without inferring destruction from its text alone.
+            const OrbitAttackTrace orbit_trace =
+                telemetry_orbit_begin_attack(faction_id, i, sat_type, base_id, max_busters);
+            const bool trace_satellite = autosim_ui_active() && conf.telemetry_enabled;
+            if (trace_satellite) {
+                char action[256];
+                snprintf(action, sizeof(action),
+                    "enter actor=%d target=%d type=%d base=%d actor_odp=%d deployed=%d target_odp=%d target_n=%d target_m=%d target_e=%d",
+                    faction_id, i, sat_type, base_id, plr.satellites_ODP, plr.ODP_deployed,
+                    Factions[i].satellites_ODP, Factions[i].satellites_nutrient,
+                    Factions[i].satellites_mineral, Factions[i].satellites_energy);
+                telemetry_record_ui_notice("satellite_native", "action_sat_attack", action);
+            }
             action_sat_attack(faction_id, i, sat_type, base_id);
+            telemetry_orbit_end_attack(orbit_trace, faction_id, i, sat_type, base_id);
+            if (trace_satellite) {
+                char action[256];
+                snprintf(action, sizeof(action),
+                    "exit actor=%d target=%d type=%d base=%d actor_odp=%d deployed=%d target_odp=%d target_n=%d target_m=%d target_e=%d",
+                    faction_id, i, sat_type, base_id, plr.satellites_ODP, plr.ODP_deployed,
+                    Factions[i].satellites_ODP, Factions[i].satellites_nutrient,
+                    Factions[i].satellites_mineral, Factions[i].satellites_energy);
+                telemetry_record_ui_notice("satellite_native", "action_sat_attack", action);
+            }
             break;
         }
         if (sat_type < 0) {

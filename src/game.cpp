@@ -1,5 +1,6 @@
 
 #include "game.h"
+#include "autosim_control.h"
 #include <direct.h>
 
 int* const dword_945818 = (int*)0x945818;
@@ -44,6 +45,18 @@ const uint32_t GameRulesOptions[][2] = {
 
 static uint32_t custom_game_rules = 0;
 static uint32_t custom_more_rules = 0;
+
+// An explicit Continue after true victory starts a new optional AI segment.
+// The turn driver consumes this at its next full-cycle boundary, not from
+// inside a Council, production or combat hook.
+static bool autosim_post_victory_segment_pending = false;
+static bool autosim_post_victory_ignore_time_limit = false;
+bool autosim_take_post_victory_segment_reset() {
+    const bool pending = autosim_post_victory_segment_pending;
+    autosim_post_victory_segment_pending = false;
+    return pending;
+}
+
 
 
 const char* resource_icon(int res_type, bool ocean, bool add) {
@@ -355,17 +368,90 @@ void __cdecl control_game() {
             *ControlTurnB = 0;
             *MultiplayerActive = 0;
             flush_input();
+            std::string telemetry_source_save;
+            // Native menu saves are captured by mod_load_daemon on success.
+            // Do not accidentally inherit the previous game's file identity.
+            telemetry_note_loaded_save(NULL);
             if (start_lobby) {
                 prefs_load(0);
                 prefs_use();
                 if (multiplayer_init(1)) {
                     break;
                 }
+            } else if (autosim_auto_new_game) {
+                // Explicit run profile replaces TOPMENU/DIFFICULTY/WORLDSIZE
+                // dialogs. Validate native all-AI initialization before
+                // entering the ordinary control_turn driver.
+                prefs_load(0);
+                prefs_use();
+                // 0: generated custom planet; 1/2: shipped Planet map variants.
+                // The latter use map_menu's native MP loader, not WorldBuilder.
+                DefaultPrefs->map_type = autosim_new_world_source
+                    ? autosim_new_world_source + 1 : 1;
+                DefaultPrefs->difficulty = autosim_new_difficulty;
+                DefaultPrefs->faction_id = autosim_new_observer;
+                AlphaIniPrefs->custom_world[0] = autosim_new_world_size;
+                AlphaIniPrefs->custom_world[1] = autosim_new_world_ocean;
+                AlphaIniPrefs->custom_world[2] = 2 - autosim_new_world_ocean;
+                AlphaIniPrefs->custom_world[3] = autosim_new_world_erosion;
+                AlphaIniPrefs->custom_world[4] = 1;
+                AlphaIniPrefs->custom_world[5] = autosim_new_world_cloud;
+                AlphaIniPrefs->custom_world[6] = autosim_new_world_life;
+                // Explicit run-specific regular rules override only the low
+                // 16 bits and two native random-leader flags. Never persist
+                // to Alpha Centauri.ini, or change scenario/high rules.
+                if (autosim_new_rules_override) {
+                    AlphaIniPrefs->rules = (AlphaIniPrefs->rules & 0xFFFF0000u)
+                        | autosim_new_rules_mask;
+                    const unsigned leader_flags =
+                        STATE_RAND_FAC_LEADER_PERSONALITIES
+                        | STATE_RAND_FAC_LEADER_SOCIAL_AGENDA;
+                    *GameState = (*GameState & ~leader_flags)
+                        | ((autosim_new_random_leaders & 1)
+                            ? STATE_RAND_FAC_LEADER_PERSONALITIES : 0)
+                        | ((autosim_new_random_leaders & 2)
+                            ? STATE_RAND_FAC_LEADER_SOCIAL_AGENDA : 0);
+                }
+                const char* builtin = autosim_new_world_source == 1
+                    ? "maps\\xplanet.mp"
+                    : (autosim_new_world_source == 2 ? "maps\\xplanetx.mp" : NULL);
+                if (builtin && !FileExists(builtin)) {
+                    char message[320];
+                    snprintf(message, sizeof(message),
+                        "Selected Planet map is missing: %s\n"
+                        "Install the game's original map files or select a generated planet.",
+                        builtin);
+                    MessageBoxA(*phWnd, message, "thinkerNeca Automation",
+                        MB_OK | MB_ICONSTOP);
+                    break;
+                }
+                *ControlTurnMove = 0;
+                if (map_menu(1)
+                || (FactionStatus[0] & 0xFEu)
+                || MapWin->cOwner < 1 || MapWin->cOwner >= MaxPlayerNum
+                || !is_alive(MapWin->cOwner)
+                || (*GameState & (STATE_SCENARIO_EDITOR | STATE_OMNISCIENT_VIEW
+                    | STATE_SCENARIO_CHEATED_FLAG))) {
+                    MessageBoxA(*phWnd,
+                        "Automatic new-game setup failed its all-AI invariants.\n"
+                        "No turn will be simulated.",
+                        "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                    break;
+                }
+                telemetry_source_save.clear();
             } else if (startup_load_path.size()) {
                 if (!mod_load_daemon(startup_load_path.c_str(), 0)) {
+                    telemetry_source_save = startup_load_path;
                     for (int i = 1; i < MaxPlayerNum; ++i) {
                         load_faction_art(i);
                     }
+                } else if (autosim_launcher_active) {
+                    MessageBoxA(*phWnd,
+                        "Could not load the selected automation save.\n"
+                        "The simulation will not start.",
+                        "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                    startup_load_path.clear();
+                    break;
                 }
                 startup_load_path = "";
             } else if (top_menu(0)) {
@@ -388,9 +474,20 @@ void __cdecl control_game() {
             if (*MultiplayerActive) {
                 net_control_turn();
             } else {
+                telemetry_begin_session(telemetry_source_save.c_str());
                 control_turn();
+                telemetry_end_session();
             }
             desktop_close();
+            // One automation launcher invocation always runs at most one
+            // game. Save & Exit sets ControlTurnB=1 for the native menu,
+            // which previously regenerated a second world because the
+            // launcher New Game flag was still set on loop reentry.
+            // Sequential game batches will be driven outside terranx.exe.
+            if (autosim_launcher_active) {
+                *ControlTurnB = 0;
+                return cleanup_close();
+            }
             if (!*ControlTurnB) {
                 return cleanup_close();
             }
@@ -508,12 +605,27 @@ int __cdecl custom_planet(int use_images, int use_defaults) {
         cur_setup.preview_buffers[2] = nullptr;
     }
     *MapLandCoverage = 2 - *MapOceanCoverage;
-    prefs_save(0);
+    if (!autosim_auto_new_game) prefs_save(0);
     return 0;
 }
 
 int __cdecl size_of_planet(int setup_mode) {
     debug("size_of_planet %d\n", setup_mode);
+    // Native Custom Map is selection 99 and normally shows an edit dialog.
+    // The explicit new-game launcher profile supplies those two numbers
+    // directly, using the same dimensions/map-init sequence as native.
+    // X is the native half-width: the engine stores MapAreaX = 2 * X.
+    if (setup_mode == 1 && autosim_auto_new_game
+    && autosim_new_world_source == 0 && autosim_new_world_size == 6) {
+        *dword_945820 = 1;
+        *MapSizePlanet = 99;
+        *MapAreaX = 2 * autosim_new_custom_x;
+        *MapAreaY = autosim_new_custom_y;
+        map_init();
+        Path_init(Paths);
+        *GameDrawState |= 8;
+        return 0;
+    }
     Popup cur_popup;
     SetupWin cur_setup;
     Popup_ctor(&cur_popup);
@@ -562,6 +674,14 @@ int __cdecl size_of_planet(int setup_mode) {
             }
         }
         if (selection != 99) {
+            // The installed alpha(x).txt can differ from the distributed
+            // six-entry list. Fail closed rather than read a missing preset.
+            if (autosim_auto_new_game && (selection < 0 || selection >= entry_count)) {
+                MessageBoxA(*phWnd,
+                    "Selected world size is missing from the installed #WORLDSIZE list.",
+                    "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                return 1;
+            }
             width = widths[selection];
             *MapAreaY = heights[selection];
         } else {
@@ -589,12 +709,18 @@ int __cdecl size_of_planet(int setup_mode) {
             }
         }
     } else {
+        if (autosim_auto_new_game) {
+            MessageBoxA(*phWnd,
+                "The installed alpha(x).txt has no #WORLDSIZE list.",
+                "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+            return 1;
+        }
         *MapSizePlanet = 2;
         width = 40;
         *MapAreaY = 80;
     }
     *MapAreaX = 2 * width;
-    prefs_save(0);
+    if (!autosim_auto_new_game) prefs_save(0);
     if (setup_mode < 2) {
         map_init();
         Path_init(Paths);
@@ -627,7 +753,7 @@ int __cdecl map_menu(int flag) {
             return 1;
         }
         DefaultPrefs->map_type = choice;
-        prefs_save(0);
+        if (!autosim_auto_new_game) prefs_save(0);
         bool restart_outer = false;
         bool reset_climate = false;
         bool retry;
@@ -637,6 +763,8 @@ int __cdecl map_menu(int flag) {
             case 0:
             case 1:
                 if (size_of_planet(flag)) {
+                    // An unattended launch cannot retry a menu without input.
+                    if (autosim_auto_new_game) return 1;
                     restart_outer = true;
                     break;
                 }
@@ -645,6 +773,7 @@ int __cdecl map_menu(int flag) {
                 }
                 if (choice == 1) {
                     if (custom_planet(1, flag)) {
+                        if (autosim_auto_new_game) return 1;
                         retry = true;
                     }
                 } else {
@@ -665,6 +794,11 @@ int __cdecl map_menu(int flag) {
 
             case 2:
                 if (mod_load_map_daemon("maps\\xplanet.mp")) {
+                    if (autosim_auto_new_game) {
+                        MessageBoxA(*phWnd, "Could not load maps\\xplanet.mp.",
+                            "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                        return 1;
+                    }
                     restart_outer = true;
                 } else {
                     reset_climate = true;
@@ -673,6 +807,11 @@ int __cdecl map_menu(int flag) {
 
             case 3:
                 if (mod_load_map_daemon("maps\\xplanetx.mp")) {
+                    if (autosim_auto_new_game) {
+                        MessageBoxA(*phWnd, "Could not load maps\\xplanetx.mp.",
+                            "thinkerNeca Automation", MB_OK | MB_ICONSTOP);
+                        return 1;
+                    }
                     restart_outer = true;
                 } else {
                     reset_climate = true;
@@ -699,6 +838,7 @@ int __cdecl map_menu(int flag) {
             world_climate();
         }
         if (config_game(flag)) {
+            if (autosim_auto_new_game) return 1;
             continue;
         }
         return 0;
@@ -1505,6 +1645,31 @@ CONF_PICK:
     if (!flag) {
         prefs_save(1);
     }
+    // Launcher-only explicit seven-slot roster. Use the same native faction
+    // reader and flag/art loaders as the ordinary randomized faction picker.
+    // This runs before normal game setup; it does not touch saved-game rosters.
+    if (autosim_auto_new_game && !autosim_new_roster[0].empty()) {
+        for (int i = 1; i < MaxPlayerNum; ++i) {
+            const std::string& identity = autosim_new_roster[i - 1];
+            const bool needs_expansion = identity == "CYBORG"
+                || identity == "PIRATES" || identity == "DRONE"
+                || identity == "ANGELS" || identity == "FUNGBOY"
+                || identity == "CARETAKE" || identity == "USURPER";
+            if (needs_expansion && !*ExpansionEnabled) {
+                MessageBoxA(*phWnd,
+                    "The selected faction roster includes Alien Crossfire factions, "
+                    "but the expansion is not enabled. The game was not started.",
+                    "thinkerNeca Automation Roster", MB_OK | MB_ICONSTOP);
+                return 1;
+            }
+            MFaction* fac = &MFactions[i];
+            strcpy_n(fac->filename, 24, identity.c_str());
+            strcpy_n(fac->search_key, 24, identity.c_str());
+            read_faction(fac, 0);
+            load_faction_art(i);
+            debug("autosim faction slot %d %s\n", i, identity.c_str());
+        }
+    }
     for (int i = 1; i < MaxPlayerNum; ++i) {
         MFaction* fac = &MFactions[i];
         if (strcmp(fac->filename, "JENN282")) {
@@ -1522,7 +1687,8 @@ CONF_PICK:
         load_faction_art(i);
     }
     load_flags();
-    if (*ExpansionEnabled && !*MultiplayerActive && !*PbemActive && MFactions[plr_id].is_alien()) {
+    if (*ExpansionEnabled && !*MultiplayerActive && !*PbemActive
+    && !autosim_auto_new_game && MFactions[plr_id].is_alien()) {
         *GameRules &= ~RULES_BLIND_RESEARCH;
         *GameRules |= RULES_NO_UNITY_SURVEY|RULES_INTENSE_RIVALRY;
     }
@@ -1538,7 +1704,10 @@ CONF_SEAT:
                 }
             }
         } else {
-            FactionStatus[0] = 1 << plr_id;
+            // The unattended observer is a camera anchor, not a human.
+            // Initialise every starting faction through the normal AI
+            // allocation/placement branch, including the observed one.
+            FactionStatus[0] = autosim_auto_new_game ? 0 : 1 << plr_id;
         }
         MapWin->cOwner = plr_id;
 CONF_FINAL:
@@ -1558,7 +1727,7 @@ CONF_FINAL:
             AlphaIniPrefs->time_controls = value;
             GameTimeControl[0] = value;
         }
-        prefs_save(0);
+        if (!autosim_auto_new_game) prefs_save(0);
         log_set_state(0);
         if (!(flag & 2)) {
             *VehCount = 0;
@@ -1582,7 +1751,7 @@ CONF_FINAL:
             *dword_93A9B4 = 0;
             return 0;
         }
-        if (!*MultiplayerActive && !(flag & 2)) {
+        if (!*MultiplayerActive && !(flag & 2) && !autosim_auto_new_game) {
             planetfall(MapWin->cOwner);
         }
         return 0;
@@ -1827,11 +1996,14 @@ CONF_LOOP:
 void __cdecl setup_game(int flag) {
     debug("setup_game %d\n", flag);
     LastSavePath[0] = 0;
-    prefs_put("Latest Save", unk_945E78);
-    prefs_put("Latest Scenario", unk_945E7C);
+    if (!autosim_auto_new_game) {
+        prefs_put("Latest Save", unk_945E78);
+        prefs_put("Latest Scenario", unk_945E7C);
+    }
 
     // change prefs_put_2 value to only reset preferences once when the conditions are met
-    if (!*DiffLevel && !flag && !prefs_get_2("DontResetBeginnerPrefs", 0, 0)) {
+    if (!autosim_auto_new_game && !*DiffLevel && !flag
+    && !prefs_get_2("DontResetBeginnerPrefs", 0, 0)) {
         prefs_load(1);
         AlphaIniPrefs->preferences |= PREF_BSC_TUTORIAL_MSGS;
         prefs_put_2("DontResetBeginnerPrefs", 1, 0);
@@ -2059,7 +2231,8 @@ int __cdecl end_of_game(int flag) {
     }
     int winner_id = -1;
     if (!(*GameState & STATE_GAME_DONE) && flag) {
-        if (*CurrentMissionYear >= *EndingMissionYear) {
+        if (*CurrentMissionYear >= *EndingMissionYear
+        && !(autosim_session_active() && autosim_post_victory_ignore_time_limit)) {
             *GameVictoryType = VIC_TIME_LIMIT;
             *GameState |= STATE_GAME_DONE;
         }
@@ -2141,6 +2314,184 @@ int __cdecl end_of_game(int flag) {
     }
     if (!(*GameState & STATE_GAME_DONE) || (*GameState & STATE_FINAL_SCORE_DONE)) {
         return 0;
+    }
+    if (autosim_session_active()) {
+        // Normal native victory detection above has already completed.
+        // Here the observer is only a camera, not the loser or winner.
+        int winner = 0;
+        if (*GameVictoryType == VIC_UNIFY_SOLO || *GameVictoryType == VIC_UNIFY_COOP) {
+            int alive_count = 0;
+            for (int fc = 1; fc < MaxPlayerNum; ++fc) {
+                if (is_alive(fc)) { winner = fc; ++alive_count; }
+            }
+            if (alive_count != 1) winner = 0;
+        } else {
+            unsigned flag_value = 0;
+            if (*GameVictoryType == VIC_DIPLOMATIC_SOLO
+            || *GameVictoryType == VIC_DIPLOMATIC_COOP
+            || *GameVictoryType == VIC_DIPLOMATIC_LOSS) {
+                flag_value = PFLAG_UNK_20000;
+            } else if (*GameVictoryType == VIC_ECONOMIC_SOLO
+            || *GameVictoryType == VIC_ECONOMIC_COOP
+            || *GameVictoryType == VIC_ECONOMIC_LOSS) {
+                flag_value = PFLAG_UNK_40000;
+            } else if (*GameVictoryType == VIC_ALIEN_SOLO
+            || *GameVictoryType == VIC_ALIEN_COOP
+            || *GameVictoryType == VIC_ALIEN_LOSS) {
+                flag_value = PFLAG_UNK_100000;
+            }
+            if (flag_value) {
+                for (int fc = 1; fc < MaxPlayerNum; ++fc) {
+                    if ((unsigned)Factions[fc].player_flags & flag_value) {
+                        if (winner) { winner = 0; break; }
+                        winner = fc;
+                    }
+                }
+            }
+        }
+        if (winner && (*GameVictoryType == VIC_UNIFY_SOLO
+            || *GameVictoryType == VIC_UNIFY_COOP
+            || *GameVictoryType == VIC_DIPLOMATIC_SOLO
+            || *GameVictoryType == VIC_DIPLOMATIC_COOP
+            || *GameVictoryType == VIC_DIPLOMATIC_LOSS
+            || *GameVictoryType == VIC_ECONOMIC_SOLO
+            || *GameVictoryType == VIC_ECONOMIC_COOP
+            || *GameVictoryType == VIC_ECONOMIC_LOSS)) {
+            mon_winning_unify(winner, -1);
+        }
+        // This is a completed native victory phase, not necessarily a
+        // completed full faction cycle. Record it before showing controls.
+        telemetry_record_terminal_result(NULL, "operator_decision_pending");
+        autosim_null_render_suppress(false);
+        autosim_monitor_progress("victory_paused", 0);
+        draw_map(1);
+
+        AutosimDialogState dialog;
+        autosim_fill_dialog_state(&dialog, AUTOSIM_DIALOG_VICTORY);
+        // end_of_game is called after a turn/faction phase, before the
+        // completed-cycle telemetry checkpoint. A manual save at this point
+        // can be serialized, but reload semantics still need Windows tests.
+        dialog.partial_turn = true;
+        dialog.can_continue_after_victory = false;
+        for (int fc = 1; fc < MaxPlayerNum; ++fc)
+            if (is_alive(fc)) dialog.can_continue_after_victory = true;
+
+        const char* victory_name = "Unclassified world ending";
+        switch (*GameVictoryType) {
+        case VIC_UNIFY_SOLO: case VIC_UNIFY_COOP:
+            victory_name = "Conquest"; break;
+        case VIC_DIPLOMATIC_SOLO: case VIC_DIPLOMATIC_COOP:
+        case VIC_DIPLOMATIC_LOSS:
+            victory_name = "Supreme Leader"; break;
+        case VIC_ECONOMIC_SOLO: case VIC_ECONOMIC_COOP:
+        case VIC_ECONOMIC_LOSS:
+            victory_name = "Economic"; break;
+        case VIC_TRANSCEND_PLR: case VIC_TRANSCEND_UNK:
+        case VIC_TRANSCEND_LOSS:
+            victory_name = "Transcendence"; break;
+        case VIC_ALIEN_SOLO: case VIC_ALIEN_COOP:
+        case VIC_ALIEN_LOSS:
+            victory_name = "Alien Subspace"; break;
+        case VIC_TIME_LIMIT: victory_name = "Time limit"; break;
+        case VIC_SUDDEN_DEATH: victory_name = "Scenario objective"; break;
+        default: break;
+        }
+        char victory_summary[256];
+        snprintf(victory_summary, sizeof(victory_summary),
+            "MY%d: %s victory. %s (observer %d, raw type %d).",
+            *CurrentMissionYear, victory_name,
+            winner ? MFactions[winner].formal_name_faction
+                   : "Winner not yet established from native state",
+            MapWin->cOwner, *GameVictoryType);
+        dialog.victory_summary = victory_summary;
+        telemetry_record_ui_notice("autosim", "VICTORY_PAUSE", victory_summary);
+
+        for (;;) {
+            const AutosimDialogChoice choice = autosim_show_control_dialog(&dialog);
+            if (choice == AUTOSIM_DIALOG_FAILED) {
+                // Never silently close a world at victory if modal creation
+                // fails. Provide an explicit retry or exit fallback.
+                if (MessageBoxA(*phWnd,
+                    "Victory was recorded, but the control dialog could not open.\n"
+                    "Retry the controls, or cancel to exit without a new save.",
+                    "thinkerNeca Victory", MB_RETRYCANCEL | MB_ICONWARNING) == IDRETRY)
+                    continue;
+                telemetry_record_ui_notice("autosim", "VICTORY", "dialog_failed_explicit_exit");
+                break;
+            }
+            if (choice == AUTOSIM_DIALOG_EXIT_NO_SAVE) {
+                telemetry_record_ui_notice("autosim", "VICTORY", "exit_without_save");
+                break;
+            }
+            if (!autosim_apply_dialog_options(dialog)) {
+                MessageBoxA(*phWnd,
+                    "Could not write campaign metadata. Check campaigns/ permissions.",
+                    "thinkerNeca Victory", MB_OK | MB_ICONWARNING);
+                continue;
+            }
+            if (choice == AUTOSIM_DIALOG_SAVE_CONTINUE
+            || choice == AUTOSIM_DIALOG_SAVE_EXIT) {
+                std::string saved_path, error;
+                if (!autosim_save_named(dialog.save_name, &saved_path, &error)) {
+                    MessageBoxA(*phWnd, error.c_str(),
+                        "thinkerNeca Victory Save", MB_OK | MB_ICONWARNING);
+                    continue;
+                }
+                if (!telemetry_record_named_save(saved_path.c_str())) {
+                    MessageBoxA(*phWnd,
+                        "Save succeeded, but campaign-link metadata could not be written.",
+                        "thinkerNeca Victory Save", MB_OK | MB_ICONWARNING);
+                }
+                telemetry_archive_named_save(saved_path.c_str());
+                telemetry_record_terminal_result(saved_path.c_str(),
+                    "saved_post_victory_checkpoint_reload_unverified");
+                telemetry_record_ui_notice("autosim", "VICTORY_SAVED",
+                    saved_path.c_str());
+                if (choice == AUTOSIM_DIALOG_SAVE_EXIT) break;
+            }
+            if (choice == AUTOSIM_DIALOG_CONTINUE
+            || choice == AUTOSIM_DIALOG_SAVE_CONTINUE
+            || choice == AUTOSIM_DIALOG_TAKE_CONTROL) {
+                // Explicit post-victory sandbox continuation: there is no
+                // remaining ordinary win condition to enforce. Preserve
+                // historical winner flags/monuments and telemetry, but clear
+                // terminal control bits so native AI turns may proceed.
+                const int victory_type = *GameVictoryType;
+                *GameState &= ~(STATE_GAME_DONE | STATE_FINAL_SCORE_DONE
+                    | STATE_VICTORY_CONQUER | STATE_VICTORY_ECONOMIC);
+                *GameVictoryType = VIC_NONE;
+                if (victory_type == VIC_TIME_LIMIT) {
+                    // A deliberate post-retirement sandbox should not
+                    // re-trigger the same clock victory every new year.
+                    autosim_post_victory_ignore_time_limit = true;
+                }
+                if (victory_type == VIC_ALIEN_SOLO
+                || victory_type == VIC_ALIEN_COOP
+                || victory_type == VIC_ALIEN_LOSS)
+                    *GameMoreRules &= ~MRULES_UNK_80;
+                telemetry_resume_after_victory();
+                if (choice == AUTOSIM_DIALOG_TAKE_CONTROL) {
+                    set_human(MapWin->cOwner, true);
+                    // Post-victory human play is not unattended AI runtime.
+                    telemetry_run_clock_set_active(false);
+                    telemetry_record_ui_notice("autosim", "VICTORY",
+                        "post_victory_take_human_control");
+                } else {
+                    autosim_post_victory_segment_pending = true;
+                    telemetry_record_ui_notice("autosim", "VICTORY",
+                        "post_victory_ai_continue_new_segment");
+                }
+                autosim_null_render_suppress(autosim_control_active());
+                autosim_monitor_progress("victory_continued", 0);
+                return 0; // resume caller's normal, unfinished turn phases
+            }
+        }
+        // Exit is a real choice, not an automatic consequence of winning.
+        *GameState |= STATE_FINAL_SCORE_DONE;
+        *ControlTurnB = 0;
+        *ControlTurnA = 1;
+        autosim_monitor_progress("victory_exit", 0);
+        return 1;
     }
     int victor_id = 0;
     for (int i = 1; i < MaxPlayerNum; i++) {
