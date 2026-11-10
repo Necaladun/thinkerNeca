@@ -644,6 +644,10 @@ as deliberate pauses also satisfy the user's desired inactivity alert.
 
 **Verification:** source changes plus updated structural test `tools/test_autosim_stage3.py` and Windows CI. Pending: real economic win -> modal, Save & Exit, Save & Continue, direct Continue AI (including turn/quota tracking), Take Control, retry failed SAV writes, actual reload of both victory-save types, second victory after continuation, time-limit continuation, observer death, Council/alien/transcendence mid-upkeep wins, and normal non-automation human game. `N`/R rendering commands must be exercised while live simulation is processing, not while the victory modal is blocking the turn driver.
 
+### TEL-LOG-02 old byte-backed numeric field recovery (10 November 2026)
+
+The initial TEL-LOG-02 writer inserted some native one-byte numbers directly into std::ostringstream, which serializes `char` as a character rather than decimal. An actual 19,932-line recorded `production.jsonl` used literal 0x01–0x07 for the `faction` key and 0x01–0x06 for `actual_morale`, making every line invalid JSON. The writer now explicitly casts native byte-backed TEL-LOG-02 numeric fields to `int` before streaming. The reporter can interpret only the known legacy raw-byte numeric keys, within the four TEL-LOG-02 streams and only after strict parsing fails; it warns, leaves source bytes unchanged, and still rejects unrelated corruption. For old campaigns, replace the installed Python reporter; for newly recorded valid logs, install the new DLL. Windows runtime checks are not replaced by CI.
+
 ### AUTO-LOG — timed phase telemetry, checkpoint archives and unified launch/report tools (9 November 2026)
 
 **Source build (draft PR #11; Windows runtime tests pending).** The existing Automation Launcher and TEL-001 session recorder were extended; no additional run executable, new configuration INI, non-launcher change, or general-purpose log database was created. Use `Run Automation.bat` as entrypoint.
