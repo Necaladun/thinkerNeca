@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """TEL-LOG-02 source-level and synthetic renderer checks, not Windows evidence."""
 from pathlib import Path
+import tempfile
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -86,4 +87,40 @@ events["production"] = [{
 html = render_tel02_streams(events)
 check("HTML escapes native text", "&lt;Victory&gt;" in html and "<Victory>" not in html)
 check("cross-stream event order", html.index("Scout") < html.index("&lt;Victory&gt;"))
+check("native byte-backed numeric fields cast before JSON output",
+    all(("<< (int)" + name) in tel for name in (
+        "b.faction_id", "veh.faction_id", "veh.morale",
+        "Vehs[slot].morale", "atk.faction_id", "def.faction_id")))
+from campaign_report import read_jsonl
+with tempfile.TemporaryDirectory() as tmp:
+    p = Path(tmp) / "production.jsonl"
+    raw = (b'{"schema":1,"event":"unit_completed","faction":\x01,'
+           b'"actual_morale":\x03,"unit_name":"Scout Patrol"}\n'
+           b'{"schema":1,"event":"queue_changed","faction":\x07}\n')
+    p.write_bytes(raw)
+    parsed = read_jsonl(p, legacy_tel02=True)
+    check("legacy raw numeric bytes recovered without editing source",
+        len(parsed) == 2 and parsed[0]["faction"] == 1
+        and parsed[0]["actual_morale"] == 3
+        and parsed[1]["faction"] == 7 and p.read_bytes() == raw)
+    try:
+        read_jsonl(p)
+    except ValueError:
+        check("non TEL-LOG-02 streams remain strict", True)
+    else:
+        raise AssertionError("ordinary stream unexpectedly repaired invalid bytes")
+    p.write_bytes(b'{"schema":1,"faction":\x01,"unexpected":"\x04"}\n')
+    try:
+        read_jsonl(p, legacy_tel02=True)
+    except ValueError:
+        check("unrelated corruption is still an error", True)
+    else:
+        raise AssertionError("unexpected corruption was suppressed")
+    p.write_bytes(b'{"schema":1,"faction":oops}\n')
+    try:
+        read_jsonl(p, legacy_tel02=True)
+    except ValueError:
+        check("malformed numeric value is not guessed", True)
+    else:
+        raise AssertionError("malformed numeric value was accepted")
 print("TEL-LOG-02 static/synthetic checks complete. Native Windows unverified.")

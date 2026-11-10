@@ -11,6 +11,7 @@ import argparse
 import csv
 import html
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -46,22 +47,62 @@ BASE_FIELDS = (
 )
 
 
-def read_jsonl(path):
-    """Read complete records; ignore an uncommitted, truncated final line."""
+# Older TEL-LOG-02 builds emitted numeric byte fields as raw one-byte
+# characters. Only these known integer keys in the four TEL-LOG-02 streams
+# may be recovered. Never modify the original JSONL.
+_LEGACY_TEL02_BYTE_FIELD = re.compile(
+    rb'("(?:faction|actual_morale|morale|damage_taken|home_base_slot'
+    rb'|attacker_faction|defender_faction_at_log)":)'
+    rb'([\x00-\x1f\x80-\xff])(?=[,}])'
+)
+
+
+def _recover_legacy_tel02_numeric_bytes(raw):
+    def numeric(match):
+        byte = match.group(2)[0]
+        # In signed byte fields (e.g. absent home_base_id), 0xff means -1.
+        value = byte if byte < 128 else byte - 256
+        return match.group(1) + str(value).encode("ascii")
+    return _LEGACY_TEL02_BYTE_FIELD.subn(numeric, raw)
+
+
+def read_jsonl(path, legacy_tel02=False):
+    """Read complete records; tolerate only a truncated tail or known byte bug."""
     records = []
+    recovered_rows = recovered_fields = 0
     with path.open("rb") as source:
         lines = source.readlines()
     for line_no, raw in enumerate(lines, 1):
         if not raw.strip():
             continue
         try:
-            records.append(json.loads(raw.decode("utf-8")))
+            row = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            if legacy_tel02:
+                fixed, fields = _recover_legacy_tel02_numeric_bytes(raw)
+                if fields:
+                    try:
+                        row = json.loads(fixed.decode("utf-8"))
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        pass  # Unrelated malformed content remains an error.
+                    else:
+                        records.append(row)
+                        recovered_rows += 1
+                        recovered_fields += fields
+                        continue
             if line_no == len(lines) and not raw.endswith(b"\n"):
                 print(f"Warning: ignoring truncated final line in {path}:{line_no}", file=sys.stderr)
                 continue
             raise ValueError(f"{path}:{line_no}: invalid JSON: {exc}") from exc
+        records.append(row)
+    if recovered_rows:
+        print(
+            f"Warning: recovered {recovered_rows} legacy TEL-LOG-02 row(s) "
+            f"({recovered_fields} numeric byte field(s)) from {path}; "
+            "original JSONL left unchanged.", file=sys.stderr,
+        )
     return records
+
 
 def load_session(session_dir):
     manifest = json.loads((session_dir / "manifest.json").read_text(encoding="utf-8"))
@@ -544,7 +585,7 @@ def generate(campaign_dir, session_id=None, output_dir=None):
     tel02_ids = set()
     for name, fields in TEL02_FIELDS.items():
         event_path = session_dir / (name + ".jsonl")
-        events = read_jsonl(event_path) if event_path.is_file() else []
+        events = read_jsonl(event_path, legacy_tel02=True) if event_path.is_file() else []
         for event in events:
             if event.get("schema") != SCHEMA:
                 raise ValueError(f"{name}: unsupported event schema")

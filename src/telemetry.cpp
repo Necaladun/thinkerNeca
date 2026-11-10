@@ -1531,6 +1531,7 @@ void telemetry_resume_after_victory() {
 
 // TEL-LOG-02. Emit only source-observed mutations; no RNG, AI recalculation,
 // native UI or game-state writes. All four streams share a session event order.
+// Cast native byte-backed numeric values: iostream inserts char as a glyph.
 static std::ostringstream tel02_row(const char* event) {
     std::ostringstream out;
     out << "{\"schema\":1,\"event\":" << json_string(event)
@@ -1567,14 +1568,14 @@ static void tel02_vehicle_event(const char* event, int slot, const char* cause,
     const int uid = veh.unit_id;
     std::ostringstream out = tel02_row(event);
     tel02_add_vehicle(out, slot, "vehicle");
-    out << ",\"faction\":" << veh.faction_id
+    out << ",\"faction\":" << (int)veh.faction_id
         << ",\"unit_id\":" << uid
         << ",\"unit_name\":" << json_string(
             uid >= 0 && uid < MaxProtoNum ? Units[uid].name : "")
         << ",\"x\":" << veh.x << ",\"y\":" << veh.y
-        << ",\"morale\":" << veh.morale
-        << ",\"damage_taken\":" << veh.damage_taken
-        << ",\"home_base_slot\":" << veh.home_base_id
+        << ",\"morale\":" << (int)veh.morale
+        << ",\"damage_taken\":" << (int)veh.damage_taken
+        << ",\"home_base_slot\":" << (int)veh.home_base_id
         << ",\"cause\":" << json_string(cause);
     if (old_owner >= 0) out << ",\"previous_faction\":" << old_owner;
     out << ",\"cause_status\":\"source_observed_or_unspecified\"}";
@@ -1616,7 +1617,7 @@ void telemetry_production_queue_changed(int base_id, int old_item, int new_item,
         || old_item == new_item) return;
     const BASE& b = Bases[base_id];
     std::ostringstream out = tel02_row("queue_changed");
-    out << ",\"faction\":" << b.faction_id
+    out << ",\"faction\":" << (int)b.faction_id
         << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
         << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
         << ",\"previous_item\":" << old_item << ",\"new_item\":" << new_item
@@ -1630,14 +1631,14 @@ void telemetry_production_unit(int base_id, int unit_id, int slot, int cost) {
         || slot < 0 || slot >= *VehCount) return;
     const BASE& b = Bases[base_id];
     std::ostringstream out = tel02_row("unit_completed");
-    out << ",\"faction\":" << b.faction_id
+    out << ",\"faction\":" << (int)b.faction_id
         << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
         << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
         << ",\"unit_id\":" << unit_id
         << ",\"unit_name\":" << json_string(Units[unit_id].name)
         << ",\"mineral_cost\":" << cost
         << ",\"minerals_after\":" << b.minerals_accumulated
-        << ",\"actual_morale\":" << Vehs[slot].morale;
+        << ",\"actual_morale\":" << (int)Vehs[slot].morale;
     tel02_add_vehicle(out, slot, "vehicle");
     out << ",\"source\":\"mod_base_production\"}";
     tel02_append(production_file, out.str());
@@ -1651,7 +1652,7 @@ void telemetry_production_facility(int base_id, int facility_id, int cost) {
     const char* event = facility_id >= SP_ID_First ? "project_completed"
         : satellite ? "satellite_completed" : "facility_completed";
     std::ostringstream out = tel02_row(event);
-    out << ",\"faction\":" << b.faction_id
+    out << ",\"faction\":" << (int)b.faction_id
         << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
         << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
         << ",\"facility_id\":" << facility_id
@@ -1708,11 +1709,11 @@ void telemetry_combat_exchange(int attacker, int defender, int original_defender
     std::ostringstream out = tel02_row("hp_exchange");
     out << ",\"mode\":" << json_string(mode)
         << ",\"combat_type_flags\":" << type_flags
-        << ",\"attacker_faction\":" << atk.faction_id
+        << ",\"attacker_faction\":" << (int)atk.faction_id
         << ",\"defender_faction\":" << original_defender_faction
-        << ",\"defender_faction_at_log\":" << def.faction_id
-        << ",\"attacker_unit_id\":" << atk.unit_id
-        << ",\"defender_unit_id\":" << def.unit_id
+        << ",\"defender_faction_at_log\":" << (int)def.faction_id
+        << ",\"attacker_unit_id\":" << (int)atk.unit_id
+        << ",\"defender_unit_id\":" << (int)def.unit_id
         << ",\"attacker_reactor\":" << atk.reactor_type()
         << ",\"defender_reactor\":" << def.reactor_type()
         << ",\"defender_x_at_hook\":" << def.x << ",\"defender_y_at_hook\":" << def.y
@@ -1738,7 +1739,7 @@ void telemetry_unit_upgraded(int slot, int old_unit_id, int new_unit_id, int cos
     const VEH& veh = Vehs[slot];
     std::ostringstream out = tel02_row("upgraded");
     tel02_add_vehicle(out, slot, "vehicle");
-    out << ",\"faction\":" << veh.faction_id
+    out << ",\"faction\":" << (int)veh.faction_id
         << ",\"old_unit_id\":" << old_unit_id
         << ",\"unit_id\":" << new_unit_id
         << ",\"unit_name\":" << json_string(Units[new_unit_id].name)
@@ -1752,7 +1753,7 @@ void telemetry_production_stockpile(int base_id, int credits_gained) {
         || credits_gained <= 0) return;
     const BASE& b = Bases[base_id];
     std::ostringstream out = tel02_row("stockpile_energy");
-    out << ",\"faction\":" << b.faction_id
+    out << ",\"faction\":" << (int)b.faction_id
         << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
         << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
         << ",\"credits_gained\":" << credits_gained
@@ -1766,7 +1767,7 @@ void telemetry_production_hurry(int base_id, int energy_before, int minerals_bef
     const int minerals_after = b.minerals_accumulated;
     if (energy_after == energy_before && minerals_after == minerals_before) return;
     std::ostringstream out = tel02_row("upkeep_hurry_observed");
-    out << ",\"faction\":" << b.faction_id
+    out << ",\"faction\":" << (int)b.faction_id
         << ",\"base_slot\":" << base_id << ",\"base_name\":" << json_string(b.name)
         << ",\"base_x\":" << b.x << ",\"base_y\":" << b.y
         << ",\"credits_before\":" << energy_before
