@@ -6,6 +6,14 @@
 
 *CI/static* means source/synthetic-file checks. *User-verified* means observed in-game for that specific case. *Pending* does not mean broken. Compilation does not establish runtime rendering or save correctness.
 
+## AUTO-LOG session picker separation (10 November 2026; PR #11 draft)
+
+**User-reported Windows defect:** in the integrated `Campaign tools & archive` WinForms view, multiple campaigns appeared combined into a single row, preventing selection and opening of individual recorded games. The stored campaign data and reporter JSONL were not identified as damaged. The source previously assigned the PowerShell `ConvertFrom-Json` pipeline output directly into a ListView data tag; the one-session smoke test could not catch array nesting.
+
+**Correction:** `Convert-CampaignSessionRows` / `Add-CampaignSessionNode` explicitly normalize possibly nested JSON arrays into individual session objects. The UI uses one `ListViewItem` with its own `.Tag` per session in a generic list; columns fit the viewport and the full campaign/session path is a tooltip. Filter and refresh preserve separate entries. The folder button now opens `campaign_dir/sessions/session-NNN`; the ZIP button is labelled as a full campaign export.
+
+**Windows CI:** the PowerShell `-ReportSelfTest` now exercises the actual Python `--scan-json` bridge with two campaigns and three sessions, preserving three unique campaign/session paths and checking empty arrays. `-GuiSelfTest` constructs the real WinForms list and asserts three separate item tags, filter-to-one and restored rows. Build/structural tests remain separate. **Required installed check:** with real multi-campaign recordings, refresh, select different sessions, double-click/open each report, use the session folder button, filter and clear, and verify ZIP still contains every session. No claim of installed Windows correctness from synthetic GUI CI alone.
+
 ## TEL-LOG-02: production/unit/combat/research (9 November 2026, draft PR #11)
 
 **Source-only; Windows acceptance pending:** New telemetry streams `production.jsonl`, `units.jsonl`, `combat.jsonl` and `research.jsonl` record actual C++ source mutation events independent of UI suppression: `mod_base_change` explicit queue changes after retool, `mod_base_production` completed builds/Stockpile Energy after game state mutation, `mod_base_upkeep` observed `mod_base_hurry` deltas, `veh_init` placement and `veh_kill` pre-compaction removal, `veh_upgrade` paid prototype changes, Marine Detachment owner changes, `mod_capture_base` verified surviving-base ownership change, `mod_battle_fight_2` actual HP exchanges (never option=0 odds queries), and `tech_achieved` real tech owner-bit gains (excluding maps, commlinks and prototypes). Research target observation is at completed-cycle granularity, not AI choice reasoning. Common event IDs are session-global. HTML/CSV Analyzer supports legacy sessions with absent streams.
