@@ -459,6 +459,33 @@ function Invoke-CampaignReporter([string[]]$arguments) {
     }
 }
 
+# Convert the JSON ARRAY to individual session objects, irrespective of
+# ConvertFrom-Json's PowerShell 5.1 single/array pipeline behaviour. A nested
+# array must never become one ListViewItem with joined campaign names.
+function Add-CampaignSessionNode($value, [System.Collections.Generic.List[object]]$rows) {
+    if ($null -eq $value) { return }
+    if ($value -is [System.Array]) {
+        foreach ($item in $value) { Add-CampaignSessionNode $item $rows }
+        return
+    }
+    if ($null -eq $value.PSObject.Properties['campaign_dir'] -or
+        $null -eq $value.PSObject.Properties['session_id']) {
+        throw 'Malformed campaign scan row: missing campaign_dir or session_id.'
+    }
+    [void]$rows.Add($value)
+}
+
+function Convert-CampaignSessionRows([string]$json) {
+    if ([string]::IsNullOrWhiteSpace($json)) {
+        throw 'Campaign scanner returned no JSON.'
+    }
+    $decoded = ConvertFrom-Json -InputObject $json
+    $rows = New-Object 'System.Collections.Generic.List[object]'
+    Add-CampaignSessionNode $decoded $rows
+    # Preserve array identity even when one or zero rows are present.
+    return ,($rows.ToArray())
+}
+
 if ($ReportSelfTest) {
     # Exercise the actual CLI bridge with one synthetic, zero-turn session.
     # This test does not need thinker.exe, a game directory or Tkinter.
@@ -473,12 +500,38 @@ if ($ReportSelfTest) {
             '{"schema":1,"state":"closed","last_committed_turn":-1,"updated_utc":"20261109T000000Z"}')
         [System.IO.File]::WriteAllText((Join-Path $session 'turns.jsonl'), '')
         $json = Invoke-CampaignReporter -arguments @('--scan-json', $tmp)
-        $rows = @($json | ConvertFrom-Json)
+        $rows = Convert-CampaignSessionRows $json
         if ($rows.Count -ne 1 -or $rows[0].session_id -ne 'session-001' -or
             $rows[0].status -ne 'Closed') {
             throw 'Headless campaign/session scan contract failed.'
         }
-        Write-Host 'AUTO-LAUNCH integrated campaign report bridge passed'
+        # The previous one-session test could not detect a JSON array being
+        # displayed as a single row. Exercise multiple distinct games and
+        # multiple sessions of one campaign through the actual scan bridge.
+        $other = Join-Path $tmp 'campaign-second\sessions\session-001'
+        $continuation = Join-Path $tmp 'campaign-test\sessions\session-002'
+        foreach ($directory in @($other, $continuation)) {
+            [void][System.IO.Directory]::CreateDirectory($directory)
+            [System.IO.File]::WriteAllText((Join-Path $directory 'manifest.json'),
+                '{"schema":1,"started_utc":"20261109T000000Z","source_save":null}')
+            [System.IO.File]::WriteAllText((Join-Path $directory 'status.json'),
+                '{"schema":1,"state":"closed","last_committed_turn":-1,"updated_utc":"20261109T000000Z"}')
+            [System.IO.File]::WriteAllText((Join-Path $directory 'turns.jsonl'), '')
+        }
+        $json = Invoke-CampaignReporter -arguments @('--scan-json', $tmp)
+        $rows = Convert-CampaignSessionRows $json
+        if ($rows.Count -ne 3) {
+            throw ('Multiple campaign sessions were collapsed: got ' + $rows.Count)
+        }
+        $identities = @($rows | ForEach-Object {
+            [string]$_.campaign_dir + '\' + [string]$_.session_id
+        } | Sort-Object -Unique)
+        if ($identities.Count -ne 3) {
+            throw 'Campaign/session identities were lost during JSON conversion.'
+        }
+        $emptyRows = Convert-CampaignSessionRows '[]'
+        if ($emptyRows.Count -ne 0) { throw 'Empty campaign list must remain empty.' }
+        Write-Host 'AUTO-LAUNCH multi-campaign/session report bridge passed'
     } finally {
         if ([System.IO.Directory]::Exists($tmp)) {
             [System.IO.Directory]::Delete($tmp, $true)
@@ -813,16 +866,20 @@ try {
     $sessionList.MultiSelect = $false
     $sessionList.HideSelection = $false
     $sessionList.GridLines = $true
+    $sessionList.ShowItemToolTips = $true
     $sessionList.SetBounds(28,129,874,266)
-    [void]$sessionList.Columns.Add('Campaign',200)
-    [void]$sessionList.Columns.Add('Session',90)
-    [void]$sessionList.Columns.Add('Faction / observer',147)
-    [void]$sessionList.Columns.Add('Years',110)
-    [void]$sessionList.Columns.Add('Turns',64)
-    [void]$sessionList.Columns.Add('Bases',55)
-    [void]$sessionList.Columns.Add('Status',93)
-    [void]$sessionList.Columns.Add('Updated',138)
-    $sessionList.Tag = [object[]]@()
+    # Keep columns within viewport; each session is one ListViewItem/row.
+    [void]$sessionList.Columns.Add('Campaign',190)
+    [void]$sessionList.Columns.Add('Session',80)
+    [void]$sessionList.Columns.Add('Faction / observer',140)
+    [void]$sessionList.Columns.Add('Years',108)
+    [void]$sessionList.Columns.Add('Turns',55)
+    [void]$sessionList.Columns.Add('Bases',54)
+    [void]$sessionList.Columns.Add('Status',85)
+    [void]$sessionList.Columns.Add('Updated',130)
+    # A generic List (not nested PowerShell arrays) prevents the JSON results
+    # being grouped into one GUI item by implicit pipeline enumeration.
+    $sessionList.Tag = (New-Object 'System.Collections.Generic.List[object]')
     $reportTab.Controls.Add($sessionList)
 
     [void](Add-Label $reportTab 'Selected recording' 28 405 870 24)
@@ -842,11 +899,11 @@ try {
     $openExisting.SetBounds(248,548,199,42)
     $reportTab.Controls.Add($openExisting)
     $openCampaign = New-Object System.Windows.Forms.Button
-    $openCampaign.Text = 'Open campaign folder'
+    $openCampaign.Text = 'Open selected session folder'
     $openCampaign.SetBounds(459,548,202,42)
     $reportTab.Controls.Add($openCampaign)
     $zipCampaign = New-Object System.Windows.Forms.Button
-    $zipCampaign.Text = 'Export ZIP'
+    $zipCampaign.Text = 'Export campaign ZIP'
     $zipCampaign.SetBounds(673,548,229,42)
     $reportTab.Controls.Add($zipCampaign)
 
@@ -890,7 +947,7 @@ try {
         $sessionList.BeginUpdate()
         try {
             $sessionList.Items.Clear()
-            foreach ($row in @($sessionList.Tag)) {
+            foreach ($row in $sessionList.Tag) {
                 if ($null -eq $row) { continue }
                 $haystack = @($row.folder, $row.campaign_name, $row.player,
                     $row.years, $row.status, $row.started, $row.updated,
@@ -902,6 +959,8 @@ try {
                     [void]$item.SubItems.Add([string]$value)
                 }
                 $item.Tag = $row
+                $item.ToolTipText = ([string]$row.campaign_name + ' / ' +
+                    [string]$row.session_id + ' / ' + [string]$row.campaign_dir)
                 [void]$sessionList.Items.Add($item)
                 if ($priorPath -eq ([string]$row.campaign_dir + '\' + [string]$row.session_id)) {
                     $item.Selected = $true
@@ -919,7 +978,9 @@ try {
         try {
             $root = [System.IO.Path]::GetFullPath($rootBox.Text)
             $json = Invoke-CampaignReporter -arguments @('--scan-json', $root)
-            $sessionList.Tag = [object[]]@($json | ConvertFrom-Json)
+            $rows = Convert-CampaignSessionRows $json
+            $sessionList.Tag.Clear()
+            foreach ($row in $rows) { [void]$sessionList.Tag.Add($row) }
             & $displayCampaignRows
             $reportStatus.Text = "$(@($sessionList.Tag).Count) session(s) found. Select, filter, generate or export."
         } catch {
@@ -958,7 +1019,8 @@ try {
             } catch {
                 $scanFailure += '; fallback directory scan also failed: ' + $_.Exception.Message
             }
-            $sessionList.Tag = [object[]]$fallbackRows.ToArray()
+            $sessionList.Tag.Clear()
+            foreach ($row in $fallbackRows) { [void]$sessionList.Tag.Add($row) }
             & $displayCampaignRows
             $reportStatus.Text = 'Report scan unavailable: ' + $scanFailure +
                 '. Folder and ZIP actions remain available.'
@@ -1019,8 +1081,15 @@ try {
     })
     $openCampaign.Add_Click({
         $row = & $getSelectedRow
-        if ($row -and [System.IO.Directory]::Exists([string]$row.campaign_dir)) {
-            Invoke-Item -LiteralPath ([string]$row.campaign_dir)
+        if (-not $row) { return }
+        $sessionFolder = Join-Path (Join-Path ([string]$row.campaign_dir) 'sessions') ([string]$row.session_id)
+        if ([System.IO.Directory]::Exists($sessionFolder)) {
+            Invoke-Item -LiteralPath $sessionFolder
+        } else {
+            [void][System.Windows.Forms.MessageBox]::Show(
+                'Selected session folder no longer exists. Refresh the list.',
+                'Campaign session', [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning)
         }
     })
     $zipCampaign.Add_Click({
