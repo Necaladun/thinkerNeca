@@ -89,7 +89,7 @@ check("single launcher owns session picker, report actions and full ZIP",
       and "Invoke-CampaignReporter -arguments @([string]$row.campaign_dir," in launcher
       and "Generate + open report" in launcher
       and "Open existing report" in launcher
-      and "Open campaign folder" in launcher
+      and "Open selected session folder" in launcher
       and "Choose folder..." in launcher
       and "ZipFile]::CreateFromDirectory" in launcher
       and "Pure PowerShell fallback:" in launcher
@@ -101,6 +101,17 @@ check("single launcher owns session picker, report actions and full ZIP",
       and "build/ci/tools/Campaign Analyzer.pyw" not in workflow
       and 'parser.add_argument("--scan-json"' in report
       and '"campaign_dir": str(row["campaign_dir"])' in report)
+check("GUI session picker binds one campaign/session per clickable row",
+      "Convert-CampaignSessionRows" in launcher
+      and "Add-CampaignSessionNode" in launcher
+      and "foreach ($row in $sessionList.Tag)" in launcher
+      and "$sessionList.Tag = (New-Object 'System.Collections.Generic.List[object]')" in launcher
+      and "$item.Tag = $row" in launcher
+      and "session-002" in launcher
+      and "Campaign picker collapsed independent sessions" in launcher
+      and "Campaign picker multi-row filtering failed." in launcher
+      and "Open selected session folder" in launcher
+      and "$sessionFolder = Join-Path" in launcher)
 check("offline CSV/HTML handles independent optional timing/save streams",
       "render_automation_diagnostics" in report
       and 'timings.jsonl' in report and 'checkpoints.jsonl' in report
